@@ -23,6 +23,7 @@ async function fetchExerciseLibrary() {
       apikey: key,
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
+      Range: '0-99999',
     },
   });
   if (!res.ok) throw new Error(`Supabase error: ${res.status} ${await res.text()}`);
