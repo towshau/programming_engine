@@ -84,6 +84,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err.message || err);
+  console.error('Sync failed:', err.message || err);
+  if (err.response?.data) console.error('API response:', JSON.stringify(err.response.data));
   process.exit(1);
 });
