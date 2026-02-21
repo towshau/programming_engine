@@ -14,20 +14,34 @@ function getEnv(name) {
   return v;
 }
 
+const PAGE_SIZE = 1000;
+
 async function fetchExerciseLibrary() {
   const url = getEnv('SUPABASE_URL');
   const key = getEnv('SUPABASE_ANON_KEY');
-  const apiUrl = `${url.replace(/\/$/, '')}/rest/v1/exercise_library?select=exercise_id,exercise_name,tags&order=exercise_id`;
-  const res = await fetch(apiUrl, {
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      Range: '0-99999',
-    },
-  });
-  if (!res.ok) throw new Error(`Supabase error: ${res.status} ${await res.text()}`);
-  return res.json();
+  const baseUrl = url.replace(/\/$/, '');
+  const apiUrl = `${baseUrl}/rest/v1/exercise_library?select=exercise_id,exercise_name,tags&order=exercise_id`;
+  const all = [];
+  let start = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const end = start + PAGE_SIZE - 1;
+    const res = await fetch(apiUrl, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Range-Unit': 'items',
+        Range: `${start}-${end}`,
+      },
+    });
+    if (!res.ok) throw new Error(`Supabase error: ${res.status} ${await res.text()}`);
+    const page = await res.json();
+    all.push(...page);
+    hasMore = page.length === PAGE_SIZE;
+    start += PAGE_SIZE;
+  }
+  return all;
 }
 
 async function writeToSheet(rows) {
