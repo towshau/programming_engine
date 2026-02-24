@@ -21,6 +21,8 @@ Requires three environment variables (see `exercise-library-sheet-sync/.env.exam
 
 Optional: `GOOGLE_SHEET_ID` (defaults to the hardcoded sheet ID in the script).
 
+**Gotcha:** `GOOGLE_SERVICE_ACCOUNT_JSON` must be the full JSON object string (starts with `{`, ~2300 chars). If the secret is stored as a hash/reference rather than the raw JSON, the script will fail with "GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON". The Supabase fetch will still succeed independently.
+
 ### Development notes
 
 - Node.js 20+ required (CI uses Node 20; v22 works fine).
