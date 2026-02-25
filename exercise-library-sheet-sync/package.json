@@ -1,0 +1,1 @@
+{"name":"programming_engine","version":"1.0.0","description":"Exercise library sync to Google Sheet","type":"module","scripts":{"sync-exercise-library":"node scripts/sync-exercise-library-to-sheet.mjs"},"dependencies":{"googleapis":"^144.0.0"}}
