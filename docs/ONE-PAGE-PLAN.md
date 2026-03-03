@@ -63,8 +63,12 @@
 - **Engine scripts (tools/):**
   - **normalize_one_member.py** — Ingest: member_tbresults + exercise_library → normalised sessions (by assigned_date), series labels (A1, A2, B1, …), write to programming_past_programs_staging. Optional **phase detection**: pass `--scheme GPP|Strength|Hypertrophy` to detect current rep-range phase and next phase from A-series median reps; result in payload.phase_detection. See docs/data-model.md § Phase detection.
   - **detect_phase.py** — Standalone phase detection: given member_id and scheme name, normalises and returns current_rep_range, next_rep_range, confidence, direction. Used by normalize when --scheme is set; can be run alone: `python tools/detect_phase.py <member_id> Strength`.
+  - **load_rules.py** — Load engine config: `programming_rules` (15 rules), `programming_progression_schemes` (by scheme name), `programming_exercise_exclusions` (by member). Returns rules dict + scheme steps + exclusion list. Standalone: `python tools/load_rules.py --member-id <uuid> --scheme Strength`.
+  - **generate_program.py** — Deterministic generator: past program + rules + phase detection + library → canonical program JSON. Carries forward exercises with updated rep ranges (A/B compounds at scheme range, C/D accessories at +2). Applies exclusions, avoids banned exercises, enforces C-series self-sufficiency. Standalone: `python tools/generate_program.py <member_id> --scheme Strength`.
+  - **write_programs.py** — Persist generated program JSON to `programming_generated`. Input: payload from file or stdin; required: --run-id, --member-id, --sessions-per-week; optional: phase_number, scheme_name, rep_range, changes_summary, rules_applied. See docs/data-model.md (canonical payload shape).
+  - **run_pipeline.py** — End-to-end pipeline runner: Ingest → Phase detect → Load config → Generate → Write. Single command for one member: `python tools/run_pipeline.py <member_id> --scheme Strength --sessions-per-week 3`. Options: `--dry-run`, `--skip-staging`, `--output FILE`.
   - **apply_auto_exclusions.py** — Feedback → programming_exercise_exclusions (e.g. 3+ negative feedbacks → exclude exercise for member).
-- **Workflows:** Markdown SOPs in workflows/ (ingest -> apply rules -> generate -> write).
+- **Workflows:** Chronological order: Ingest → Load config → Generate → Write. See **workflows/README.md**. Cue for *when* to generate is TBD (manual, cron, Retool).
 
 ---
 

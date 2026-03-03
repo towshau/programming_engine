@@ -51,10 +51,39 @@ Generated program per member per run (output of engine). Writer in `tools/write_
 | `rep_range` | text (nullable) | Rep range this program uses (e.g. 10-12) |
 | `changes_summary` | text (nullable) | What changed from last phase (human-readable) |
 | `rules_applied` | jsonb (nullable) | Array of rule_keys applied during generation |
-| `payload` | jsonb | Canonical program JSON (shape TBD in Phase 2) |
+| `payload` | jsonb | Canonical program JSON; see **Canonical payload shape** below. |
 | `created_at`, `updated_at` | timestamptz | Audit |
 
 Unique `(run_id, member_id)`. Indexes: `run_id`, `member_id`, `assigned_to` (partial), `created_at`. Migrations: `20250225100005` (create), `20250225100009` (add coach/self-improving columns).
+
+**Canonical payload shape** (same structure as staging so generators and writers share one contract):
+
+- Top-level: `{ "sessions": [ ... ] }`.
+- Each session: `day` (date or day index), optional `assigned_date`, and `exercises`: array of exercise objects.
+- Each exercise: `exercise_name`, optional `exercise_id`, `series_label` (e.g. A1, B1), `sets`: array of `{ "set_number", "reps", "result" }`. Optional: `tags`, `series_assignment`.
+- Rep ranges and prescriptions can sit in exercise-level notes or in the top-level metadata; `rep_range` column on the table holds the scheme rep range (e.g. 8-10) for the whole program.
+
+Example minimal payload:
+
+```json
+{
+  "sessions": [
+    {
+      "day": 1,
+      "exercises": [
+        {
+          "exercise_name": "Squat - Back - Barbell - High Bar",
+          "exercise_id": "...",
+          "series_label": "A1",
+          "sets": [{"set_number": 1, "reps": "8-10"}, {"set_number": 2, "reps": "8-10"}]
+        }
+      ]
+    }
+  ]
+}
+```
+
+Writer: `tools/write_programs.py` — reads payload from file or stdin and inserts into `programming_generated` with run_id, member_id, sessions_per_week, and optional phase/scheme/rep_range/changes_summary/rules_applied.
 
 ### programming_feedback
 

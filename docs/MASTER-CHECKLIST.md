@@ -20,19 +20,20 @@ Apply migrations in `supabase/migrations/` in order. All programming-engine tabl
 
 ## 2. Ingest and normalization
 
-- [ ] **Normalized past program** — Tool/script that reads `member_tbresults` + `exercise_library` and writes normalized "past program" per member to `programming_past_programs_staging` (and/or JSON). Validate accuracy before wiring rules/LLM.
+- [x] **Normalized past program** — Tool/script that reads `member_tbresults` + `exercise_library` and writes normalized "past program" per member to `programming_past_programs_staging` (and/or JSON). Validate accuracy before wiring rules/LLM. **Done:** `tools/normalize_one_member.py` (sessions by assigned_date, series labels A1/B1/C1…, optional phase detection via `--scheme`). `tools/detect_phase.py` for standalone phase detection.
 
 ---
 
 ## 3. Engine config and tools (WAT)
 
-- [ ] **WAT layout** — `workflows/`, `tools/`, `requirements.txt` at repo root.
-- [ ] **Tool: fetch** — Fetch from Supabase (members, member_tbresults, exercise_library).
-- [ ] **Tool: normalize** — Normalize raw data to past-program-per-member (see above).
-- [ ] **Tool: load_rules** — Load from `programming_rules` (and optionally progression/exclusions).
-- [ ] **Tool: write** — Persist generated programs to Supabase (after canonical JSON and output table exist).
-- [ ] **Tool: generate (LLM)** — e.g. `generate_program_llm.py`; input past program + rules + exercise_library → canonical program JSON per member.
-- [ ] **Workflows** — Markdown SOPs in `workflows/` (ingest → apply rules → generate → write); edge cases and tool order.
+- [x] **WAT layout** — `workflows/`, `tools/`, `requirements.txt` at repo root. **Done:** `tools/` and `requirements.txt` exist; `workflows/` folder not yet created (Markdown SOPs).
+- [x] **Tool: fetch** — Fetch from Supabase (members, member_tbresults, exercise_library). **Done:** inside `normalize_one_member.py` and `detect_phase.py` (fetch_results_for_member, fetch_exercise_library); schemes via detect_phase.fetch_schemes.
+- [x] **Tool: normalize** — Normalize raw data to past-program-per-member (see above). **Done:** `tools/normalize_one_member.py`; series assignment + optional phase detection.
+- [x] **Tool: load_rules** — Load from `programming_rules` (and optionally progression/exclusions). **Done:** `tools/load_rules.py`; loads 15 rules, scheme steps, member exclusions. Standalone or imported.
+- [x] **Tool: generate** — Deterministic generator: past program + rules + phase detection + library → canonical JSON. **Done:** `tools/generate_program.py`; carries forward exercises with updated rep ranges; applies exclusions, C-series rules, avoid list. Standalone: `python tools/generate_program.py <member_id> --scheme Strength`.
+- [x] **Tool: write** — Persist generated programs to Supabase. **Done:** `tools/write_programs.py`; payload from file or stdin → `programming_generated`. Canonical payload shape in data-model.md.
+- [x] **Pipeline runner** — End-to-end: Ingest → Phase detect → Load config → Generate → Write. **Done:** `tools/run_pipeline.py <member_id> --scheme Strength --sessions-per-week 3`. Options: --dry-run, --skip-staging, --output.
+- [x] **Workflows** — Markdown SOPs in `workflows/` (ingest → load → generate → write). **Done:** `workflows/README.md` with all tools, options, and summary table. Cue for generate TBD (manual, cron, Retool).
 
 ---
 
@@ -48,11 +49,11 @@ Apply migrations in `supabase/migrations/` in order. All programming-engine tabl
 
 ## 5. Documentation and decisions
 
-- [ ] **docs/data-model.md** — Schema for all programming_ tables; existing tables (member_tbresults, exercise_library, member with current_status) documented.
-- [ ] **docs/engine-config.md** — Rules separation, progression_schemes, exercise_exclusions (done).
-- [ ] **docs/build-plan.md** — Build order, deleted-exercises flow, progression branching (done).
-- [ ] **Canonical program JSON shape** — Defined and documented (Phase 2).
-- [ ] **Cursor rule / skill** — Programming engine purpose, rules location, canonical shape, output (Supabase); optional skill for running/extending engine.
+- [x] **docs/data-model.md** — Schema for all programming_ tables; existing tables (member_tbresults, exercise_library, member with current_status) documented. Phase detection § added.
+- [x] **docs/engine-config.md** — Rules separation, progression_schemes, exercise_exclusions (done).
+- [x] **docs/build-plan.md** — Build order, deleted-exercises flow, progression branching (done).
+- [x] **Canonical program JSON shape** — Same as staging; documented in data-model.md § programming_generated (Canonical payload shape). Generator and writer both produce/consume `{ "sessions": [ { "day", "exercises": [ { "exercise_name", "series_label", "sets" } ] } ] }`.
+- [x] **Cursor rule / skill** — Programming engine purpose, rules location, canonical shape, output (Supabase); optional skill for running/extending engine. **Done:** `.cursor/rules/integrations-env.mdc`, `.cursor/rules/one-page-plan-sync.mdc`; ONE-PAGE-PLAN lists tools and phase detection.
 - [x] **Tool: add_technical_debt.py** — Script to append new technical-debt items to [TECHNICAL-REVIEW.md](TECHNICAL-REVIEW.md). Run from repo root: `python tools/add_technical_debt.py "Title" "Debt." "Solution."` or without args for prompts.
 
 ---
