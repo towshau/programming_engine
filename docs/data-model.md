@@ -17,6 +17,8 @@ This doc describes the data the programming engine depends on: existing Supabase
 
 ### programming_past_programs_staging
 
+**Where normalized workouts go:** The normalization tool (`tools/normalize_one_member.py`) writes one row per member per run here. `payload` is jsonb: `sessions` (each with `workout_id`, `assigned_date`, `completed_date`, `exercises`; each exercise has `exercise_name`, `exercise_id`, `sets`).
+
 Normalised past program per member per run (output of normalization tool). Upsert by `(run_id, member_id)` so each run overwrites that run’s data.
 
 | Column | Type | Purpose |

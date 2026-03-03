@@ -79,6 +79,34 @@ sources (only_exercise_library); composition (max_exercises_per_series, series_c
 
 ---
 
+## How to make it self-improving (practical path)
+
+Two separate layers:
+
+| Layer | What it is | How it helps |
+|-------|------------|--------------|
+| **Cursor (skills + subagents)** | You + AI in Cursor get better at *working on* the engine | Skills = when to trigger, schema, pipeline, rules. Subagents = run evals, analyze feedback, explore code. The engine doesn’t run inside Cursor. |
+| **Engine’s own learning** | Code that runs without you (cron, Edge Function, or pipeline step) | Feedback → auto-exclusion; rule-hit × feedback → suggest rule changes; versioned prompts. The engine gets better from data. |
+
+**Order that works:**
+
+1. **Implement the feedback loop in code first**  
+   - Job: read `programming_feedback`, count negative feedback per `(member_id, exercise_id)` (e.g. `feedback_type` in `exercise_swap`, `pairing_issue`, `too_hard`, `too_easy`, `other`). If count ≥ 3 and no active row in `programming_exercise_exclusions`, insert one (reason e.g. `auto_exclusion_from_feedback`). Run this after each run or on a schedule.  
+   - Optional: aggregate `rules_applied` × feedback (e.g. “rule X often present when too_hard”) → report or table for human review.  
+
+2. **Add a Cursor skill for this repo**  
+   - Skill describes: when to use it (programming engine, rules, schema, pipeline, feedback), where tables and docs live, how generation + exclusions + rules work. Then when you say “add a rule” or “wire auto-exclusion,” the AI follows the schema and patterns.  
+
+3. **Use subagents for one-off improvement work**  
+   - Examples: “Run these members through the generator and compare to last run”; “Analyze `programming_feedback` and list top exercise_id by negative count”; “Find all places that read `programming_rules`.”  
+
+4. **Turn it into a “growing” engine**  
+   - Feedback → exclusions and (optionally) rule–feedback reports are the core. “Growing” = (a) you add rules over time (governed by the skill + docs), (b) auto-exclusion and reports run automatically (cron or post-run step), (c) later: versioned prompts in `workflows/` or `programming_rules`, and/or a small “rule analyst” that suggests rule edits from correlations. You do **not** need the engine to run inside Cursor for it to be self-improving; you need automation that consumes feedback and updates config (exclusions, and optionally rule suggestions).  
+
+**Summary:** Skills + subagents make *you* (and Cursor) better at improving the engine. The engine becomes self-learning when **scheduled or pipeline-triggered code** reads feedback and updates exclusions (and optionally rule suggestions). Start with (1), then (2) and (3); (4) is the same loop running without you in the middle.
+
+---
+
 ## Open questions
 
 - Sessions per week: member-level config?

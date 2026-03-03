@@ -16,7 +16,7 @@ Track improvements identified and their implementation status. Cross off when do
 ### Easy to add and give feedback
 
 - [x] **5. Add programming_feedback table** — Coaches flag programs or leave feedback (exercise_swap, pairing_issue, too_hard, too_easy, positive). Retool form next to program view.
-- [ ] **6. Auto-exclusion from repeated feedback** — If exercise gets 3+ negative feedbacks for a member, auto-create row in programming_exercise_exclusions.
+- [ ] **6. Auto-exclusion from repeated feedback** — If exercise gets 3+ negative feedbacks for a member, auto-create row in programming_exercise_exclusions. **Tool:** `python tools/apply_auto_exclusions.py` (implemented; run after feedback is in, or on a schedule). See ONE-PAGE-PLAN § "How to make it self-improving".
 
 ### Self-improving engine
 

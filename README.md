@@ -9,7 +9,7 @@ Repo for gym programming tooling: (1) syncing the exercise library to a Google S
 | Part | Location | Description |
 |------|----------|--------------|
 | **Exercise library → Sheet sync** | `exercise-library-sheet-sync/` | Node app. Syncs Supabase `exercise_library` to a Google Sheet. Run: `cd exercise-library-sheet-sync && npm install && npm run sync-exercise-library`. CI: `.github/workflows/sync-exercise-library-to-sheet.yml`. |
-| **Programming engine (planned)** | `docs/`, future `workflows/`, `tools/` | WAT-based pipeline: ingest past programs from `member_tbresults`, apply rules from Supabase `programming_rules`, generate programs via LLM, write to Supabase. Not yet implemented. |
+| **Programming engine (in progress)** | `docs/`, `tools/` | Pipeline: normalize past programs → staging, apply auto-exclusions from feedback. Run locally: `python tools/normalize_one_member.py`, `python tools/apply_auto_exclusions.py`. **Weekly CI:** `.github/workflows/programming-engine-weekly.yml` (Monday 9am UTC; needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in repo secrets). |
 
 ---
 
@@ -30,7 +30,7 @@ To continue work on this repo in a new Cursor project:
    Phase 1: document schema in `docs/data-model.md` (member_tbresults, member table with `current_status`, program tables). Phase 2: canonical program JSON shape. Then add `workflows/`, `tools/`, and Python tools.
 
 5. **Env**  
-   For sync: copy `exercise-library-sheet-sync/.env.example` to `.env` and set Supabase and Google credentials. For the engine (later): `.env` at repo root for Python tools.
+   For sync: copy `exercise-library-sheet-sync/.env.example` to `.env` and set Supabase and Google credentials. For the engine: `.env` at repo root with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. For the **weekly GitHub Action**, add the same as repo secrets: Settings → Secrets and variables → Actions → `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 
 ---
 

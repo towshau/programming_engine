@@ -1,0 +1,11 @@
+---
+description: Where credentials live and how integrations (Supabase) are configured. Never commit secrets.
+alwaysApply: true
+---
+
+# Integrations and environment
+
+- **Credentials:** All secrets (Supabase, etc.) live in **`.env` at the repo root**. There is no `.env` in the repo (it is gitignored); the user creates it locally.
+- **Template:** Copy from **`.env.example`** at repo root (engine) or from **`exercise-library-sheet-sync/.env.example`** (sync app). Required for engine tools: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_ANON_KEY`).
+- **Never** commit `.env` or put real API keys, service role keys, or tokens in rules, docs, or code. When adding a new tool that needs credentials, document the variable names in `.env.example` only.
+- **Supabase:** Programming engine tools (e.g. `tools/apply_auto_exclusions.py`) and the sync app read from the environment; point users to the appropriate `.env.example` when they ask about setup.
