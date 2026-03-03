@@ -41,10 +41,34 @@ Generated program per member per run (output of engine). Writer in `tools/write_
 | `member_id` | uuid | Member |
 | `assigned_to` | uuid (nullable) | Optional coach for filter / export for Coach X |
 | `sessions_per_week` | int | 2, 3, or 4 (program days) |
+| `duration_weeks` | int (default 6) | Program duration: first = 4 weeks, standard = 6 |
+| `phase_number` | int (nullable) | Phase within scheme cycle (e.g. 1–4 for GPP) |
+| `scheme_name` | text (nullable) | Denormalised: GPP, Hypertrophy, Strength |
+| `rep_range` | text (nullable) | Rep range this program uses (e.g. 10-12) |
+| `changes_summary` | text (nullable) | What changed from last phase (human-readable) |
+| `rules_applied` | jsonb (nullable) | Array of rule_keys applied during generation |
 | `payload` | jsonb | Canonical program JSON (shape TBD in Phase 2) |
 | `created_at`, `updated_at` | timestamptz | Audit |
 
-Unique `(run_id, member_id)`. Indexes: `run_id`, `member_id`, `assigned_to` (partial), `created_at`. Migration: `20250225100005_create_programming_generated.sql`.
+Unique `(run_id, member_id)`. Indexes: `run_id`, `member_id`, `assigned_to` (partial), `created_at`. Migrations: `20250225100005` (create), `20250225100009` (add coach/self-improving columns).
+
+### programming_feedback
+
+Coach feedback on generated programs. Retool form inserts here; feeds into exclusions and rule tuning. See [IMPROVEMENTS.md](IMPROVEMENTS.md).
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `id` | uuid | PK |
+| `run_id` | uuid (nullable) | Which generation run |
+| `member_id` | uuid | Which member's program |
+| `coach_id` | uuid (nullable) | Who gave feedback |
+| `feedback_type` | text | exercise_swap, pairing_issue, too_hard, too_easy, positive, other |
+| `details` | text (nullable) | Free text from coach |
+| `exercise_id` | uuid (nullable) | If about a specific exercise |
+| `resolved` | boolean (default false) | Has it been acted on |
+| `created_at`, `updated_at` | timestamptz | Audit |
+
+Indexes: `member_id`, `run_id` (partial), `resolved` (partial, unresolved), `exercise_id` (partial). Migration: `20250225100008`.
 
 ---
 

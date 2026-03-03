@@ -8,12 +8,13 @@ Single checklist of tables, deliverables, and build items we've discussed. Cross
 
 Apply migrations in `supabase/migrations/` in order. All programming-engine tables use the `programming_` prefix.
 
-- [ ] **programming_progression_schemes** — Rep-range progression config (from/to, exercise_behavior, order, active). Migration: `20250225100000_create_progression_schemes.sql`
-- [ ] **programming_exercise_exclusions** — Per-member exercise exclusions (member_id, exercise_id, reason, active). Migration: `20250225100001_create_member_exercise_exclusions.sql`
-- [ ] **programming_removal_requests** — Queue for "deleted exercise" reports; admin/Retool submits here; senior coach reviews. Migration: `20250225100002_create_exercise_removal_requests.sql`
-- [ ] **programming_rules** — General rules (gym, category, rule_key, rule_value jsonb, priority, active). Migration: `20250225100003_create_programming_rules.sql`
-- [x] **Program output table** — `programming_generated`; run_id, member_id, assigned_to, sessions_per_week, payload jsonb. Migration: `20250225100005_create_programming_generated.sql`.
-- [x] **Staging table for normalised past programs** — `programming_past_programs_staging`; run_id, member_id, assigned_to, payload jsonb. Migration: `20250225100004_create_programming_past_programs_staging.sql`.
+- [x] **programming_progression_schemes** — Rep-range progression config (from/to, exercise_behavior, goal, scheme_type, order, active). Migration: `20250225100000`. Seeded GPP/Hypertrophy/Strength: `20250225100007`.
+- [x] **programming_exercise_exclusions** — Per-member exercise exclusions (member_id, exercise_id, reason, active). Migration: `20250225100001`.
+- [x] **programming_removal_requests** — Queue for "deleted exercise" reports; admin/Retool submits; senior coach reviews. Migration: `20250225100002`.
+- [x] **programming_rules** — General rules (gym, category, rule_key, rule_value jsonb, priority, active). Migration: `20250225100003`. Seeded 15 rules: `20250225100006`, `20250225100010`.
+- [x] **programming_generated** — run_id, member_id, assigned_to, sessions_per_week, payload, duration_weeks, phase_number, scheme_name, rep_range, changes_summary, rules_applied. Migrations: `20250225100005`, `20250225100009`.
+- [x] **programming_past_programs_staging** — run_id, member_id, assigned_to, payload jsonb. Migration: `20250225100004`.
+- [x] **programming_feedback** — Coach feedback on programs (run_id, member_id, coach_id, feedback_type, details, exercise_id, resolved). Migration: `20250225100008`.
 
 ---
 
@@ -38,7 +39,9 @@ Apply migrations in `supabase/migrations/` in order. All programming-engine tabl
 ## 4. Admin and operations
 
 - [ ] **Retool: Deleted-exercise form** — Form connects to Supabase; on submit, insert into `programming_removal_requests` (no direct delete). Senior coach / head coach reviews in queue; actual delete/deactivate is separate gated step after approval.
-- [ ] **Retool: View programs** — View/list on `programming_past_programs_staging` and `programming_generated`; filter by member, date, and (when available) coach.
+- [ ] **Retool: View programs** — View/list on `programming_past_programs_staging` and `programming_generated`; filter by member, date, and (when available) coach. Unpack payload into readable program cards.
+- [ ] **Retool: Feedback form** — Form next to program view; insert into `programming_feedback`. Coach flags programs in 30 seconds.
+- [ ] **Retool: Flagged programs counter** — Badge/count of unresolved feedback per member or run.
 - [ ] **PDF export on demand** — Export run or per-coach subset to PDF for audit/share; script or Retool button; optional store in Supabase Storage or shared drive.
 
 ---
@@ -69,3 +72,4 @@ Apply migrations in `supabase/migrations/` in order. All programming-engine tabl
 - **Data model:** [data-model.md](data-model.md).
 - **Engine config:** [engine-config.md](engine-config.md).
 - **Questions:** [questions-to-answer-later.md](questions-to-answer-later.md).
+- **Improvements:** [IMPROVEMENTS.md](IMPROVEMENTS.md).
