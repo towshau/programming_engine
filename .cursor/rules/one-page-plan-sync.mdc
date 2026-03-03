@@ -1,0 +1,36 @@
+---
+description: Keep docs/ONE-PAGE-PLAN.md in sync with process- and algorithm-level changes in this repo. Update or remove entries when you add, change, or delete tools, pipeline steps, or algorithms.
+alwaysApply: true
+---
+
+# One-page plan sync
+
+**File:** `docs/ONE-PAGE-PLAN.md` is the agent-facing map of this repo. Keep it accurate whenever you touch process- or algorithm-level items.
+
+## When to update ONE-PAGE-PLAN
+
+- **Adding** a new script in `tools/`, a pipeline step, a config table, or a documented algorithm  
+  → Add a short entry in the relevant section (e.g. **Engine scripts** under Tools and workflows, or **Pipeline**, **Tables**, etc.). Include how to run it and, if needed, "see docs/X for details".
+
+- **Changing** what a tool does, how the pipeline runs, or how an algorithm works  
+  → Update the corresponding bullet, step, or row in ONE-PAGE-PLAN so it matches the new behavior. Do not leave stale descriptions.
+
+- **Removing** a script, pipeline step, table, or algorithm  
+  → **Remove** its entry from ONE-PAGE-PLAN. Delete the bullet, step, or table row. Do not leave references to removed items.
+
+## What counts as process/algorithm (must be reflected in ONE-PAGE-PLAN)
+
+- Scripts in `tools/` (e.g. normalize_one_member.py, detect_phase.py, apply_auto_exclusions.py).
+- Pipeline steps (Ingest, Cohort, Config, Generate, Write).
+- Engine config tables and progression schemes (Tables section, Progression schemes).
+- Documented algorithms (e.g. phase detection) — at least a one-line summary and pointer to the canonical doc (e.g. data-model.md).
+
+## What to keep only in other docs
+
+- Full schema, column lists, and migration details → data-model.md, engine-config.md.
+- Narrative rules and coach-facing text → programming-rules-source.md.
+- ONE-PAGE-PLAN stays a **map**: short, scannable, with links to those docs. When in doubt, add a pointer rather than duplicating long content.
+
+## Checklist before finishing a change
+
+If your edit added, changed, or removed a tool, pipeline step, table, or algorithm: open `docs/ONE-PAGE-PLAN.md` and update or remove the matching item so the one-page plan stays current.

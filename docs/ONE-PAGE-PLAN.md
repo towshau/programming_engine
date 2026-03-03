@@ -60,6 +60,10 @@
 
 - **Layout:** workflows/, tools/, requirements.txt at repo root.
 - **Tools:** fetch, normalize, load_rules, generate (LLM), write. Utility: add_technical_debt.py.
+- **Engine scripts (tools/):**
+  - **normalize_one_member.py** — Ingest: member_tbresults + exercise_library → normalised sessions (by assigned_date), series labels (A1, A2, B1, …), write to programming_past_programs_staging. Optional **phase detection**: pass `--scheme GPP|Strength|Hypertrophy` to detect current rep-range phase and next phase from A-series median reps; result in payload.phase_detection. See docs/data-model.md § Phase detection.
+  - **detect_phase.py** — Standalone phase detection: given member_id and scheme name, normalises and returns current_rep_range, next_rep_range, confidence, direction. Used by normalize when --scheme is set; can be run alone: `python tools/detect_phase.py <member_id> Strength`.
+  - **apply_auto_exclusions.py** — Feedback → programming_exercise_exclusions (e.g. 3+ negative feedbacks → exclude exercise for member).
 - **Workflows:** Markdown SOPs in workflows/ (ingest -> apply rules -> generate -> write).
 
 ---

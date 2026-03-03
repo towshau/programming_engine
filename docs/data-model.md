@@ -17,7 +17,9 @@ This doc describes the data the programming engine depends on: existing Supabase
 
 ### programming_past_programs_staging
 
-**Where normalized workouts go:** The normalization tool (`tools/normalize_one_member.py`) writes one row per member per run here. `payload` is jsonb: `sessions` (each with `workout_id`, `assigned_date`, `completed_date`, `exercises`; each exercise has `exercise_name`, `exercise_id`, `sets`).
+**Where normalized workouts go:** The normalization tool (`tools/normalize_one_member.py`) writes one row per member per run here. `payload` is jsonb: **sessions = one per day (assigned_date)**; each session has `day`, `assigned_date`, `completed_date`, and `exercises` (all exercises on that day, each with `exercise_name`, `exercise_id`, `tags`, `series_assignment`, `series_label`, `sets`).
+
+The payload also includes a top-level `phase_detection` object (when `--scheme` is provided) — see **Phase detection** below.
 
 Normalised past program per member per run (output of normalization tool). Upsert by `(run_id, member_id)` so each run overwrites that run’s data.
 
@@ -112,3 +114,68 @@ Indexes: `(gym, active)`, `(name, active)`, `(goal, active)` where goal is not n
 ## Rules table (existing plan)
 
 - **programming_rules** — Columns: id, gym (enum `gym`, nullable), name, category, rule_key, rule_value (jsonb), priority, active, created_at, updated_at. Engine loads rows where `gym = :gym OR gym IS NULL` and `active = true`; higher priority overrides. Indexes: `(gym, active)`, `(category)`. Narrative source: [programming-rules-source.md](programming-rules-source.md).
+
+---
+
+## Phase detection (`tools/detect_phase.py`)
+
+Determines a member's current progression phase from their normalised sessions and recommends the next phase. Integrated into `normalize_one_member.py` (pass `--scheme <name>`) and usable standalone.
+
+### Algorithm
+
+1. **Extract A-series reps only.** B/C/D-series accessories run at higher rep ranges regardless of phase and would skew detection. Only exercises with `series_label` in `{A1, A2}` are sampled.
+
+2. **Compute block medians.** Sessions are grouped into blocks of 4 (one training week). The median rep count of A-series working sets in each block is calculated. Block 0 = most recent.
+
+3. **Map median to detection band.** Each scheme rep-range has an overlapping detection band:
+
+   | Scheme range | Detection band | Centre |
+   |-------------|----------------|--------|
+   | 10-12 | 9--14 | 11 |
+   | 8-10 | 7--11 | 9 |
+   | 6-8 | 5--9 | 7 |
+   | 4-6 | 3--7 | 5 |
+   | 3-5 | 1--6 | 4 |
+
+   The range whose centre is closest to the median wins.
+
+4. **Direction of travel.** Compare block 0 median to block 1 median:
+   - **down** (>0.5 drop): reps are decreasing — progressing through the scheme.
+   - **up** (>0.5 rise): reps jumped — likely a reset.
+   - **flat**: stalling or mixed-intensity block.
+
+5. **Resolve overlap.** If the median sits in two bands, direction breaks the tie: down picks the lower range, up picks the higher range, flat keeps the closest centre.
+
+6. **Look up next phase.** Match the detected `from_rep_range` to a row in `programming_progression_schemes` for the member's scheme. The row's `to_rep_range` is the recommendation.
+
+7. **Confidence score.**
+   - **high**: distance to centre <= 1 and direction is clear (or only one block of history).
+   - **medium**: distance <= 2 and direction is known.
+   - **low**: ambiguous — flag for coach review, do not auto-generate.
+
+### Output shape (in payload `phase_detection`)
+
+```json
+{
+  "current_rep_range": "4-6",
+  "current_order": 3,
+  "next_rep_range": "3-5",
+  "next_order": 4,
+  "exercise_behavior": "same_exercises",
+  "confidence": "medium",
+  "median_reps": 5,
+  "direction": "flat",
+  "n_reps_sampled": 27,
+  "blocks_analysed": 19
+}
+```
+
+### Usage
+
+```bash
+# Standalone
+python tools/detect_phase.py <member_id> Strength
+
+# Via normalize (writes phase_detection to staging payload)
+python tools/normalize_one_member.py <member_id> --scheme Strength
+```
