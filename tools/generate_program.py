@@ -99,6 +99,46 @@ def _is_excluded(exercise_name, exercise_id, exclusions, avoid_list):
     return False
 
 
+# ── Frequency detection ──────────────────────────────────────────────────────
+
+def detect_sessions_per_week(sessions):
+    """Infer sessions-per-week from the member's recent training history.
+
+    Counts distinct day signatures (unique A-series exercise combos) in the
+    most recent ~4 weeks of full sessions. Returns 2, 3, or 4.
+    """
+    sorted_sessions = sorted(
+        sessions,
+        key=lambda s: s.get("assigned_date") or s.get("day") or "",
+        reverse=True,
+    )
+
+    full_days = [s for s in sorted_sessions if len(s.get("exercises", [])) >= 3]
+
+    def _day_signature(sess):
+        a_names = sorted(
+            ex["exercise_name"]
+            for ex in sess.get("exercises", [])
+            if (ex.get("series_label") or "").upper() in ("A1", "A2")
+        )
+        return tuple(a_names)
+
+    # Look at the most recent ~16 sessions (roughly 4 weeks) and count unique day patterns
+    recent = full_days[:16]
+    signatures = set()
+    for sess in recent:
+        sig = _day_signature(sess)
+        if sig:
+            signatures.add(sig)
+
+    distinct = len(signatures)
+    if distinct >= 4:
+        return 4
+    elif distinct <= 2:
+        return 2
+    return 3
+
+
 # ── Core generator ───────────────────────────────────────────────────────────
 
 def extract_current_program(sessions, sessions_per_week=3):
@@ -251,7 +291,8 @@ def main():
     ap = argparse.ArgumentParser(description="Generate next program for a member")
     ap.add_argument("member_id", help="Member UUID")
     ap.add_argument("--scheme", default="GPP", help="Scheme: GPP, Strength, Hypertrophy")
-    ap.add_argument("--sessions-per-week", type=int, default=3, choices=[2, 3, 4])
+    ap.add_argument("--sessions-per-week", type=int, default=None, choices=[2, 3, 4],
+                    help="Override; auto-detected from history if omitted")
     ap.add_argument("--output", default=None, help="Write JSON to file (default: stdout)")
     ap.add_argument("--pretty", action="store_true", help="Pretty-print JSON")
     args = ap.parse_args()
@@ -270,6 +311,10 @@ def main():
     sessions = payload["sessions"]
     print(f"Normalised {len(sessions)} sessions.", file=sys.stderr)
 
+    # Auto-detect sessions per week if not overridden
+    spw = args.sessions_per_week or detect_sessions_per_week(sessions)
+    print(f"Sessions per week: {spw}" + (" (auto-detected)" if not args.sessions_per_week else " (override)"), file=sys.stderr)
+
     # 2. Phase detection
     phase = detect_phase_for_member(sb, args.member_id, args.scheme, sessions)
     print(f"Phase: current={phase.get('current_rep_range')}, next={phase.get('next_rep_range')}, confidence={phase.get('confidence')}", file=sys.stderr)
@@ -284,7 +329,7 @@ def main():
         exercise_lib,
         phase,
         config,
-        sessions_per_week=args.sessions_per_week,
+        sessions_per_week=spw,
     )
 
     # Attach metadata
@@ -296,7 +341,7 @@ def main():
         "phase_order": phase.get("next_order"),
         "confidence": phase.get("confidence"),
         "exercise_behavior": phase.get("exercise_behavior"),
-        "sessions_per_week": args.sessions_per_week,
+        "sessions_per_week": spw,
     }
 
     indent = 2 if args.pretty else None

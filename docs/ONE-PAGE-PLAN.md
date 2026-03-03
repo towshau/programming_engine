@@ -72,12 +72,15 @@
 
 ---
 
-## Admin and operations
+## Admin and operations (Retool)
 
-- **Deleted exercises:** Retool form -> programming_removal_requests (no delete). Senior coach reviews; gated step.
-- **View programs:** Retool lists staging + generated; filter member, date, coach. Readable layout (not raw JSON).
-- **Feedback form:** Next to program view; coaches submit in 30 seconds.
-- **PDF export:** On-demand by run or per coach.
+Retool page prompts and specs live in **retool/** (see `retool/README.md` for build order).
+
+- **Program Viewer** (`retool/01-view-programs.md`) — Card-based view of generated + staging programs; filter by member, scheme, date. Unpacks payload into readable day/exercise/set cards.
+- **Coach Feedback** (`retool/02-feedback-form.md`) — Slide-out form on the program viewer; flags exercise_swap, pairing_issue, too_hard, too_easy, positive, other in 30 seconds.
+- **Flagged Counter** (`retool/03-flagged-counter.md`) — Badge + breakdown of unresolved feedback by member; mark resolved; bulk resolve.
+- **Exercise Removal Requests** (`retool/04-deleted-exercise-form.md`) — Submit form + senior coach review queue; approve/reject (no direct delete).
+- **PDF Export** (`retool/05-pdf-export.md`) — Export selected program to PDF via Retool's built-in PDF or Edge Function.
 
 ---
 

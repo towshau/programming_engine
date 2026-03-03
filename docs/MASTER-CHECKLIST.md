@@ -60,7 +60,7 @@ Apply migrations in `supabase/migrations/` in order. All programming-engine tabl
 
 ## 6. Open questions (see questions-to-answer-later.md)
 
-- [ ] Sessions per week formula — Optionality for member-level unified config?
+- [x] Sessions per week formula — **Done:** Auto-detected from member's recent training history (distinct day signatures in last ~4 weeks). Manual override via `--sessions-per-week`. See `generate_program.py` `detect_sessions_per_week()`.
 - [ ] Deleted exercises — How recognised (feedback vs system)? Flow documented in build-plan.
 - [ ] Exact exercise_behavior values and semantics — same_exercises vs allow_exercise_changes.
 - [ ] Where does member goal live? — For progression branching (strength / hypertrophy etc.).

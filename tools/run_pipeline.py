@@ -44,14 +44,15 @@ from normalize_one_member import (
 )
 from detect_phase import detect_phase_for_member
 from load_rules import load_config
-from generate_program import generate_next_program
+from generate_program import generate_next_program, detect_sessions_per_week
 
 
 def main():
     ap = argparse.ArgumentParser(description="Run full programming pipeline for one member")
     ap.add_argument("member_id", help="Member UUID")
     ap.add_argument("--scheme", default="GPP", help="GPP | Strength | Hypertrophy")
-    ap.add_argument("--sessions-per-week", type=int, default=3, choices=[2, 3, 4])
+    ap.add_argument("--sessions-per-week", type=int, default=None, choices=[2, 3, 4],
+                    help="Override; auto-detected from history if omitted")
     ap.add_argument("--duration-weeks", type=int, default=6)
     ap.add_argument("--skip-staging", action="store_true", help="Skip writing to staging")
     ap.add_argument("--dry-run", action="store_true", help="Print JSON, don't write to DB")
@@ -75,6 +76,10 @@ def main():
     past = normalize(rows, exercise_lib)
     sessions = past["sessions"]
     print(f"  Normalised {len(sessions)} sessions.")
+
+    # Auto-detect sessions per week if not overridden
+    spw = args.sessions_per_week or detect_sessions_per_week(sessions)
+    print(f"  Sessions per week: {spw}" + (" (auto-detected)" if not args.sessions_per_week else " (override)"))
 
     if not args.skip_staging and not args.dry_run:
         staging_row = {
@@ -105,7 +110,7 @@ def main():
         exercise_lib,
         phase,
         config,
-        sessions_per_week=args.sessions_per_week,
+        sessions_per_week=spw,
     )
 
     program["metadata"] = {
@@ -117,7 +122,7 @@ def main():
         "phase_order": phase.get("next_order"),
         "confidence": phase.get("confidence"),
         "exercise_behavior": phase.get("exercise_behavior"),
-        "sessions_per_week": args.sessions_per_week,
+        "sessions_per_week": spw,
         "duration_weeks": args.duration_weeks,
     }
 
@@ -144,7 +149,7 @@ def main():
             "run_id": run_id,
             "member_id": member_id,
             "assigned_to": None,
-            "sessions_per_week": args.sessions_per_week,
+            "sessions_per_week": spw,
             "duration_weeks": args.duration_weeks,
             "phase_number": phase.get("next_order"),
             "scheme_name": args.scheme,
