@@ -60,6 +60,86 @@ C_SERIES_BAD_TAGS = {
 }
 AVOID_EXERCISES_DEFAULT = {"walking lunges", "farmer carries"}
 
+PRESS_TAGS = {"Vertical Press", "Horizontal Press"}
+PULL_TAGS = {"Vertical Pull", "Horizontal Pull"}
+
+
+def _apply_press_pull_pairing(exercises, rules):
+    """Re-pair so press+pull share A/B series; press in the '1' slot.
+
+    Only activates when the superset_press_pull_pairing rule is loaded AND the
+    session contains at least one press and one pull exercise.  Accessories
+    (non-press/pull) flow into the remaining series slots.
+    """
+    rule = rules.get("superset_press_pull_pairing")
+    if not rule:
+        return exercises
+
+    press_tags = set(rule.get("press_tags", PRESS_TAGS))
+    pull_tags = set(rule.get("pull_tags", PULL_TAGS))
+    press_first = rule.get("press_first", True)
+
+    presses = [ex for ex in exercises if (ex.get("tags") or "") in press_tags]
+    pulls = [ex for ex in exercises if (ex.get("tags") or "") in pull_tags]
+    others = [ex for ex in exercises
+              if (ex.get("tags") or "") not in press_tags | pull_tags]
+
+    if not presses or not pulls:
+        return exercises
+
+    remaining_pulls = list(pulls)
+    pairs = []
+    for press in presses:
+        if remaining_pulls:
+            pairs.append((press, remaining_pulls.pop(0)))
+        else:
+            pairs.append((press, None))
+    solo_pulls = remaining_pulls
+
+    SERIES = ["A", "B", "C", "D"]
+    result = []
+    si = 0
+
+    for press, pull in pairs:
+        if si >= len(SERIES):
+            break
+        letter = SERIES[si]
+        if press_first:
+            press["series_label"] = f"{letter}1"
+            result.append(press)
+            if pull:
+                pull["series_label"] = f"{letter}2"
+                result.append(pull)
+        else:
+            if pull:
+                pull["series_label"] = f"{letter}1"
+                result.append(pull)
+            press["series_label"] = f"{letter}2"
+            result.append(press)
+        si += 1
+
+    for pull in solo_pulls:
+        if si >= len(SERIES):
+            break
+        pull["series_label"] = f"{SERIES[si]}1"
+        result.append(pull)
+        si += 1
+
+    for acc in others:
+        if si >= len(SERIES):
+            acc["series_label"] = "extra"
+            result.append(acc)
+            continue
+        letter = SERIES[si]
+        slot = sum(1 for r in result
+                   if (r.get("series_label") or "").startswith(letter)) + 1
+        acc["series_label"] = f"{letter}{slot}"
+        result.append(acc)
+        if slot >= 2:
+            si += 1
+
+    return result
+
 
 def _parse_rep_range(rr):
     """'8-10' -> (8, 10).  '3-5' -> (3, 5).  Single number -> (n, n)."""
@@ -220,7 +300,9 @@ def generate_next_program(
 
     new_sessions = []
     for day_idx, old_session in enumerate(current_block, start=1):
-        new_exercises = []
+
+        # Phase 1: collect eligible exercises (no sets yet)
+        collected = []
         for ex in old_session.get("exercises", []):
             label = ex.get("series_label") or ""
             name = ex.get("exercise_name", "")
@@ -229,7 +311,6 @@ def generate_next_program(
 
             if not label or label == "Warm Up":
                 continue
-
             if _is_excluded(name, eid, exclusions, avoid_list):
                 continue
 
@@ -237,14 +318,33 @@ def generate_next_program(
             if series_letter in ("C", "D") and not _is_c_series_ok(name, tags):
                 continue
 
-            series_assignment = ex.get("series_assignment") or []
+            info = exercise_lib.get(name) or {}
+            collected.append({
+                "exercise_name": name,
+                "exercise_id": info.get("exercise_id") or eid,
+                "series_label": label,
+                "tags": tags,
+                "_series_assignment": ex.get("series_assignment") or [],
+            })
+
+        # Phase 2: apply press/pull superset pairing
+        collected = _apply_press_pull_pairing(collected, rules)
+
+        # Phase 3: assign sets based on final series labels
+        new_exercises = []
+        for ex in collected:
+            label = ex["series_label"]
+            series_letter = label[0].upper() if label else "C"
+            tags = ex.get("tags")
+            sa = ex.pop("_series_assignment", [])
+
             is_compound = (
                 tags in (
                     "Horizontal Press", "Vertical Press", "Horizontal Pull",
                     "Vertical Pull", "Lower Body Push", "Lower Body Pull",
                     "Hip Dominant",
                 )
-                and "A" in series_assignment
+                and "A" in sa
             )
 
             if series_letter == "A":
@@ -260,18 +360,15 @@ def generate_next_program(
                 num_sets = sets_c
                 reps_str = _format_rep_range(acc_low, acc_high)
 
-            sets = [
-                {"set_number": i + 1, "reps": reps_str}
-                for i in range(num_sets)
-            ]
-
-            info = exercise_lib.get(name) or {}
             new_exercises.append({
-                "exercise_name": name,
-                "exercise_id": info.get("exercise_id") or eid,
+                "exercise_name": ex["exercise_name"],
+                "exercise_id": ex["exercise_id"],
                 "series_label": label,
                 "tags": tags,
-                "sets": sets,
+                "sets": [
+                    {"set_number": i + 1, "reps": reps_str}
+                    for i in range(num_sets)
+                ],
             })
 
         new_sessions.append({

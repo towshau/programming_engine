@@ -84,9 +84,9 @@ Retool page prompts and specs live in **retool/** (see `retool/README.md` for bu
 
 ---
 
-## Rules (15 seeded)
+## Rules (16 active)
 
-sources (only_exercise_library); composition (max_exercises_per_series, series_composition, avoid_exercises_when_possible); equipment (pairings_both_gyms, c_series_self_sufficient); session (home_workouts_weekends, set_structures, daily_programming_sets, warm_up_sets, additional_work_on_own); timing (session_timing, rest_times); volume (rehab_integration); progression (default_rep_progression).
+sources (only_exercise_library); composition (max_exercises_per_series, series_composition, avoid_exercises_when_possible); equipment (pairings_both_gyms, c_series_self_sufficient); exercise_pairing (**superset_press_pull_pairing** — pair press+pull in A/B series, press in slot 1; applied in generator after exercise collection); session (home_workouts_weekends, set_structures, daily_programming_sets, warm_up_sets, additional_work_on_own); timing (session_timing, rest_times); volume (rehab_integration); progression (default_rep_progression).
 
 ---
 
