@@ -23,7 +23,7 @@ Build the ingest/normalization piece: read **member_tbresults** + **exercise_lib
 
 ## Viewing and auditing programs (normalised past + generated)
 
-**Where they live:** Supabase. Normalised past programs → staging table (e.g. `programming_past_programs_staging`). Generated programs → program output table (e.g. `programming_generated`). Single source of truth; no duplicate storage.
+**Where they live:** Supabase. Normalised past programs → staging table (e.g. `programming_normalized_programs`). Generated programs → program output table (e.g. `programming_generated`). Single source of truth; no duplicate storage.
 
 **How you view them:** Retool (or similar) connected to Supabase. Build a view/list that queries these tables — filter by member, date range, and (when you have it) **coach**. Easy to read in the browser; always current.
 

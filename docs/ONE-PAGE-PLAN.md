@@ -9,7 +9,7 @@
 - **Supabase (source):** member_tbresults, member_tbhealthmax, exercise_library (trigger-built), member table with current_status = 'active' for cohort.
 - **Supabase (engine config):** All tables use `programming_` prefix; gym column uses enum `gym` (BLIGH, BRIDGE, COLLIN) where applicable.
 - **Retool:** Admin form for deleted-exercise reports. View programs (staging + generated) with readable layout. Feedback form for coaches. Flagged-programs counter. PDF export on demand.
-- **Output:** Normalised past programs -> programming_past_programs_staging. Generated programs -> programming_generated. Single source of truth; view/audit in Retool; optional PDF to Supabase Storage or shared drive.
+- **Output:** Normalised past programs -> programming_normalized_programs. Generated programs -> programming_generated. Single source of truth; view/audit in Retool; optional PDF to Supabase Storage or shared drive.
 
 ---
 
@@ -21,7 +21,7 @@
 | programming_exercise_exclusions | Per-member exercise exclusions | member_id, exercise_id, reason, active. |
 | programming_removal_requests | Queue for "deleted exercise" reports; senior coach review | exercise_id, reason, submitted_by, status, reviewed_by. |
 | programming_rules | General engine rules (gym-scoped) | gym, category, rule_key, rule_value (jsonb), priority, active. **15 rules seeded.** |
-| programming_past_programs_staging | Normalised past program per member per run | run_id, member_id, assigned_to, payload (jsonb). |
+| programming_normalized_programs | Normalised past program per member per run | run_id, member_id, assigned_to, payload (jsonb). |
 | programming_generated | Generated program per member per run | run_id, member_id, assigned_to, sessions_per_week, duration_weeks, phase_number, scheme_name, rep_range, changes_summary, rules_applied (jsonb), payload (jsonb). |
 | programming_feedback | Coach feedback on generated programs | run_id, member_id, coach_id, feedback_type, details, exercise_id, resolved. |
 
@@ -38,7 +38,7 @@
 
 ## Pipeline
 
-1. **Ingest:** member_tbresults + exercise_library -> normalised past program per member (-> programming_past_programs_staging).
+1. **Ingest:** member_tbresults + exercise_library -> normalised past program per member (-> programming_normalized_programs).
 2. **Cohort:** Member table current_status = 'active' -> member IDs.
 3. **Config:** Load programming_rules, programming_progression_schemes (by scheme name), programming_exercise_exclusions (by member). Never invent exercises.
 4. **Generate:** Past program + rules + progression + exclusions -> canonical program JSON per member (LLM or deterministic).
@@ -61,7 +61,7 @@
 - **Layout:** workflows/, tools/, requirements.txt at repo root.
 - **Tools:** fetch, normalize, load_rules, generate (LLM), write. Utility: add_technical_debt.py.
 - **Engine scripts (tools/):**
-  - **normalize_one_member.py** — Ingest: member_tbresults + exercise_library → normalised sessions (by assigned_date), series labels (A1, A2, B1, …), write to programming_past_programs_staging. Optional **phase detection**: pass `--scheme GPP|Strength|Hypertrophy` to detect current rep-range phase and next phase from A-series median reps; result in payload.phase_detection. See docs/data-model.md § Phase detection.
+  - **normalize_one_member.py** — Ingest: member_tbresults + exercise_library → normalised sessions (by assigned_date), series labels (A1, A2, B1, …), write to programming_normalized_programs. Optional **phase detection**: pass `--scheme GPP|Strength|Hypertrophy` to detect current rep-range phase and next phase from A-series median reps; result in payload.phase_detection. See docs/data-model.md § Phase detection.
   - **detect_phase.py** — Standalone phase detection: given member_id and scheme name, normalises and returns current_rep_range, next_rep_range, confidence, direction. Used by normalize when --scheme is set; can be run alone: `python tools/detect_phase.py <member_id> Strength`.
   - **load_rules.py** — Load engine config: `programming_rules` (15 rules), `programming_progression_schemes` (by scheme name), `programming_exercise_exclusions` (by member). Returns rules dict + scheme steps + exclusion list. Standalone: `python tools/load_rules.py --member-id <uuid> --scheme Strength`.
   - **generate_program.py** — Deterministic generator: past program + rules + phase detection + library → canonical program JSON. Carries forward exercises with updated rep ranges (A/B compounds at scheme range, C/D accessories at +2). Applies exclusions, avoids banned exercises, enforces C-series self-sufficiency. Standalone: `python tools/generate_program.py <member_id> --scheme Strength`.

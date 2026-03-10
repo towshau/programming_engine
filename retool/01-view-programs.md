@@ -26,7 +26,7 @@ Connect to the Supabase `programming_generated` table. Here are the columns:
 - `payload` (jsonb) — the full program; structure below
 - `created_at` (timestamptz)
 
-Also connect to `programming_past_programs_staging` (same shape but simpler: run_id, member_id, assigned_to, payload, created_at) for viewing past normalised programs.
+Also connect to `programming_normalized_programs` (same shape but simpler: run_id, member_id, assigned_to, payload, created_at) for viewing past normalised programs.
 
 ### Payload structure (programming_generated.payload)
 
@@ -65,7 +65,7 @@ Also connect to `programming_past_programs_staging` (same shape but simpler: run
    - Dropdown: select member (query distinct member_ids, ideally join to a member/staff table for names)
    - Dropdown: filter by scheme_name (GPP, Strength, Hypertrophy, or All)
    - Date range picker: filter by created_at
-   - Toggle: "Generated" vs "Staging" (switches between programming_generated and programming_past_programs_staging)
+   - Toggle: "Generated" vs "Staging" (switches between programming_generated and programming_normalized_programs)
 
 2. **Program list (left panel or top section):**
    - Table or list of programs matching filters, showing: member name/id, scheme_name, rep_range, phase_number, duration_weeks, sessions_per_week, created_at, changes_summary
@@ -99,7 +99,7 @@ LIMIT 50;
 
 -- Staging programs (toggle)
 SELECT p.*, s.first_name, s.last_name
-FROM programming_past_programs_staging p
+FROM programming_normalized_programs p
 LEFT JOIN staff_database s ON s.id::text = p.member_id::text
 ORDER BY p.created_at DESC
 LIMIT 50;

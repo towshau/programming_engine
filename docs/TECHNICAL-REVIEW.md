@@ -53,7 +53,7 @@ Pre-build review of the current design: config scalability, rule-set expansion, 
 
 ### 2.4 Staging table growth and lifecycle
 
-**Debt:** `programming_past_programs_staging` will grow unbounded if every normalization run appends rows. Same idea for `programming_generated` if we never purge.
+**Debt:** `programming_normalized_programs` will grow unbounded if every normalization run appends rows. Same idea for `programming_generated` if we never purge.
 
 **Solution:** Decide and document up front:
 
@@ -64,7 +64,7 @@ Pre-build review of the current design: config scalability, rule-set expansion, 
 
 ### 2.5 program output and staging schema – run and coach
 
-**Debt:** When we create `programming_generated` and `programming_past_programs_staging`, we might forget fields that support "run" and "per-coach" use cases.
+**Debt:** When we create `programming_generated` and `programming_normalized_programs`, we might forget fields that support "run" and "per-coach" use cases.
 
 **Solution:** When defining the schema (Phase 2), include from the start:
 

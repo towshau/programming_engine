@@ -49,7 +49,7 @@ The programming engine follows the **WAT framework**: AI orchestrates, determini
 
 **Decided:** Rules live in **Supabase** in a **`programming_rules`** table.
 
-**Suggested columns:** `id`, `gym` (nullable; NULL = all gyms), `name`, `category`, `rule_key`, `rule_value` (jsonb), `priority`, `active`, `created_at`, `updated_at`. Engine loads rows where `gym = :gym OR gym IS NULL` and `active = true`; higher `priority` overrides. Narrative source: `docs/programming-rules-source.md`.
+**Suggested columns:** `id`, `gym` (nullable; NULL = all gyms), `name`, `category`, `rule_key`, `rule_value` (jsonb), `priority`, `active`, `created_at`, `updated_at`, `source` (nullable text; who/what created the rule, e.g. `'manual'`, `'seed'`, or later `'agent:slack_feedback'`), `source_ref` (nullable text; link to original input, e.g. Slack message URL or coach note ID). Engine loads rows where `gym = :gym OR gym IS NULL` and `active = true`; higher `priority` overrides. Narrative source: `docs/programming-rules-source.md`.
 
 ---
 

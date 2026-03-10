@@ -1,81 +1,183 @@
-# Data model and schema
+# Data Model — Programming Engine
 
-This doc describes the data the programming engine depends on: existing Supabase tables, member/cohort source, program output, and the engine config tables. Migrations for new tables live in **`supabase/migrations/`** and can be applied with the Supabase CLI or dashboard. Build order: see [build-plan.md](build-plan.md) (Build order).
+## Overview
 
----
-
-## Existing tables (Supabase)
-
-- **member_tbhealthmax** — (document columns, grain, and how “past programs” are identified; full schema lives in Supabase.)
-- **member_tbresults** — Row-based exercise data for all gym members; used as “past programs” for ingest.
-- **exercise_library** — Built by trigger from source data: exercise_id, exercise_name, tags. Engine and sync app use this; no invented exercises.
-- **Member table (with current_status)** — Source for cohort: filter `current_status = 'active'` to get member IDs for program generation. Confirm table name, “active” value, and join path in your Supabase schema.
+The engine reads from Supabase tables and writes to `programming_generated`. `member_database` defines the cohort. `member_tbresults` provides raw exercise data from TeamBuildr. `programming_normalized_programs` is our enriched layer that adds series labels, exercise order, and pairings (missing from TB exports). `programming_rules` and `programming_exercise_exclusions` control generation logic. Migrations live in `supabase/migrations/`.
 
 ---
 
-## Program output and viewing
+## Tables
 
-### programming_past_programs_staging
+### member_database
 
-**Where normalized workouts go:** The normalization tool (`tools/normalize_one_member.py`) writes one row per member per run here. `payload` is jsonb: **sessions = one per day (assigned_date)**; each session has `day`, `assigned_date`, `completed_date`, and `exercises` (all exercises on that day, each with `exercise_name`, `exercise_id`, `tags`, `series_assignment`, `series_label`, `sets`).
+**Purpose:** Master member table. Defines who gets a program.
 
-The payload also includes a top-level `phase_detection` object (when `--scheme` is provided) — see **Phase detection** below.
+**Cohort query:**
+```sql
+SELECT id, member_name, coach_id, gym_string, injuries, goals, contraindications
+FROM member_database
+WHERE current_status = 'active' AND test_account = false;
+```
 
-Normalised past program per member per run (output of normalization tool). Upsert by `(run_id, member_id)` so each run overwrites that run’s data.
+**Key columns for the engine:**
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | uuid | PK |
-| `run_id` | uuid | Groups all members in this normalization run |
-| `member_id` | uuid | Member |
-| `assigned_to` | uuid (nullable) | Optional coach for filter / export by coach |
-| `payload` | jsonb | Normalised structure: sessions, exercises, rep ranges |
-| `created_at`, `updated_at` | timestamptz | Audit |
+| Column | Type | Use |
+|--------|------|-----|
+| id | uuid | PK; join key to all member_* tables |
+| current_status | membership_status enum | Filter: `'active'` only |
+| test_account | boolean | Filter: `false` only |
+| coach_id | uuid | FK to staff_database; programming coach |
+| gym_string | text | Gym location; used to load gym-specific rules |
+| injuries | text | Free-text; feeds exclusion logic |
+| goals | text | Free-text; informs progression choice |
+| contraindications | text | Free-text; feeds exclusion logic |
 
-Unique `(run_id, member_id)`. Indexes: `run_id`, `member_id`, `assigned_to` (partial). Migration: `20250225100004_create_programming_past_programs_staging.sql`.
+**current_status enum values:** active, on_hold, trial, online_coaching, boxing_pack, expired, no_sale, F&F, inactive.
+
+---
+
+### member_tbresults
+
+**Purpose:** Raw exercise data from TeamBuildr export. One row = one set of one exercise.
+
+| Column | Type | Use |
+|--------|------|-----|
+| id | bigint | PK (auto-increment) |
+| member_id | uuid | FK to member_database.id |
+| member_name | text | Denormalized |
+| exercise_name | text | Full exercise name |
+| assigned_date | date | Date workout was assigned; identifies the training day |
+| completed_date | date | Date member actually completed it |
+| set_number | numeric | Which set (1, 2, 3…) |
+| result | text | Weight/value achieved |
+| reps | numeric | Reps performed |
+| workout_id | numeric | TeamBuildr workout ID; one per exercise per day |
+| tags | text | Exercise tag (e.g. "Vertical Press", "Horizontal Pull") |
+
+**Grain:** One row per set per exercise per day per member. A 3-set exercise = 3 rows. Unilateral exercises may double (left + right).
+
+**What it does NOT contain:** Exercise order, series assignment (A/B/C), or pairing information. These are UI-only in TeamBuildr and not included in exports.
+
+**Program detection logic:**
+- No phase or program_id column. Programs are detected by comparing exercises week over week.
+- A program stays the same for 4–6 weeks (same exercises, same structure).
+- If the full week's exercises change, that signals a new program.
+- Minor mid-week adjustments (1–2 exercise swaps) are adjustments, not a new program.
+- Use the most recent N weeks (6–8) of data to identify the current program rather than just the latest assigned_date.
+
+**Identifying one training day:** Group by `member_id` + `assigned_date`. A 3D member has 3 distinct `assigned_date` values per week, each with a different set of exercises.
+
+---
+
+### programming_normalized_programs
+
+**Purpose:** Enriched layer on top of member_tbresults. Adds series labels, exercise order, and pairings missing from TB exports. Engine's baseline for generating the next program. (Renamed from `programming_past_programs_staging`.)
+
+| Column | Type | Use |
+|--------|------|-----|
+| id | uuid | PK |
+| run_id | uuid | Groups all members in one normalization run |
+| member_id | uuid | FK to member_database.id |
+| assigned_to | uuid (nullable) | Optional coach filter |
+| payload | jsonb | Normalized program structure (see below) |
+| created_at | timestamptz | Record creation |
+| updated_at | timestamptz | Last update (sync or coach feedback) |
+
+Unique `(run_id, member_id)`. Migration: `20250225100004`.
+
+**Payload structure:**
+```json
+{
+  "sessions": [
+    {
+      "day": "2025-01-14",
+      "assigned_date": "2025-01-14",
+      "completed_date": "2025-01-16",
+      "exercises": [
+        {
+          "series_label": "A1",
+          "exercise_name": "Chin Up - Medium Grip",
+          "exercise_id": "1200726784",
+          "tags": "Vertical Pull",
+          "series_assignment": ["A", "B"],
+          "sets": [{"set_number": 1, "reps": 6, "result": "0"}]
+        }
+      ]
+    }
+  ],
+  "phase_detection": { "...see Phase Detection below..." }
+}
+```
+
+**Key payload fields:**
+- `series_label` — A1, A2, B1, C1, Warm Up. Gives exercise order and series.
+- `series_assignment` — Which series this exercise belongs to (for pairing logic).
+- `sets` — Per-set data with actual reps/result (completed data from TB).
+- `phase_detection` — Added when `--scheme` is passed to normalization tool.
+
+**Weekly sync/diff process:**
+1. Pull latest week from `member_tbresults` for each active member.
+2. Compare against the payload here.
+3. Same exercises → update weights/reps, keep our order.
+4. Minor change (1–2 exercises differ) → slot new exercise into same position.
+5. Whole week different → new program detected. Archive old record, create new, infer order from rules.
+
+**Coach feedback:** When a coach corrects exercise order or series assignments, update the payload immediately. Corrected version becomes baseline for next generation.
+
+---
 
 ### programming_generated
 
-Generated program per member per run (output of engine). Writer in `tools/write_programs.py`. View in Retool; PDF export on demand (see [build-plan.md](build-plan.md) – Viewing and auditing programs).
+**Purpose:** Engine output. One row = one generated program for one member in one run.
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | uuid | PK |
-| `run_id` | uuid | Groups all members in this generation run |
-| `member_id` | uuid | Member |
-| `assigned_to` | uuid (nullable) | Optional coach for filter / export for Coach X |
-| `sessions_per_week` | int | 2, 3, or 4 (program days) |
-| `duration_weeks` | int (default 6) | Program duration: first = 4 weeks, standard = 6 |
-| `phase_number` | int (nullable) | Phase within scheme cycle (e.g. 1–4 for GPP) |
-| `scheme_name` | text (nullable) | Denormalised: GPP, Hypertrophy, Strength |
-| `rep_range` | text (nullable) | Rep range this program uses (e.g. 10-12) |
-| `changes_summary` | text (nullable) | What changed from last phase (human-readable) |
-| `rules_applied` | jsonb (nullable) | Array of rule_keys applied during generation |
-| `payload` | jsonb | Canonical program JSON; see **Canonical payload shape** below. |
-| `created_at`, `updated_at` | timestamptz | Audit |
+| Column | Type | Use |
+|--------|------|-----|
+| id | uuid | PK |
+| run_id | uuid | Groups all members in one generation run |
+| member_id | uuid | FK to member_database.id |
+| assigned_to | uuid (nullable) | Coach assignment for filter/export |
+| sessions_per_week | integer | 2, 3, or 4 (same as last time) |
+| duration_weeks | integer (default 6) | First program = 4 weeks, standard = 6 |
+| phase_number | integer (nullable) | Phase within scheme cycle (1–4) |
+| scheme_name | text (nullable) | GPP, Hypertrophy, Strength, etc. |
+| rep_range | text (nullable) | e.g. "10-12", "4-6" |
+| changes_summary | text (nullable) | What changed from last phase (human-readable) |
+| rules_applied | jsonb (nullable) | Array of rule_keys applied during generation |
+| payload | jsonb | Canonical program JSON (see below) |
+| created_at, updated_at | timestamptz | Audit |
 
-Unique `(run_id, member_id)`. Indexes: `run_id`, `member_id`, `assigned_to` (partial), `created_at`. Migrations: `20250225100005` (create), `20250225100009` (add coach/self-improving columns).
+Unique `(run_id, member_id)`. Migrations: `20250225100005` (create), `20250225100009` (add coach columns). Writer: `tools/write_programs.py`.
 
-**Canonical payload shape** (same structure as staging so generators and writers share one contract):
-
-- Top-level: `{ "sessions": [ ... ] }`.
-- Each session: `day` (date or day index), optional `assigned_date`, and `exercises`: array of exercise objects.
-- Each exercise: `exercise_name`, optional `exercise_id`, `series_label` (e.g. A1, B1), `sets`: array of `{ "set_number", "reps", "result" }`. Optional: `tags`, `series_assignment`.
-- Rep ranges and prescriptions can sit in exercise-level notes or in the top-level metadata; `rep_range` column on the table holds the scheme rep range (e.g. 8-10) for the whole program.
-
-Example minimal payload:
+#### Canonical Program JSON (payload)
 
 ```json
 {
+  "metadata": {
+    "run_id": "uuid",
+    "member_id": "uuid",
+    "scheme": "GPP",
+    "confidence": "high",
+    "phase_order": 4,
+    "duration_weeks": 6,
+    "sessions_per_week": 3,
+    "current_rep_range": "6-8",
+    "next_rep_range": "4-6",
+    "exercise_behavior": "same_exercises"
+  },
   "sessions": [
     {
       "day": 1,
       "exercises": [
         {
-          "exercise_name": "Squat - Back - Barbell - High Bar",
-          "exercise_id": "...",
           "series_label": "A1",
-          "sets": [{"set_number": 1, "reps": "8-10"}, {"set_number": 2, "reps": "8-10"}]
+          "exercise_name": "Press - Flat - Dumbbell",
+          "exercise_id": "1182509177",
+          "tags": "Horizontal Press",
+          "sets": [
+            {"set_number": 1, "reps": "4-6"},
+            {"set_number": 2, "reps": "4-6"},
+            {"set_number": 3, "reps": "4-6"}
+          ]
         }
       ]
     }
@@ -83,128 +185,189 @@ Example minimal payload:
 }
 ```
 
-Writer: `tools/write_programs.py` — reads payload from file or stdin and inserts into `programming_generated` with run_id, member_id, sessions_per_week, and optional phase/scheme/rep_range/changes_summary/rules_applied.
+**Key payload fields:**
+- `metadata.scheme` — progression scheme (GPP, Hypertrophy, Strength).
+- `metadata.confidence` — high / medium / low; certainty of phase detection.
+- `metadata.exercise_behavior` — `same_exercises` (keep exercises, change reps) vs new selection.
+- `sessions[].day` — day number (1, 2, 3).
+- `sessions[].exercises[]` — ordered list; `series_label` defines structure.
+- `sets[].reps` — prescribed rep range (string like "4-6"), not completed reps.
+
+**Difference from normalized payload:** Normalized = past program (actual weights/results). Generated = next program (prescribed rep ranges). Same exercise shape so generated output becomes the next normalized baseline after completion.
+
+---
 
 ### programming_feedback
 
-Coach feedback on generated programs. Retool form inserts here; feeds into exclusions and rule tuning. See [IMPROVEMENTS.md](IMPROVEMENTS.md).
+**Purpose:** Coach feedback on generated programs. Retool form inserts here; feeds into exclusions and rule tuning.
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | uuid | PK |
-| `run_id` | uuid (nullable) | Which generation run |
-| `member_id` | uuid | Which member's program |
-| `coach_id` | uuid (nullable) | Who gave feedback |
-| `feedback_type` | text | exercise_swap, pairing_issue, too_hard, too_easy, positive, other |
-| `details` | text (nullable) | Free text from coach |
-| `exercise_id` | uuid (nullable) | If about a specific exercise |
-| `resolved` | boolean (default false) | Has it been acted on |
-| `created_at`, `updated_at` | timestamptz | Audit |
+| Column | Type | Use |
+|--------|------|-----|
+| id | uuid | PK |
+| run_id | uuid (nullable) | Which generation run |
+| member_id | uuid | Which member's program |
+| coach_id | uuid (nullable) | Who gave feedback |
+| feedback_type | text | exercise_swap, pairing_issue, too_hard, too_easy, positive, other |
+| details | text (nullable) | Free text from coach |
+| exercise_id | uuid (nullable) | If about a specific exercise |
+| resolved | boolean (default false) | Has it been acted on |
+| created_at, updated_at | timestamptz | Audit |
 
-Indexes: `member_id`, `run_id` (partial), `resolved` (partial, unresolved), `exercise_id` (partial). Migration: `20250225100008`.
+Migration: `20250225100008`.
 
 ---
 
-## Engine config tables (schema to add)
+### programming_rules
 
-These tables are specified in [engine-config.md](engine-config.md). Add them to the schema section below when implementing; create migrations when adding the tools that read them.
+**Purpose:** Deterministic rules the engine loads before generating a program.
+
+| Column | Type | Use |
+|--------|------|-----|
+| id | uuid | PK |
+| gym | gym enum (nullable) | NULL = all gyms; non-null = gym-specific override |
+| name | text | Human-readable label |
+| category | text | volume, progression, exercise_selection, structure, member_specific |
+| rule_key | text | Machine key |
+| rule_value | jsonb | Flexible payload |
+| priority | integer | Higher overrides lower for same rule_key |
+| active | boolean | Only load where true |
+| source | text (nullable) | Who/what created: 'manual', 'seed', later 'agent:slack_feedback' |
+| source_ref | text (nullable) | Link to origin (Slack URL, coach note ID) |
+| created_at, updated_at | timestamptz | Audit |
+
+**Load query:**
+```sql
+SELECT * FROM programming_rules
+WHERE (gym = :gym OR gym IS NULL) AND active = true
+ORDER BY priority DESC;
+```
+
+---
 
 ### programming_progression_schemes
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | uuid | PK |
-| `gym` | gym (enum, nullable) | Uses existing Supabase enum `gym`; NULL = all gyms |
-| `name` | text | e.g. "Default Locker Room" |
-| `goal` | text (nullable) | e.g. default, strength, hypertrophy for branching |
-| `scheme_type` | text (nullable) | Optional alternate identifier for scheme branch |
-| `from_rep_range` | text | e.g. "10-12", "8-10" |
-| `to_rep_range` | text | e.g. "8-10", "6-8" |
-| `exercise_behavior` | text or jsonb | e.g. "same_exercises" \| "allow_exercise_changes" |
-| `order` | int | Order when multiple schemes apply |
-| `active` | boolean | Include in engine |
-| `created_at`, `updated_at` | timestamptz | Audit |
+**Purpose:** Config for rep-range progression. Engine picks rows by scheme name and cycles through in order.
 
-Indexes: `(gym, active)`, `(name, active)`, `(goal, active)` where goal is not null. **Seeded:** GPP (order 1–4, 10-12→8-10→6-8→4-6→10-12), Hypertrophy, Strength. Engine selects by scheme **name** (member’s chosen scheme); cycles through rows in **order**. See [engine-config.md](engine-config.md).
+| Column | Type | Use |
+|--------|------|-----|
+| id | uuid | PK |
+| gym | gym enum (nullable) | NULL = all gyms |
+| name | text | e.g. "Default Locker Room" |
+| goal | text (nullable) | default, strength, hypertrophy |
+| from_rep_range | text | e.g. "10-12" |
+| to_rep_range | text | e.g. "8-10" |
+| exercise_behavior | text or jsonb | "same_exercises" or "allow_exercise_changes" |
+| order | int | Cycle order within scheme |
+| active | boolean | Include in engine |
+| created_at, updated_at | timestamptz | Audit |
+
+Seeded: GPP (order 1–4: 10-12→8-10→6-8→4-6→10-12), Hypertrophy, Strength. See [engine-config.md](engine-config.md).
+
+---
 
 ### programming_exercise_exclusions
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `id` | uuid | PK |
-| `member_id` | uuid (FK) | Member |
-| `exercise_id` | uuid (FK) | Exercise to exclude for this member |
-| `reason` | text (nullable) | Optional |
-| `active` | boolean | If false, exclusion ignored |
-| `created_at`, `updated_at` | timestamptz | Audit |
+**Purpose:** Per-member exercises the engine must never assign. Sourced from injuries, contraindications, and coach feedback.
+
+| Column | Type | Use |
+|--------|------|-----|
+| id | uuid | PK |
+| member_id | uuid (FK) | Member |
+| exercise_id | uuid (FK) | Exercise to exclude |
+| reason | text (nullable) | Optional |
+| active | boolean | If false, exclusion ignored |
+| created_at, updated_at | timestamptz | Audit |
 
 ---
 
-## Rules table (existing plan)
+### exercise_library
 
-- **programming_rules** — Columns: id, gym (enum `gym`, nullable), name, category, rule_key, rule_value (jsonb), priority, active, created_at, updated_at. Engine loads rows where `gym = :gym OR gym IS NULL` and `active = true`; higher priority overrides. Indexes: `(gym, active)`, `(category)`. Narrative source: [programming-rules-source.md](programming-rules-source.md).
+**Purpose:** Canonical list of available exercises with tags.
+
+| Column | Type |
+|--------|------|
+| exercise_id | text |
+| exercise_name | text |
+| tags | text |
+
+Built by trigger from `member_tbhealthmax` + `member_tbresults`. Synced weekly to Google Sheet.
 
 ---
 
-## Phase detection (`tools/detect_phase.py`)
+### member_programs (display only)
 
-Determines a member's current progression phase from their normalised sessions and recommends the next phase. Integrated into `normalize_one_member.py` (pass `--scheme <name>`) and usable standalone.
+**Purpose:** Team-facing display table. Not used by the engine for generation. May be updated after generation to reflect the output.
+
+---
+
+## Join Paths
+
+```
+member_database.id
+  ├── member_tbresults.member_id               (raw TB data)
+  ├── programming_normalized_programs.member_id (enriched baseline)
+  ├── programming_generated.member_id           (engine output)
+  ├── programming_feedback.member_id            (coach feedback)
+  ├── programming_exercise_exclusions.member_id (exclusions)
+  └── member_programs.member_id                 (display)
+
+programming_rules              (loaded by gym, no member join)
+programming_progression_schemes (loaded by scheme name)
+exercise_library                (lookup by exercise_name/tags)
+```
+
+---
+
+## Engine Read Path (summary)
+
+1. **Cohort:** `member_database` → active, non-test members.
+2. **Past program:** `programming_normalized_programs` → most recent payload per member (has order, series, pairings).
+3. **Latest performance:** `member_tbresults` → most recent N weeks for weights/reps and drift detection.
+4. **Rules:** `programming_rules` → filtered by gym + active.
+5. **Progression:** `programming_progression_schemes` → by scheme name + order.
+6. **Exclusions:** `programming_exercise_exclusions` → per-member blocked exercises.
+7. **Exercise catalog:** `exercise_library` → available exercises + tags.
+
+---
+
+## Phase Detection (`tools/detect_phase.py`)
+
+Determines a member's current progression phase from normalised A-series reps and recommends the next phase.
 
 ### Algorithm
 
-1. **Extract A-series reps only.** B/C/D-series accessories run at higher rep ranges regardless of phase and would skew detection. Only exercises with `series_label` in `{A1, A2}` are sampled.
-
-2. **Compute block medians.** Sessions are grouped into blocks of 4 (one training week). The median rep count of A-series working sets in each block is calculated. Block 0 = most recent.
-
-3. **Map median to detection band.** Each scheme rep-range has an overlapping detection band:
+1. **Extract A-series reps only.** Only exercises with `series_label` in {A1, A2} are sampled (B/C accessories run at higher reps and would skew detection).
+2. **Compute block medians.** Sessions grouped into blocks of 4 (one training week). Median rep count of A-series working sets per block.
+3. **Map median to detection band.**
 
    | Scheme range | Detection band | Centre |
    |-------------|----------------|--------|
-   | 10-12 | 9--14 | 11 |
-   | 8-10 | 7--11 | 9 |
-   | 6-8 | 5--9 | 7 |
-   | 4-6 | 3--7 | 5 |
-   | 3-5 | 1--6 | 4 |
+   | 10-12 | 9–14 | 11 |
+   | 8-10 | 7–11 | 9 |
+   | 6-8 | 5–9 | 7 |
+   | 4-6 | 3–7 | 5 |
+   | 3-5 | 1–6 | 4 |
 
-   The range whose centre is closest to the median wins.
+4. **Direction of travel.** Compare block 0 to block 1: down (>0.5 drop) = progressing, up (>0.5 rise) = reset, flat = stalling.
+5. **Resolve overlap.** Direction breaks tie: down → lower range, up → higher range, flat → closest centre.
+6. **Look up next phase.** Match detected `from_rep_range` to `programming_progression_schemes` row. `to_rep_range` = recommendation.
+7. **Confidence:** high (distance ≤1, clear direction), medium (distance ≤2), low (ambiguous — flag for coach review).
 
-4. **Direction of travel.** Compare block 0 median to block 1 median:
-   - **down** (>0.5 drop): reps are decreasing — progressing through the scheme.
-   - **up** (>0.5 rise): reps jumped — likely a reset.
-   - **flat**: stalling or mixed-intensity block.
-
-5. **Resolve overlap.** If the median sits in two bands, direction breaks the tie: down picks the lower range, up picks the higher range, flat keeps the closest centre.
-
-6. **Look up next phase.** Match the detected `from_rep_range` to a row in `programming_progression_schemes` for the member's scheme. The row's `to_rep_range` is the recommendation.
-
-7. **Confidence score.**
-   - **high**: distance to centre <= 1 and direction is clear (or only one block of history).
-   - **medium**: distance <= 2 and direction is known.
-   - **low**: ambiguous — flag for coach review, do not auto-generate.
-
-### Output shape (in payload `phase_detection`)
+### Output shape
 
 ```json
 {
   "current_rep_range": "4-6",
-  "current_order": 3,
   "next_rep_range": "3-5",
-  "next_order": 4,
-  "exercise_behavior": "same_exercises",
   "confidence": "medium",
   "median_reps": 5,
-  "direction": "flat",
-  "n_reps_sampled": 27,
-  "blocks_analysed": 19
+  "direction": "flat"
 }
 ```
 
 ### Usage
 
 ```bash
-# Standalone
 python tools/detect_phase.py <member_id> Strength
-
-# Via normalize (writes phase_detection to staging payload)
 python tools/normalize_one_member.py <member_id> --scheme Strength
 ```

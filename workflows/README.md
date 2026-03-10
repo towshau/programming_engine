@@ -7,7 +7,7 @@ This folder documents the **order of operations** for the engine. The pipeline c
 ## Pipeline order
 
 ### 1. Ingest / Normalize
-Read `member_tbresults` + `exercise_library` for a member → normalised past program (sessions by day, series labels A1/A2/B1/...) → write to `programming_past_programs_staging`.
+Read `member_tbresults` + `exercise_library` for a member → normalised past program (sessions by day, series labels A1/A2/B1/...) → write to `programming_normalized_programs`.
 
 **Tool:** `python tools/normalize_one_member.py <member_id> [--scheme GPP|Strength|Hypertrophy]`
 
@@ -40,7 +40,7 @@ Persist the generated program JSON to `programming_generated` with run_id, membe
 
 Runs all 4 steps. Writes to both staging and generated tables. Options:
 - `--dry-run` — print program JSON without writing to Supabase.
-- `--skip-staging` — don't write to `programming_past_programs_staging`.
+- `--skip-staging` — don't write to `programming_normalized_programs`.
 - `--output FILE` — save program JSON to a local file.
 - `--duration-weeks 4|6` — program duration (default 6).
 
@@ -50,7 +50,7 @@ Runs all 4 steps. Writes to both staging and generated tables. Options:
 
 | Step | Tool | Input | Output |
 |------|------|-------|--------|
-| Ingest | normalize_one_member.py | member_tbresults, exercise_library | programming_past_programs_staging |
+| Ingest | normalize_one_member.py | member_tbresults, exercise_library | programming_normalized_programs |
 | Config | load_rules.py | programming_rules, schemes, exclusions | JSON config bundle |
 | Generate | generate_program.py | past program, config, library, phase | canonical program JSON |
 | Write | write_programs.py | program JSON | programming_generated |

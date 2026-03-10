@@ -4,9 +4,9 @@ Normalize past program for one member and write to staging.
 
 Reads member_tbresults + exercise_library for the given member_id, groups by
 **day (assigned_date)** so all exercises on the same day form one session (Day 1,
-Day 2, ...), then writes one row to programming_past_programs_staging.
+Day 2, ...), then writes one row to programming_normalized_programs.
 
-Where normalized workouts go: programming_past_programs_staging (one row per
+Where normalized workouts go: programming_normalized_programs (one row per
 member per run_id; payload = jsonb with sessions/exercises/sets).
 
 Usage:
@@ -243,8 +243,8 @@ def main():
         "payload": payload,
     }
 
-    supabase.table("programming_past_programs_staging").insert(row).execute()
-    print(f"\nUpserted 1 row to programming_past_programs_staging: run_id={run_id}, member_id={member_id}")
+    supabase.table("programming_normalized_programs").insert(row).execute()
+    print(f"\nUpserted 1 row to programming_normalized_programs: run_id={run_id}, member_id={member_id}")
     print("Payload sessions:", len(payload["sessions"]))
 
 

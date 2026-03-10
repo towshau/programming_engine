@@ -13,14 +13,14 @@ Apply migrations in `supabase/migrations/` in order. All programming-engine tabl
 - [x] **programming_removal_requests** — Queue for "deleted exercise" reports; admin/Retool submits; senior coach reviews. Migration: `20250225100002`.
 - [x] **programming_rules** — General rules (gym, category, rule_key, rule_value jsonb, priority, active). Migration: `20250225100003`. Seeded 15 rules: `20250225100006`, `20250225100010`.
 - [x] **programming_generated** — run_id, member_id, assigned_to, sessions_per_week, payload, duration_weeks, phase_number, scheme_name, rep_range, changes_summary, rules_applied. Migrations: `20250225100005`, `20250225100009`.
-- [x] **programming_past_programs_staging** — run_id, member_id, assigned_to, payload jsonb. Migration: `20250225100004`.
+- [x] **programming_normalized_programs** — run_id, member_id, assigned_to, payload jsonb. Migration: `20250225100004`.
 - [x] **programming_feedback** — Coach feedback on programs (run_id, member_id, coach_id, feedback_type, details, exercise_id, resolved). Migration: `20250225100008`.
 
 ---
 
 ## 2. Ingest and normalization
 
-- [x] **Normalized past program** — Tool/script that reads `member_tbresults` + `exercise_library` and writes normalized "past program" per member to `programming_past_programs_staging` (and/or JSON). Validate accuracy before wiring rules/LLM. **Done:** `tools/normalize_one_member.py` (sessions by assigned_date, series labels A1/B1/C1…, optional phase detection via `--scheme`). `tools/detect_phase.py` for standalone phase detection.
+- [x] **Normalized past program** — Tool/script that reads `member_tbresults` + `exercise_library` and writes normalized "past program" per member to `programming_normalized_programs` (and/or JSON). Validate accuracy before wiring rules/LLM. **Done:** `tools/normalize_one_member.py` (sessions by assigned_date, series labels A1/B1/C1…, optional phase detection via `--scheme`). `tools/detect_phase.py` for standalone phase detection.
 
 ---
 
@@ -40,7 +40,7 @@ Apply migrations in `supabase/migrations/` in order. All programming-engine tabl
 ## 4. Admin and operations
 
 - [ ] **Retool: Deleted-exercise form** — Form connects to Supabase; on submit, insert into `programming_removal_requests` (no direct delete). Senior coach / head coach reviews in queue; actual delete/deactivate is separate gated step after approval.
-- [ ] **Retool: View programs** — View/list on `programming_past_programs_staging` and `programming_generated`; filter by member, date, and (when available) coach. Unpack payload into readable program cards.
+- [ ] **Retool: View programs** — View/list on `programming_normalized_programs` and `programming_generated`; filter by member, date, and (when available) coach. Unpack payload into readable program cards.
 - [ ] **Retool: Feedback form** — Form next to program view; insert into `programming_feedback`. Coach flags programs in 30 seconds.
 - [ ] **Retool: Flagged programs counter** — Badge/count of unresolved feedback per member or run.
 - [ ] **PDF export on demand** — Export run or per-coach subset to PDF for audit/share; script or Retool button; optional store in Supabase Storage or shared drive.

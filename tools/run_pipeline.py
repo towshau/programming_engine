@@ -3,7 +3,7 @@
 End-to-end pipeline: Ingest -> Load config -> Generate -> Write.
 
 Runs all four steps for one member and persists the generated program to
-programming_generated (and optionally to programming_past_programs_staging).
+programming_generated (and optionally to programming_normalized_programs).
 
 Usage:
   python tools/run_pipeline.py <member_id> --scheme Strength --sessions-per-week 3
@@ -13,7 +13,7 @@ Options:
   --scheme           GPP | Strength | Hypertrophy (default GPP)
   --sessions-per-week  2, 3, or 4 (default 3)
   --duration-weeks   4 or 6 (default 6)
-  --skip-staging     Don't write to programming_past_programs_staging
+  --skip-staging     Don't write to programming_normalized_programs
   --dry-run          Print program JSON but don't write to Supabase
   --output FILE      Also save program JSON to a local file
 
@@ -88,8 +88,8 @@ def main():
             "assigned_to": None,
             "payload": past,
         }
-        sb.table("programming_past_programs_staging").insert(staging_row).execute()
-        print(f"  Written to programming_past_programs_staging.")
+        sb.table("programming_normalized_programs").insert(staging_row).execute()
+        print(f"  Written to programming_normalized_programs.")
 
     # ── Step 2: Phase Detection ──
     print(f"\n[2/4] Phase detection (scheme={args.scheme})...")
