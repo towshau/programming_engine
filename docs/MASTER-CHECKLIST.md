@@ -33,7 +33,8 @@ Apply migrations in `supabase/migrations/` in order. All programming-engine tabl
 - [x] **Tool: generate** — Deterministic generator: past program + rules + phase detection + library → canonical JSON. **Done:** `tools/generate_program.py`; carries forward exercises with updated rep ranges; applies exclusions, C-series rules, avoid list. Standalone: `python tools/generate_program.py <member_id> --scheme Strength`.
 - [x] **Tool: write** — Persist generated programs to Supabase. **Done:** `tools/write_programs.py`; payload from file or stdin → `programming_generated`. Canonical payload shape in data-model.md.
 - [x] **Pipeline runner** — End-to-end: Ingest → Phase detect → Load config → Generate → Write. **Done:** `tools/run_pipeline.py <member_id> --scheme Strength --sessions-per-week 3`. Options: --dry-run, --skip-staging, --output.
-- [x] **Workflows** — Markdown SOPs in `workflows/` (ingest → load → generate → write). **Done:** `workflows/README.md` with all tools, options, and summary table. Cue for generate TBD (manual, cron, Retool).
+- [x] **Batch generator** — Weekly batch: query `member_programs` for due/awaiting members, run pipeline for each, write to `programming_generated`. Skip recently generated. **Done:** `tools/run_weekly_batch.py`. Options: --dry-run, --limit, --member-id. GitHub Actions runs Monday 09:00 UTC. `member_programs.scheme_name` (default GPP) drives per-member scheme.
+- [x] **Workflows** — Markdown SOPs in `workflows/` (ingest → load → generate → write). **Done:** `workflows/README.md` with all tools, options, and summary table. Scheduled via GitHub Actions (`.github/workflows/programming-engine-weekly.yml`).
 
 ---
 
@@ -63,7 +64,7 @@ Apply migrations in `supabase/migrations/` in order. All programming-engine tabl
 - [x] Sessions per week formula — **Done:** Auto-detected from member's recent training history (distinct day signatures in last ~4 weeks). Manual override via `--sessions-per-week`. See `generate_program.py` `detect_sessions_per_week()`.
 - [ ] Deleted exercises — How recognised (feedback vs system)? Flow documented in build-plan.
 - [ ] Exact exercise_behavior values and semantics — same_exercises vs allow_exercise_changes.
-- [ ] Where does member goal live? — For progression branching (strength / hypertrophy etc.).
+- [x] Where does member goal live? — **Done:** `member_programs.scheme_name` (default GPP). Migration: `20250311000001`. Coaches update via Retool.
 
 ---
 

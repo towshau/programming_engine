@@ -68,7 +68,8 @@
   - **write_programs.py** — Persist generated program JSON to `programming_generated`. Input: payload from file or stdin; required: --run-id, --member-id, --sessions-per-week; optional: phase_number, scheme_name, rep_range, changes_summary, rules_applied. See docs/data-model.md (canonical payload shape).
   - **run_pipeline.py** — End-to-end pipeline runner: Ingest → Phase detect → Load config → Generate → Write. Single command for one member: `python tools/run_pipeline.py <member_id> --scheme Strength --sessions-per-week 3`. Options: `--dry-run`, `--skip-staging`, `--output FILE`.
   - **apply_auto_exclusions.py** — Feedback → programming_exercise_exclusions (e.g. 3+ negative feedbacks → exclude exercise for member).
-- **Workflows:** Chronological order: Ingest → Load config → Generate → Write. See **workflows/README.md**. Cue for *when* to generate is TBD (manual, cron, Retool).
+  - **run_weekly_batch.py** — Weekly batch generator: queries `member_programs` for members due within 8 days (`update_stage`/`complete`) or `awaiting_program`; skips members with a `programming_generated` row from the last 7 days; runs normalize → phase detect → generate for each; writes to `programming_generated` only (stage/due_date updates are manual). Options: `--dry-run`, `--limit N`, `--member-id <uuid>`, `--duration-weeks N`. Uses `scheme_name` from `member_programs` per member.
+- **Workflows:** Chronological order: Ingest → Load config → Generate → Write. See **workflows/README.md**. Batch generation runs weekly via GitHub Actions (Monday 09:00 UTC) or on demand via `workflow_dispatch`.
 
 ---
 
@@ -123,7 +124,7 @@ Two separate layers:
 - Sessions per week: member-level config?
 - Deleted exercises: user feedback vs system?
 - exercise_behavior values and semantics.
-- Where does member goal / selected scheme live?
+- ~~Where does member goal / selected scheme live?~~ → `member_programs.scheme_name` (default GPP). Coaches update via Retool.
 
 ---
 

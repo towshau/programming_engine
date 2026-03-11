@@ -294,9 +294,23 @@ Built by trigger from `member_tbhealthmax` + `member_tbresults`. Synced weekly t
 
 ---
 
-### member_programs (display only)
+### member_programs
 
-**Purpose:** Team-facing display table. Not used by the engine for generation. May be updated after generation to reflect the output.
+**Purpose:** Team-facing display table and batch-generation trigger. The engine reads `due_date`, `programming_stage`, and `scheme_name` to determine which members need a new program.
+
+**Key columns for the engine:**
+
+| Column | Type | Use |
+|--------|------|-----|
+| member_id | uuid | FK to member_database.id |
+| member_name | text | Display |
+| due_date | date | Program expiry; batch runner triggers 8 days before |
+| programming_stage | text | Enum: awaiting_program, update_stage, complete, uploaded, inactive |
+| programming_coach_id | uuid | Coach assignment |
+| scheme_name | text (default 'GPP') | Progression scheme: GPP, Strength, Hypertrophy |
+| duration_weeks | integer | Program length in weeks |
+
+**Batch cohort query:** Members where `(due_date <= today + 8 AND programming_stage IN (update_stage, complete))` OR `programming_stage = 'awaiting_program'`. Skip if `programming_generated` row exists from last 7 days.
 
 ---
 
