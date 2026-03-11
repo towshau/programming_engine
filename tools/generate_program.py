@@ -96,7 +96,7 @@ def _apply_press_pull_pairing(exercises, rules):
             pairs.append((press, None))
     solo_pulls = remaining_pulls
 
-    SERIES = ["A", "B", "C", "D"]
+    SERIES = ["A", "B", "C", "D", "E", "F", "G", "H"]
     result = []
     si = 0
 

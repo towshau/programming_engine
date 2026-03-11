@@ -72,7 +72,14 @@ def fetch_exercise_library(supabase):
 
 
 SERIES_ORDER = ["A", "B", "C", "D"]
+EXTENDED_SERIES = ["A", "B", "C", "D", "E", "F", "G", "H"]
 MAX_PER_SERIES = 2
+
+_NON_EXERCISE_PATTERNS = {
+    "step count", "body weight", "health tracking",
+    "physicals assessment", "physicals test", "deload",
+    "wr - a -", "wr - b -", "wr - c -",
+}
 
 
 def _series_priority(series_list):
@@ -93,10 +100,13 @@ def assign_series(exercises, exercise_lib):
     - Max 2 exercises per series.
     - Each exercise is placed in its earliest eligible series that still has room.
     - Warm Up exercises are separated into their own group.
-    - Exercises with no series_assignment (metrics, etc.) are excluded.
+    - Exercises with no series_assignment but real workout data (has reps, not a
+      tracking entry) are placed at the end of the workout (E, F, ... series)
+      so they're carried forward into the next program.
     """
     warm_up = []
     to_place = []
+    unclassified = []
 
     for ex in exercises:
         info = exercise_lib.get(ex["exercise_name"]) or {}
@@ -105,7 +115,13 @@ def assign_series(exercises, exercise_lib):
             ex["series_label"] = "Warm Up"
             warm_up.append(ex)
         elif not eligibility:
-            ex["series_label"] = None
+            name_lower = ex["exercise_name"].lower()
+            is_tracking = any(pat in name_lower for pat in _NON_EXERCISE_PATTERNS)
+            has_reps = any(s.get("reps") for s in ex.get("sets", []))
+            if not is_tracking and has_reps:
+                unclassified.append(ex)
+            else:
+                ex["series_label"] = None
         else:
             to_place.append((ex, eligibility))
 
@@ -125,7 +141,6 @@ def assign_series(exercises, exercise_lib):
                 assigned = True
                 break
         if not assigned:
-            # Overflow: all eligible series are full, push to next available
             for s in SERIES_ORDER:
                 if slots[s] < MAX_PER_SERIES:
                     slot_num = slots[s] + 1
@@ -138,7 +153,29 @@ def assign_series(exercises, exercise_lib):
             ex["series_label"] = "extra"
             placed.append(ex)
 
-    return warm_up + placed
+    # Place unclassified exercises after D (into E, F, G, ...)
+    last_idx = max(
+        (EXTENDED_SERIES.index(ex["series_label"][0])
+         for ex in placed
+         if ex.get("series_label", "")[:1] in EXTENDED_SERIES),
+        default=len(SERIES_ORDER) - 1,
+    )
+    si = max(last_idx + 1, len(SERIES_ORDER))
+    ext_slots = {}
+
+    for ex in unclassified:
+        while si < len(EXTENDED_SERIES):
+            letter = EXTENDED_SERIES[si]
+            count = ext_slots.get(letter, 0)
+            if count < MAX_PER_SERIES:
+                ex["series_label"] = f"{letter}{count + 1}"
+                ext_slots[letter] = count + 1
+                break
+            si += 1
+        else:
+            ex["series_label"] = "extra"
+
+    return warm_up + placed + unclassified
 
 
 def normalize(rows, exercise_lib):
