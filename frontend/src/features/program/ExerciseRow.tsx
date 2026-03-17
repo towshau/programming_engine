@@ -1,0 +1,154 @@
+import { useState } from 'react'
+import type { ProgramExercise, CoachEdit, ExerciseLibraryItem } from '../../types'
+import { useEditorStore } from '../../stores/editorStore'
+import { isExerciseEdited } from '../../lib/applyEdits'
+import { cn } from '../../lib/utils'
+import { SeriesLabelDropdown } from './SeriesLabelDropdown'
+import { SetsRepsEditor } from './SetsRepsEditor'
+import { NotesInput } from './NotesInput'
+import { ExerciseSwapModal } from './ExerciseSwapModal'
+
+interface ExerciseRowProps {
+  exercise: ProgramExercise
+  sessionDay: number
+  edits: CoachEdit[]
+  programId: string
+  memberId: string
+  coachId: string | null
+}
+
+export function ExerciseRow({
+  exercise,
+  sessionDay,
+  edits,
+  programId,
+  memberId,
+  coachId,
+}: ExerciseRowProps) {
+  const { addPendingEdit } = useEditorStore()
+  const [showSwapModal, setShowSwapModal] = useState(false)
+  const edited = isExerciseEdited(edits, sessionDay, exercise.series_label)
+
+  const handleSeriesChange = (newLabel: string) => {
+    addPendingEdit({
+      session_day: sessionDay,
+      series_label: exercise.series_label,
+      exercise_id: exercise.exercise_id,
+      edit_type: 'series_change',
+      old_value: { series_label: exercise.series_label },
+      new_value: { series_label: newLabel },
+    })
+  }
+
+  const handleExerciseSwap = (newExercise: ExerciseLibraryItem) => {
+    addPendingEdit({
+      session_day: sessionDay,
+      series_label: exercise.series_label,
+      exercise_id: exercise.exercise_id,
+      edit_type: 'exercise_swap',
+      old_value: {
+        exercise_id: exercise.exercise_id,
+        exercise_name: exercise.exercise_name,
+      },
+      new_value: {
+        exercise_id: newExercise.exercise_id,
+        exercise_name: newExercise.exercise_name,
+        tags: newExercise.tags,
+      },
+    })
+    setShowSwapModal(false)
+  }
+
+  const handleSetsChange = (newSets: number) => {
+    addPendingEdit({
+      session_day: sessionDay,
+      series_label: exercise.series_label,
+      exercise_id: exercise.exercise_id,
+      edit_type: 'sets_change',
+      old_value: { sets: exercise.sets.length },
+      new_value: { sets: newSets },
+    })
+  }
+
+  const handleRepsChange = (newReps: string) => {
+    addPendingEdit({
+      session_day: sessionDay,
+      series_label: exercise.series_label,
+      exercise_id: exercise.exercise_id,
+      edit_type: 'reps_change',
+      old_value: { reps: exercise.sets[0]?.reps ?? '' },
+      new_value: { reps: newReps },
+    })
+  }
+
+  const handleNotesChange = (newNotes: string) => {
+    addPendingEdit({
+      session_day: sessionDay,
+      series_label: exercise.series_label,
+      exercise_id: exercise.exercise_id,
+      edit_type: 'notes_change',
+      old_value: { notes: exercise.notes ?? '' },
+      new_value: { notes: newNotes },
+    })
+  }
+
+  return (
+    <>
+      <div
+        className={cn(
+          'flex items-center gap-3 rounded-lg px-3 py-2 transition-colors group',
+          'bg-zinc-800/30 hover:bg-zinc-800/60',
+          edited && 'ring-1 ring-emerald-500/40 bg-emerald-500/5'
+        )}
+      >
+        <SeriesLabelDropdown
+          value={exercise.series_label}
+          onChange={handleSeriesChange}
+        />
+
+        <button
+          onClick={() => setShowSwapModal(true)}
+          className="flex-1 text-left min-w-0 group/name"
+          title="Click to swap exercise"
+        >
+          <span className="text-sm text-zinc-200 group-hover/name:text-emerald-400 transition-colors truncate block">
+            {exercise.exercise_name}
+          </span>
+          {exercise.tags && (
+            <span className="text-xs text-zinc-500 truncate block">
+              {exercise.tags}
+            </span>
+          )}
+        </button>
+
+        <SetsRepsEditor
+          sets={exercise.sets.length}
+          reps={exercise.sets[0]?.reps ?? ''}
+          onSetsChange={handleSetsChange}
+          onRepsChange={handleRepsChange}
+        />
+
+        <NotesInput
+          value={exercise.notes ?? ''}
+          onChange={handleNotesChange}
+        />
+
+        {edited && (
+          <div className="flex-shrink-0" title="Modified by coach">
+            <svg className="h-4 w-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+            </svg>
+          </div>
+        )}
+      </div>
+
+      {showSwapModal && (
+        <ExerciseSwapModal
+          currentExerciseName={exercise.exercise_name}
+          onSelect={handleExerciseSwap}
+          onClose={() => setShowSwapModal(false)}
+        />
+      )}
+    </>
+  )
+}

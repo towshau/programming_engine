@@ -13,7 +13,7 @@
 
 ---
 
-## Tables (7 total, all created and applied)
+## Tables (9 total, all created and applied)
 
 | Table | Purpose | Key columns |
 |-------|---------|-------------|
@@ -24,6 +24,8 @@
 | programming_normalized_programs | Normalised past program per member per run | run_id, member_id, assigned_to, payload (jsonb). |
 | programming_generated | Generated program per member per run | run_id, member_id, assigned_to, sessions_per_week, duration_weeks, phase_number, scheme_name, rep_range, changes_summary, rules_applied (jsonb), payload (jsonb). |
 | programming_feedback | Coach feedback on generated programs | run_id, member_id, coach_id, feedback_type, details, exercise_id, resolved. |
+| programming_coach_edits | Individual coach edits to generated programs (differential learning) | program_id, member_id, coach_id, session_day, series_label, exercise_id, edit_type, old_value (jsonb), new_value (jsonb). |
+| programming_regeneration_requests | Queue for program regeneration when coaches change scheme/rep-range/sessions | member_id, program_id, requested_by, scheme_name, rep_range, sessions_per_week, status (pending/processing/completed/failed). |
 
 ---
 
@@ -49,7 +51,8 @@
 ## Self-improving features
 
 - **Coach feedback:** programming_feedback table + Retool form. Coaches flag exercise_swap, pairing_issue, too_hard, too_easy, positive, other.
-- **Auto-exclusion:** If exercise gets 3+ negative feedbacks for a member, auto-create row in programming_exercise_exclusions.
+- **Coach edits (differential):** programming_coach_edits table + frontend editor. Each edit (exercise swap, series change, sets/reps/notes) stored with old_value/new_value jsonb. Original generated program is never mutated. Enables: "which exercises get swapped most?", "do edits decrease over time?", "which coaches make the most changes?".
+- **Auto-exclusion:** If exercise gets 3+ negative feedbacks for a member, auto-create row in programming_exercise_exclusions. Future: extend to also read coach_edits (3+ swaps = auto-exclude).
 - **Rule hit tracking:** rules_applied jsonb on programming_generated; track which rules fire, correlate with feedback.
 - **Changes summary:** Human-readable "what changed from last phase" on every generated program.
 - **Flagged programs counter:** Retool badge/count of unresolved feedback per member or run.
@@ -72,6 +75,30 @@
 - **Workflows:** Chronological order: Ingest → Load config → Generate → Write. See **workflows/README.md**. Batch generation runs weekly via GitHub Actions (Monday 09:00 UTC) or on demand via `workflow_dispatch`.
 
 ---
+
+## Program Editor frontend (`frontend/`)
+
+React app for coaches to review and edit generated programs. Stack: React 19 + TypeScript + Vite + Tailwind CSS 4 + Zustand + Supabase JS. Run: `cd frontend && npm run dev`.
+
+- **Coach selector** — top bar dropdown; filters member list by `programming_coach_id` on `member_memberships`.
+- **Member sidebar** — debounced search, shows member name + gym badge; click to load program.
+- **Program viewer** — reads latest `programming_generated` for member; day picker, exercises grouped by series (A/B/C) with color-coded labels.
+- **Inline editing** — click series label to change (dropdown A1–D4), click exercise name to swap (searches `exercise_library`), click sets/reps to edit, add notes. Each edit writes to `programming_coach_edits` with old/new values for differential learning.
+- **Edit overlay** — `applyEdits()` layers coach edits on top of generated payload; emerald ring + pencil icon on saved/modified exercises. Amber banner for unsaved pending edits.
+- **Local-first editing** — edits accumulate in `pendingEdits` (Zustand state) across all days; switching days doesn't lose changes. "Save Program" button (pinned right of day picker) batch-inserts all pending edits to `programming_coach_edits` in one call.
+- **Program config editing** — dual-row header: "Last Program" (read-only badges, greyed) above "Next/Current Program" (editable). Last Program falls back to `programming_normalized_programs` (historical TeamBuildr data) when no previous generated program exists. Editable fields: scheme (GPP/Hypertrophy/Strength dropdown), rep range (filtered by selected scheme from `programming_progression_schemes`), sessions/week (2–6), duration (4–8 weeks, metadata-only UPDATE). Phase auto-derived from scheme + rep range. Confidence read-only.
+- **Regenerate Workout** — when scheme, rep range, or sessions/week differ from saved values, a "Regenerate Workout" button appears. Clicking calls the **Regeneration API** on Railway (`POST /regenerate`), which runs the full pipeline and writes a new program to `programming_generated`. Frontend re-fetches the program on success so the new program appears immediately. Falls back to inserting a row into `programming_regeneration_requests` if the API is not configured.
+- **Add Exercise** — dashed "+ Add Exercise" button below each day's exercises. Opens the exercise picker modal; selected exercise is added with a default series label (next available in sequence) and 3x8-10 prescription. Stored as `exercise_add` edit type in `programming_coach_edits`.
+
+## Regeneration API (`api/`)
+
+FastAPI app deployed on Railway. Wraps the existing Python pipeline (`tools/`) as an HTTP endpoint.
+
+- **`POST /regenerate`** — accepts `{ member_id, scheme_name, rep_range, sessions_per_week, duration_weeks, requested_by, program_id }`. Runs: ingest → phase detect → load config → generate → write to `programming_generated`. Also writes/updates `programming_regeneration_requests` for audit. Returns the new program ID.
+- **`GET /health`** — liveness check.
+- **Auth** — Bearer token via `API_SECRET` env var. CORS locked to allowed origins.
+- **Deploy** — `Dockerfile` at repo root; Railway connects to the same GitHub repo. Env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `API_SECRET`, `CORS_ORIGINS`.
+- **Run locally** — `python -m uvicorn api.main:app --port 8001` (needs `.env` at repo root with Supabase creds).
 
 ## Admin and operations (Retool)
 

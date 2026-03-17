@@ -1,0 +1,92 @@
+import type { CoachEdit, ProgramExercise, ProgramSession } from '../types'
+
+/**
+ * Applies saved coach edits on top of the generated program sessions,
+ * returning a new array with modifications applied. The original is not mutated.
+ */
+export function applyEdits(
+  sessions: ProgramSession[],
+  edits: CoachEdit[]
+): ProgramSession[] {
+  if (!edits.length) return sessions
+
+  const result: ProgramSession[] = JSON.parse(JSON.stringify(sessions))
+
+  for (const edit of edits) {
+    const session = result.find((s) => s.day === edit.session_day)
+    if (!session) continue
+
+    const exerciseIdx = session.exercises.findIndex(
+      (e) => e.series_label === edit.series_label
+    )
+    if (exerciseIdx === -1 && edit.edit_type !== 'series_change' && edit.edit_type !== 'exercise_add') continue
+
+    const exercise: ProgramExercise | undefined = session.exercises[exerciseIdx]
+
+    switch (edit.edit_type) {
+      case 'exercise_swap': {
+        if (!exercise) break
+        exercise.exercise_id = edit.new_value.exercise_id as string
+        exercise.exercise_name = edit.new_value.exercise_name as string
+        if (edit.new_value.tags) exercise.tags = edit.new_value.tags as string
+        break
+      }
+      case 'series_change': {
+        if (!exercise) break
+        exercise.series_label = edit.new_value.series_label as string
+        break
+      }
+      case 'sets_change': {
+        if (!exercise) break
+        const newSetCount = edit.new_value.sets as number
+        const currentReps = exercise.sets[0]?.reps ?? '8-10'
+        exercise.sets = Array.from({ length: newSetCount }, (_, i) => ({
+          set_number: i + 1,
+          reps: currentReps,
+        }))
+        break
+      }
+      case 'reps_change': {
+        if (!exercise) break
+        const newReps = edit.new_value.reps as string
+        exercise.sets = exercise.sets.map((s) => ({ ...s, reps: newReps }))
+        break
+      }
+      case 'notes_change': {
+        if (!exercise) break
+        exercise.notes = edit.new_value.notes as string
+        break
+      }
+      case 'exercise_add': {
+        const newExercise: ProgramExercise = {
+          exercise_id: edit.new_value.exercise_id as string,
+          exercise_name: edit.new_value.exercise_name as string,
+          series_label: edit.new_value.series_label as string,
+          tags: (edit.new_value.tags as string) || undefined,
+          sets: (edit.new_value.sets as { set_number: number; reps: string }[]) ?? [
+            { set_number: 1, reps: '8-10' },
+            { set_number: 2, reps: '8-10' },
+            { set_number: 3, reps: '8-10' },
+          ],
+        }
+        session.exercises.push(newExercise)
+        break
+      }
+    }
+  }
+
+  return result
+}
+
+/**
+ * Checks whether a specific exercise in a session has been edited.
+ */
+export function isExerciseEdited(
+  edits: CoachEdit[],
+  sessionDay: number,
+  seriesLabel: string
+): boolean {
+  return edits.some(
+    (e) => e.session_day === sessionDay && e.series_label === seriesLabel
+  )
+}

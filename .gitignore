@@ -2,3 +2,4 @@
 node_modules/
 .gemini/
 __pycache__/
+dist/
