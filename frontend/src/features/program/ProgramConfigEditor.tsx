@@ -22,11 +22,13 @@ export function ProgramConfigEditor() {
     configDraft,
     progressionSchemes,
     pendingRegen,
+    regenError,
     loading,
     updateConfigDraft,
     saveDurationWeeks,
     requestRegeneration,
     hasConfigChanges,
+    clearRegenError,
   } = useEditorStore()
 
   const schemeNames = useMemo(() => {
@@ -169,6 +171,19 @@ export function ProgramConfigEditor() {
           </button>
         )}
       </div>
+
+      {/* Regeneration error banner */}
+      {regenError && (
+        <div className="flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          <span>{regenError}</span>
+          <button
+            onClick={clearRegenError}
+            className="ml-2 text-red-300 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Pending regeneration banner */}
       {pendingRegen && (

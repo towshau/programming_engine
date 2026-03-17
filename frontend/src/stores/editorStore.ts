@@ -25,6 +25,7 @@ interface EditorState {
   exerciseLibrary: ExerciseLibraryItem[]
   progressionSchemes: ProgressionScheme[]
   pendingRegen: RegenerationRequest | null
+  regenError: string | null
   selectedDay: number | null
   configDraft: {
     scheme_name: string
@@ -57,6 +58,7 @@ interface EditorState {
   saveDurationWeeks: (weeks: number) => Promise<void>
   requestRegeneration: () => Promise<void>
   hasConfigChanges: () => boolean
+  clearRegenError: () => void
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -72,6 +74,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   exerciseLibrary: [],
   progressionSchemes: [],
   pendingRegen: null,
+  regenError: null,
   selectedDay: null,
   configDraft: null,
   loading: { coaches: false, members: false, program: false, saving: false, regenerating: false },
@@ -351,7 +354,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const apiUrl = import.meta.env.VITE_REGEN_API_URL
     const apiSecret = import.meta.env.VITE_REGEN_API_SECRET
 
-    set((s) => ({ loading: { ...s.loading, regenerating: true } }))
+    set((s) => ({ loading: { ...s.loading, regenerating: true }, regenError: null }))
 
     try {
       if (apiUrl && apiSecret) {
@@ -374,8 +377,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({ detail: res.statusText }))
-          console.error('Regeneration failed:', body.detail ?? body)
-          set((s) => ({ loading: { ...s.loading, regenerating: false } }))
+          const msg = body.detail ?? JSON.stringify(body)
+          console.error('Regeneration failed:', msg)
+          set((s) => ({ loading: { ...s.loading, regenerating: false }, regenError: `Regeneration failed: ${msg}` }))
           return
         }
 
@@ -401,6 +405,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
     } catch (err) {
       console.error('Regeneration error:', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ regenError: `Regeneration error: ${msg}` })
     }
 
     set((s) => ({ loading: { ...s.loading, regenerating: false } }))
@@ -415,4 +421,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       configDraft.sessions_per_week !== program.sessions_per_week
     )
   },
+
+  clearRegenError: () => set({ regenError: null }),
 }))
