@@ -39,12 +39,10 @@ from generate_program import generate_next_program, detect_sessions_per_week
 
 app = FastAPI(title="Programming Engine API", version="1.0.0")
 
-ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5180,http://localhost:5173").split(",")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in ALLOWED_ORIGINS],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
