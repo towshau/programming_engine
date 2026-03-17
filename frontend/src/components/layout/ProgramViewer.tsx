@@ -6,15 +6,18 @@ import { ProgramHeader } from '../../features/program/ProgramHeader'
 import { ExerciseCategoryGroup } from '../../features/program/ExerciseCategoryGroup'
 import { AddExerciseButton } from '../../features/program/AddExerciseButton'
 import type { ProgramExercise, CoachEdit } from '../../types'
+import { seriesGroup, seriesSortKey } from '../../lib/utils'
 
 function groupBySeries(exercises: ProgramExercise[]) {
   const groups: Record<string, ProgramExercise[]> = {}
   for (const ex of exercises) {
-    const letter = ex.series_label.charAt(0)
-    if (!groups[letter]) groups[letter] = []
-    groups[letter].push(ex)
+    const group = seriesGroup(ex.series_label)
+    if (!groups[group]) groups[group] = []
+    groups[group].push(ex)
   }
-  return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b))
+  return Object.entries(groups).sort(
+    ([a], [b]) => seriesSortKey(a) - seriesSortKey(b)
+  )
 }
 
 export function ProgramViewer() {

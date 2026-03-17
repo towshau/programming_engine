@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { ExerciseSwapModal } from './ExerciseSwapModal'
 import type { ExerciseLibraryItem, ProgramExercise } from '../../types'
+import { seriesGroup, seriesSortKey } from '../../lib/utils'
 
 interface AddExerciseButtonProps {
   sessionDay: number
@@ -15,20 +16,23 @@ function nextSeriesLabel(existing: ProgramExercise[]): string {
   if (existing.length === 0) return 'A1'
 
   const labels = existing.map((e) => e.series_label)
-  const letterCounts: Record<string, number> = {}
+  const groupCounts: Record<string, number> = {}
   for (const label of labels) {
-    const letter = label.charAt(0)
-    const num = parseInt(label.slice(1), 10) || 0
-    if (!letterCounts[letter] || num > letterCounts[letter]) {
-      letterCounts[letter] = num
+    const grp = seriesGroup(label)
+    const numStr = label.slice(grp.length)
+    const num = parseInt(numStr, 10) || 0
+    if (!groupCounts[grp] || num > groupCounts[grp]) {
+      groupCounts[grp] = num
     }
   }
 
-  const letters = Object.keys(letterCounts).sort()
-  const lastLetter = letters[letters.length - 1] || 'A'
-  const lastNum = letterCounts[lastLetter] || 0
+  const groups = Object.keys(groupCounts).sort(
+    (a, b) => seriesSortKey(a) - seriesSortKey(b)
+  )
+  const lastGroup = groups[groups.length - 1] || 'A'
+  const lastNum = groupCounts[lastGroup] || 0
 
-  return `${lastLetter}${lastNum + 1}`
+  return `${lastGroup}${lastNum + 1}`
 }
 
 export function AddExerciseButton({

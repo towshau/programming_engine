@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { cn, seriesColor } from '../../lib/utils'
+import { cn, seriesColor, seriesGroup } from '../../lib/utils'
 
 const SERIES_OPTIONS = [
+  'WU1', 'WU2', 'WU3', 'WU4',
   'A1', 'A2', 'A3', 'A4',
   'B1', 'B2', 'B3', 'B4',
   'C1', 'C2', 'C3', 'C4',
   'D1', 'D2', 'D3', 'D4',
+  'CD1', 'CD2', 'CD3', 'CD4',
 ]
 
 interface SeriesLabelDropdownProps {
@@ -27,7 +29,7 @@ export function SeriesLabelDropdown({ value, onChange }: SeriesLabelDropdownProp
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const letter = value.charAt(0)
+  const group = seriesGroup(value)
 
   return (
     <div ref={ref} className="relative">
@@ -35,7 +37,7 @@ export function SeriesLabelDropdown({ value, onChange }: SeriesLabelDropdownProp
         onClick={() => setOpen(!open)}
         className={cn(
           'inline-flex items-center rounded px-2 py-1 text-xs font-bold border transition-colors',
-          seriesColor(letter),
+          seriesColor(group),
           'hover:opacity-80 cursor-pointer'
         )}
       >
@@ -46,24 +48,31 @@ export function SeriesLabelDropdown({ value, onChange }: SeriesLabelDropdownProp
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl p-1 grid grid-cols-4 gap-0.5 w-40">
-          {SERIES_OPTIONS.map((opt) => (
-            <button
-              key={opt}
-              onClick={() => {
-                if (opt !== value) onChange(opt)
-                setOpen(false)
-              }}
-              className={cn(
-                'rounded px-2 py-1 text-xs font-medium transition-colors',
-                opt === value
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-zinc-300 hover:bg-zinc-700'
-              )}
-            >
-              {opt}
-            </button>
-          ))}
+        <div className="absolute top-full left-0 mt-1 z-50 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl p-2 space-y-1 w-44">
+          {['WU', 'A', 'B', 'C', 'D', 'CD'].map((grp) => {
+            const opts = SERIES_OPTIONS.filter((o) => seriesGroup(o) === grp)
+            return (
+              <div key={grp} className="flex gap-0.5">
+                {opts.map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => {
+                      if (opt !== value) onChange(opt)
+                      setOpen(false)
+                    }}
+                    className={cn(
+                      'flex-1 rounded px-1.5 py-1 text-xs font-medium transition-colors',
+                      opt === value
+                        ? 'bg-emerald-600 text-white'
+                        : 'text-zinc-300 hover:bg-zinc-700'
+                    )}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

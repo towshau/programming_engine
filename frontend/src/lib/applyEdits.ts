@@ -19,7 +19,7 @@ export function applyEdits(
     const exerciseIdx = session.exercises.findIndex(
       (e) => e.series_label === edit.series_label
     )
-    if (exerciseIdx === -1 && edit.edit_type !== 'series_change' && edit.edit_type !== 'exercise_add') continue
+    if (exerciseIdx === -1 && edit.edit_type !== 'series_change' && edit.edit_type !== 'exercise_add' && edit.edit_type !== 'exercise_delete') continue
 
     const exercise: ProgramExercise | undefined = session.exercises[exerciseIdx]
 
@@ -55,6 +55,12 @@ export function applyEdits(
       case 'notes_change': {
         if (!exercise) break
         exercise.notes = edit.new_value.notes as string
+        break
+      }
+      case 'exercise_delete': {
+        if (exerciseIdx !== -1) {
+          session.exercises.splice(exerciseIdx, 1)
+        }
         break
       }
       case 'exercise_add': {

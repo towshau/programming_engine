@@ -5,6 +5,7 @@ export type EditType =
   | 'reps_change'
   | 'notes_change'
   | 'exercise_add'
+  | 'exercise_delete'
 
 export interface CoachEdit {
   id: string
