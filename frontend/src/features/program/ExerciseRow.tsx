@@ -21,10 +21,11 @@ export function ExerciseRow({
   exercise,
   sessionDay,
   edits,
-  programId,
-  memberId,
-  coachId,
+  programId: _programId,
+  memberId: _memberId,
+  coachId: _coachId,
 }: ExerciseRowProps) {
+  void _programId; void _memberId; void _coachId;
   const { addPendingEdit } = useEditorStore()
   const [showSwapModal, setShowSwapModal] = useState(false)
   const edited = isExerciseEdited(edits, sessionDay, exercise.series_label)

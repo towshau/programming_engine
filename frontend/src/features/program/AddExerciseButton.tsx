@@ -33,11 +33,12 @@ function nextSeriesLabel(existing: ProgramExercise[]): string {
 
 export function AddExerciseButton({
   sessionDay,
-  programId,
-  memberId,
-  coachId,
+  programId: _programId,
+  memberId: _memberId,
+  coachId: _coachId,
   existingExercises,
 }: AddExerciseButtonProps) {
+  void _programId; void _memberId; void _coachId;
   const { addPendingEdit, fetchExerciseLibrary, exerciseLibrary } = useEditorStore()
   const [showModal, setShowModal] = useState(false)
 
