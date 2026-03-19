@@ -251,9 +251,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const toMStatus = (s: string): MStatus =>
       (statusRank[s] !== undefined ? s : 'inactive') as MStatus
 
+    const NEW_MEMBER_DAYS = 28
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - NEW_MEMBER_DAYS)
+    const cutoffStr = cutoff.toISOString().slice(0, 10)
+
     let query = supabase
       .from('member_memberships')
-      .select('member_id, member_name, gym, programming_coach_id, status')
+      .select('member_id, member_name, gym, programming_coach_id, status, start_date')
       .order('member_name')
       .limit(2000)
 
@@ -269,12 +274,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const pgSet = new Set((pgRes.data ?? []).map((r: { member_id: string }) => r.member_id))
     const tbSet = new Set((tbRes.data ?? []).map((r: { member_id: string }) => r.member_id))
+    const today = new Date().toISOString().slice(0, 10)
 
     if (membersRes.data) {
-      const unique = new Map<string, MemberWithCoach>()
+      const unique = new Map<string, MemberWithCoach & { _startDate: string }>()
       for (const row of membersRes.data as Record<string, unknown>[]) {
         const mid = row.member_id as string
         const rowStatus = toMStatus((row.status as string) || 'inactive')
+        const startDate = (row.start_date as string) || ''
         const existing = unique.get(mid)
 
         if (!existing || statusRank[rowStatus] < statusRank[existing.membership_status]) {
@@ -282,6 +289,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           const parts = fullName.split(' ')
           const firstName = parts[0] || ''
           const lastName = parts.slice(1).join(' ') || ''
+
+          const isNew = (rowStatus === 'pending' && startDate > today) ||
+                        (startDate >= cutoffStr)
+          const hasProgram = pgSet.has(mid)
+
           unique.set(mid, {
             member_id: mid,
             member_name: fullName,
@@ -290,22 +302,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             gym: (row.gym as string) || '',
             programming_coach_id: row.programming_coach_id as string,
             membership_status: rowStatus,
-            program_status: pgSet.has(mid) ? 'has_program' : tbSet.has(mid) ? 'has_data' : 'new',
+            program_status: hasProgram ? 'has_program' : isNew ? 'new_member' : 'needs_program',
+            is_new: isNew,
+            _startDate: startDate,
           })
         }
       }
 
-      const programRank = { new: 0, has_data: 1, has_program: 2 }
-      const sorted = Array.from(unique.values()).sort((a, b) => {
-        const aActive = a.membership_status === 'active' ? 0 : 1
-        const bActive = b.membership_status === 'active' ? 0 : 1
-        if (aActive !== bActive) return aActive - bActive
-        if (aActive === 0) {
-          const ps = programRank[a.program_status] - programRank[b.program_status]
-          if (ps !== 0) return ps
-        }
-        return a.member_name.localeCompare(b.member_name)
-      })
+      type PStatus = 'new_member' | 'needs_program' | 'has_program'
+      const programRank: Record<PStatus, number> = { new_member: 0, needs_program: 1, has_program: 2 }
+      const sorted = Array.from(unique.values())
+        .map(({ _startDate: _, ...member }) => member)
+        .sort((a, b) => {
+          const aActive = a.membership_status === 'active' ? 0 : 1
+          const bActive = b.membership_status === 'active' ? 0 : 1
+          if (aActive !== bActive) return aActive - bActive
+          if (aActive === 0) {
+            const ps = programRank[a.program_status] - programRank[b.program_status]
+            if (ps !== 0) return ps
+          }
+          return a.member_name.localeCompare(b.member_name)
+        })
 
       set({ members: sorted })
     }

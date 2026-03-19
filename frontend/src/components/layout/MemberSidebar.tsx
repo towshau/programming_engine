@@ -10,8 +10,8 @@ type StatusFilter = 'all' | 'active' | 'needs_program' | 'new_member' | 'inactiv
 
 const STATUS_DOT_CLASS: Record<ProgramStatus, string> = {
   has_program: 'bg-emerald-500',
-  has_data: 'bg-amber-500',
-  new: 'bg-red-500',
+  needs_program: 'bg-amber-500',
+  new_member: 'bg-red-500',
 }
 
 function getStatusDotClass(membership: MembershipStatus, program: ProgramStatus) {
@@ -40,9 +40,9 @@ export function MemberSidebar() {
           case 'active':
             return m.membership_status === 'active'
           case 'needs_program':
-            return m.membership_status === 'active' && m.program_status === 'has_data'
+            return m.membership_status === 'active' && m.program_status === 'needs_program'
           case 'new_member':
-            return m.membership_status === 'active' && m.program_status === 'new'
+            return m.is_new
           case 'inactive':
             return m.membership_status !== 'active'
           default:
@@ -69,8 +69,8 @@ export function MemberSidebar() {
     return {
       all: members.length,
       active: active.length,
-      needs_program: active.filter((m) => m.program_status === 'has_data').length,
-      new_member: active.filter((m) => m.program_status === 'new').length,
+      needs_program: active.filter((m) => m.program_status === 'needs_program').length,
+      new_member: members.filter((m) => m.is_new).length,
       inactive: members.filter((m) => m.membership_status !== 'active').length,
     }
   }, [members])
