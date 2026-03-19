@@ -117,6 +117,8 @@ function collectChain(
   return indices
 }
 
+type ActiveView = 'next' | 'last'
+
 interface EditorState {
   coaches: Coach[]
   selectedCoach: Coach | null
@@ -127,6 +129,10 @@ interface EditorState {
   pastProgramInfo: PastProgramInfo | null
   savedEdits: CoachEdit[]
   pendingEdits: PendingEdit[]
+  activeView: ActiveView
+  previousSavedEdits: CoachEdit[]
+  previousPendingEdits: PendingEdit[]
+  previousSelectedDay: number | null
   exerciseLibrary: ExerciseLibraryItem[]
   progressionSchemes: ProgressionScheme[]
   pendingRegen: RegenerationRequest | null
@@ -154,9 +160,12 @@ interface EditorState {
   selectMember: (member: MemberWithCoach | null) => void
   fetchProgram: (memberId: string) => Promise<void>
   fetchEdits: (programId: string) => Promise<void>
+  fetchPreviousEdits: (programId: string) => Promise<void>
   fetchExerciseLibrary: () => Promise<void>
   fetchProgressionSchemes: () => Promise<void>
   setSelectedDay: (day: number | null) => void
+  setActiveView: (view: ActiveView) => void
+  setPreviousSelectedDay: (day: number | null) => void
   addPendingEdit: (edit: PendingEdit) => void
   saveProgram: () => Promise<boolean>
   finalizeProgram: () => Promise<boolean>
@@ -182,6 +191,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   pastProgramInfo: null,
   savedEdits: [],
   pendingEdits: [],
+  activeView: 'next' as ActiveView,
+  previousSavedEdits: [],
+  previousPendingEdits: [],
+  previousSelectedDay: null,
   exerciseLibrary: [],
   progressionSchemes: [],
   pendingRegen: null,
@@ -216,6 +229,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       pastProgramInfo: null,
       savedEdits: [],
       pendingEdits: [],
+      activeView: 'next' as ActiveView,
+      previousSavedEdits: [],
+      previousPendingEdits: [],
+      previousSelectedDay: null,
       selectedDay: null,
       members: [],
       configDraft: null,
@@ -265,6 +282,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       pastProgramInfo: null,
       savedEdits: [],
       pendingEdits: [],
+      activeView: 'next' as ActiveView,
+      previousSavedEdits: [],
+      previousPendingEdits: [],
+      previousSelectedDay: null,
       selectedDay: null,
       configDraft: null,
       pendingRegen: null,
@@ -327,6 +348,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         pastProgramInfo: pastInfo,
         selectedDay: 1,
         pendingEdits: [],
+        activeView: 'next' as ActiveView,
+        previousPendingEdits: [],
+        previousSelectedDay: previous?.payload?.sessions?.[0]?.day ?? 1,
         configDraft: {
           scheme_name: current.scheme_name ?? 'GPP',
           rep_range: current.rep_range ?? '8-10',
@@ -335,6 +359,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         },
       })
       get().fetchEdits(current.id)
+      if (previous) {
+        get().fetchPreviousEdits(previous.id)
+      } else {
+        set({ previousSavedEdits: [] })
+      }
 
       const { data: regenData } = await supabase
         .from('programming_regeneration_requests')
@@ -349,7 +378,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         set({ pendingRegen: null })
       }
     } else {
-      set({ program: null, previousProgram: null, pastProgramInfo: null, configDraft: null })
+      set({ program: null, previousProgram: null, pastProgramInfo: null, configDraft: null, previousSavedEdits: [], previousPendingEdits: [], previousSelectedDay: null })
     }
     set((s) => ({ loading: { ...s.loading, program: false } }))
   },
@@ -362,6 +391,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       .order('created_at', { ascending: true })
 
     set({ savedEdits: (data as CoachEdit[] | null) ?? [] })
+  },
+
+  fetchPreviousEdits: async (programId: string) => {
+    const { data } = await supabase
+      .from('programming_coach_edits')
+      .select('*')
+      .eq('program_id', programId)
+      .order('created_at', { ascending: true })
+
+    set({ previousSavedEdits: (data as CoachEdit[] | null) ?? [] })
   },
 
   fetchExerciseLibrary: async () => {
@@ -385,9 +424,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   setSelectedDay: (day) => set({ selectedDay: day }),
+  setActiveView: (view) => set({ activeView: view, saveValidationErrors: null, saveError: null }),
+  setPreviousSelectedDay: (day) => set({ previousSelectedDay: day }),
 
   addPendingEdit: (edit: PendingEdit) => {
     set((s) => {
+      if (s.activeView === 'last') {
+        const cancellable = findCancellableChain(s.previousPendingEdits, edit)
+        if (cancellable) {
+          const kept = s.previousPendingEdits.filter((_, i) => !cancellable.includes(i))
+          return { previousPendingEdits: kept }
+        }
+        return { previousPendingEdits: [...s.previousPendingEdits, edit] }
+      }
       const cancellable = findCancellableChain(s.pendingEdits, edit)
       if (cancellable) {
         const kept = s.pendingEdits.filter((_, i) => !cancellable.includes(i))
@@ -398,11 +447,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   saveProgram: async () => {
-    const { program, pendingEdits, savedEdits, selectedCoach } = get()
-    if (!program || pendingEdits.length === 0) return false
+    const { activeView, program, previousProgram, selectedCoach } = get()
+    const isLast = activeView === 'last'
+    const targetProgram = isLast ? previousProgram : program
+    const currentPending = isLast ? get().previousPendingEdits : get().pendingEdits
+    const currentSaved = isLast ? get().previousSavedEdits : get().savedEdits
 
-    const combinedEdits = [...savedEdits, ...pendingEdits]
-    const editedSessions = applyEdits(program.payload.sessions, combinedEdits)
+    if (!targetProgram || currentPending.length === 0) return false
+
+    const combinedEdits = [...currentSaved, ...currentPending] as CoachEdit[]
+    const editedSessions = applyEdits(targetProgram.payload.sessions, combinedEdits)
     const validationErrors = validateSessionsReps(editedSessions)
     if (validationErrors.length > 0) {
       set({ saveValidationErrors: validationErrors })
@@ -412,9 +466,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ saveValidationErrors: null, saveError: null })
     set((s) => ({ loading: { ...s.loading, saving: true } }))
 
-    const rows = pendingEdits.map((edit) => ({
-      program_id: program.id,
-      member_id: program.member_id,
+    const rows = currentPending.map((edit) => ({
+      program_id: targetProgram.id,
+      member_id: targetProgram.member_id,
       coach_id: selectedCoach?.id ?? null,
       session_day: edit.session_day,
       series_label: edit.series_label,
@@ -430,7 +484,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       .select()
 
     if (!error && data) {
-      const wasUploaded = program.uploaded_to_teambuildr
+      const wasUploaded = targetProgram.uploaded_to_teambuildr
       const patch: Record<string, unknown> = {
         coach_edited: true,
         updated_at: new Date().toISOString(),
@@ -442,19 +496,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       await supabase
         .from('programming_generated')
         .update(patch)
-        .eq('id', program.id)
+        .eq('id', targetProgram.id)
 
-      set((s) => ({
-        savedEdits: [...s.savedEdits, ...(data as CoachEdit[])],
-        pendingEdits: [],
-        program: s.program
-          ? {
-              ...s.program,
-              coach_edited: true,
-              uploaded_to_teambuildr: wasUploaded ? false : s.program.uploaded_to_teambuildr,
-            }
-          : null,
-      }))
+      if (isLast) {
+        set((s) => ({
+          previousSavedEdits: [...s.previousSavedEdits, ...(data as CoachEdit[])],
+          previousPendingEdits: [],
+          previousProgram: s.previousProgram
+            ? {
+                ...s.previousProgram,
+                coach_edited: true,
+                uploaded_to_teambuildr: wasUploaded ? false : s.previousProgram.uploaded_to_teambuildr,
+              }
+            : null,
+        }))
+      } else {
+        set((s) => ({
+          savedEdits: [...s.savedEdits, ...(data as CoachEdit[])],
+          pendingEdits: [],
+          program: s.program
+            ? {
+                ...s.program,
+                coach_edited: true,
+                uploaded_to_teambuildr: wasUploaded ? false : s.program.uploaded_to_teambuildr,
+              }
+            : null,
+        }))
+      }
       set((s) => ({ loading: { ...s.loading, saving: false } }))
       return true
     }
@@ -535,11 +603,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   hasPendingChanges: () => {
-    return get().pendingEdits.length > 0
+    const { activeView, pendingEdits, previousPendingEdits } = get()
+    return activeView === 'last' ? previousPendingEdits.length > 0 : pendingEdits.length > 0
   },
 
   allEdits: () => {
-    const { savedEdits, pendingEdits } = get()
+    const { activeView, savedEdits, pendingEdits, previousSavedEdits, previousPendingEdits } = get()
+    if (activeView === 'last') return [...previousSavedEdits, ...previousPendingEdits]
     return [...savedEdits, ...pendingEdits]
   },
 

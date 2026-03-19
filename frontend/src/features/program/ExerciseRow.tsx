@@ -16,6 +16,7 @@ interface ExerciseRowProps {
   programId: string
   memberId: string
   coachId: string | null
+  readOnly?: boolean
 }
 
 export function ExerciseRow({
@@ -25,14 +26,16 @@ export function ExerciseRow({
   programId: _programId,
   memberId: _memberId,
   coachId: _coachId,
+  readOnly = false,
 }: ExerciseRowProps) {
   void _programId; void _memberId; void _coachId;
   const { addPendingEdit, hasRepsError } = useEditorStore()
   const [showSwapModal, setShowSwapModal] = useState(false)
   const edited = isExerciseEdited(edits, sessionDay, exercise.series_label)
-  const repsInvalid = hasRepsError(sessionDay, exercise.series_label)
+  const repsInvalid = !readOnly && hasRepsError(sessionDay, exercise.series_label)
 
   const handleSeriesChange = (newLabel: string) => {
+    if (readOnly) return
     addPendingEdit({
       session_day: sessionDay,
       series_label: exercise.series_label,
@@ -44,6 +47,7 @@ export function ExerciseRow({
   }
 
   const handleExerciseSwap = (newExercise: ExerciseLibraryItem) => {
+    if (readOnly) return
     addPendingEdit({
       session_day: sessionDay,
       series_label: exercise.series_label,
@@ -63,6 +67,7 @@ export function ExerciseRow({
   }
 
   const handleSetsChange = (newSets: number) => {
+    if (readOnly) return
     addPendingEdit({
       session_day: sessionDay,
       series_label: exercise.series_label,
@@ -76,6 +81,7 @@ export function ExerciseRow({
   const currentUnit = getUnit(exercise.sets)
 
   const handleRepsChange = (newReps: string) => {
+    if (readOnly) return
     addPendingEdit({
       session_day: sessionDay,
       series_label: exercise.series_label,
@@ -87,6 +93,7 @@ export function ExerciseRow({
   }
 
   const handleUnitChange = (newUnit: RepUnit) => {
+    if (readOnly) return
     addPendingEdit({
       session_day: sessionDay,
       series_label: exercise.series_label,
@@ -98,6 +105,7 @@ export function ExerciseRow({
   }
 
   const handleNotesChange = (newNotes: string) => {
+    if (readOnly) return
     addPendingEdit({
       session_day: sessionDay,
       series_label: exercise.series_label,
@@ -109,6 +117,7 @@ export function ExerciseRow({
   }
 
   const handleDelete = () => {
+    if (readOnly) return
     addPendingEdit({
       session_day: sessionDay,
       series_label: exercise.series_label,
@@ -136,22 +145,36 @@ export function ExerciseRow({
         <SeriesLabelDropdown
           value={exercise.series_label}
           onChange={handleSeriesChange}
+          disabled={readOnly}
         />
 
-        <button
-          onClick={() => setShowSwapModal(true)}
-          className="flex-1 text-left min-w-0 group/name"
-          title="Click to swap exercise"
-        >
-          <span className="text-sm text-zinc-200 group-hover/name:text-emerald-400 transition-colors truncate block">
-            {exercise.exercise_name}
-          </span>
-          {exercise.tags && (
-            <span className="text-xs text-zinc-500 truncate block">
-              {exercise.tags}
+        {readOnly ? (
+          <div className="flex-1 min-w-0">
+            <span className="text-sm text-zinc-200 truncate block">
+              {exercise.exercise_name}
             </span>
-          )}
-        </button>
+            {exercise.tags && (
+              <span className="text-xs text-zinc-500 truncate block">
+                {exercise.tags}
+              </span>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowSwapModal(true)}
+            className="flex-1 text-left min-w-0 group/name"
+            title="Click to swap exercise"
+          >
+            <span className="text-sm text-zinc-200 group-hover/name:text-emerald-400 transition-colors truncate block">
+              {exercise.exercise_name}
+            </span>
+            {exercise.tags && (
+              <span className="text-xs text-zinc-500 truncate block">
+                {exercise.tags}
+              </span>
+            )}
+          </button>
+        )}
 
         <SetsRepsEditor
           sets={exercise.sets.length}
@@ -161,12 +184,15 @@ export function ExerciseRow({
           onSetsChange={handleSetsChange}
           onRepsChange={handleRepsChange}
           onUnitChange={handleUnitChange}
+          readOnly={readOnly}
         />
 
-        <NotesInput
-          value={exercise.notes ?? ''}
-          onChange={handleNotesChange}
-        />
+        {!readOnly && (
+          <NotesInput
+            value={exercise.notes ?? ''}
+            onChange={handleNotesChange}
+          />
+        )}
 
         {edited && (
           <div className="flex-shrink-0" title="Modified by coach">
@@ -176,18 +202,20 @@ export function ExerciseRow({
           </div>
         )}
 
-        <button
-          onClick={handleDelete}
-          className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-red-400"
-          title="Remove exercise"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
+        {!readOnly && (
+          <button
+            onClick={handleDelete}
+            className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-red-400"
+            title="Remove exercise"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        )}
       </div>
 
-      {showSwapModal && (
+      {showSwapModal && !readOnly && (
         <ExerciseSwapModal
           currentExerciseName={exercise.exercise_name}
           onSelect={handleExerciseSwap}

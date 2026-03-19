@@ -1,9 +1,12 @@
 import type { GeneratedProgram, PastProgramInfo } from '../../types'
+import { useEditorStore } from '../../stores/editorStore'
 import { Badge } from '../../components/ui/Badge'
 import { ProgramConfigEditor } from './ProgramConfigEditor'
+import { cn } from '../../lib/utils'
 
 interface ProgramHeaderProps {
   program: GeneratedProgram
+  previousProgram: GeneratedProgram | null
   pastProgramInfo: PastProgramInfo | null
   memberName: string
   editCount: number
@@ -11,6 +14,17 @@ interface ProgramHeaderProps {
 
 function formatDateAU(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-AU')
+}
+
+function computeExpiresDate(
+  previousProgram: GeneratedProgram | null,
+  currentProgram: GeneratedProgram,
+): Date | null {
+  const ref = previousProgram?.next_due_date ?? currentProgram.created_at
+  if (!ref) return null
+  const d = new Date(ref)
+  d.setDate(d.getDate() - 1)
+  return d
 }
 
 function PastProgramBadges({ info }: { info: PastProgramInfo }) {
@@ -69,10 +83,20 @@ function PastProgramBadges({ info }: { info: PastProgramInfo }) {
 
 export function ProgramHeader({
   program,
+  previousProgram,
   pastProgramInfo,
   memberName,
   editCount,
 }: ProgramHeaderProps) {
+  const { activeView, setActiveView } = useEditorStore()
+
+  const expiresDate = pastProgramInfo && previousProgram
+    ? computeExpiresDate(previousProgram, program)
+    : null
+
+  const isLastActive = activeView === 'last'
+  const isNextActive = activeView === 'next'
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between">
@@ -100,34 +124,68 @@ export function ProgramHeader({
         </div>
       </div>
 
-      {/* Last program (read-only) */}
+      {/* Last program — clickable tab */}
       {pastProgramInfo && (
-        <div className="rounded-lg border border-zinc-700/60 bg-zinc-800/40 p-3 space-y-2">
+        <button
+          type="button"
+          onClick={() => setActiveView('last')}
+          className={cn(
+            'w-full text-left rounded-lg p-3 space-y-2 transition-all cursor-pointer',
+            isLastActive
+              ? 'border border-blue-500/50 bg-blue-500/5 ring-1 ring-blue-500/20'
+              : 'border border-zinc-700/60 bg-zinc-800/40 hover:border-zinc-600/80',
+          )}
+        >
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+            <span className={cn(
+              'text-[10px] font-semibold uppercase tracking-wider',
+              isLastActive ? 'text-blue-400' : 'text-zinc-500',
+            )}>
               Last Program
             </span>
-            <span className="text-[10px] text-zinc-600">
-              {pastProgramInfo.source === 'generated' ? 'Generated ' : ''}
-              {formatDateAU(pastProgramInfo.created_at)}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-zinc-600">
+                {pastProgramInfo.source === 'generated' ? 'Generated ' : ''}
+                {formatDateAU(pastProgramInfo.created_at)}
+              </span>
+              {expiresDate && (
+                <span className={cn(
+                  'text-[10px]',
+                  expiresDate < new Date() ? 'text-red-400/70' : 'text-zinc-500',
+                )}>
+                  Expires {expiresDate.toLocaleDateString('en-AU')}
+                </span>
+              )}
+            </div>
           </div>
           <PastProgramBadges info={pastProgramInfo} />
-        </div>
+        </button>
       )}
 
-      {/* Next / current program (editable) */}
-      <div className="rounded-lg border border-zinc-600/60 bg-zinc-800/60 p-3 space-y-2">
+      {/* Next / current program — clickable tab */}
+      <button
+        type="button"
+        onClick={() => setActiveView('next')}
+        className={cn(
+          'w-full text-left rounded-lg p-3 space-y-2 transition-all cursor-pointer',
+          isNextActive
+            ? 'border border-emerald-500/50 bg-emerald-500/5 ring-1 ring-emerald-500/20'
+            : 'border border-zinc-700/60 bg-zinc-800/40 hover:border-zinc-600/80',
+        )}
+      >
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+          <span className={cn(
+            'text-[10px] font-semibold uppercase tracking-wider',
+            isNextActive ? 'text-emerald-400' : 'text-zinc-500',
+          )}>
             {pastProgramInfo ? 'Next Program' : 'Current Program'}
           </span>
           <span className="text-[10px] text-zinc-500">
             Generated {formatDateAU(program.created_at)}
           </span>
         </div>
-        <ProgramConfigEditor />
-      </div>
+        {isNextActive && <ProgramConfigEditor />}
+      </button>
 
       {program.changes_summary && (
         <div className="rounded-lg bg-zinc-800/50 border border-zinc-700 px-3 py-2 text-sm text-zinc-300">

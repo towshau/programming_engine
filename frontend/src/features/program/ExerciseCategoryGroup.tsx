@@ -10,6 +10,7 @@ interface ExerciseCategoryGroupProps {
   programId: string
   memberId: string
   coachId: string | null
+  readOnly?: boolean
 }
 
 export function ExerciseCategoryGroup({
@@ -20,6 +21,7 @@ export function ExerciseCategoryGroup({
   programId,
   memberId,
   coachId,
+  readOnly = false,
 }: ExerciseCategoryGroupProps) {
   const colorClasses = seriesColor(seriesLetter)
   const label = seriesGroupLabel(seriesLetter)
@@ -48,6 +50,7 @@ export function ExerciseCategoryGroup({
             programId={programId}
             memberId={memberId}
             coachId={coachId}
+            readOnly={readOnly}
           />
         ))}
       </div>

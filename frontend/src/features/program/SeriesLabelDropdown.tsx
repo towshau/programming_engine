@@ -13,9 +13,10 @@ const SERIES_OPTIONS = [
 interface SeriesLabelDropdownProps {
   value: string
   onChange: (newLabel: string) => void
+  disabled?: boolean
 }
 
-export function SeriesLabelDropdown({ value, onChange }: SeriesLabelDropdownProps) {
+export function SeriesLabelDropdown({ value, onChange, disabled = false }: SeriesLabelDropdownProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -34,17 +35,20 @@ export function SeriesLabelDropdown({ value, onChange }: SeriesLabelDropdownProp
   return (
     <div ref={ref} className="relative">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => !disabled && setOpen(!open)}
+        disabled={disabled}
         className={cn(
           'inline-flex items-center rounded px-2 py-1 text-xs font-bold border transition-colors',
           seriesColor(group),
-          'hover:opacity-80 cursor-pointer'
+          disabled ? 'cursor-default opacity-80' : 'hover:opacity-80 cursor-pointer'
         )}
       >
         {value}
-        <svg className="ml-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
+        {!disabled && (
+          <svg className="ml-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
       </button>
 
       {open && (

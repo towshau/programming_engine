@@ -10,6 +10,7 @@ interface SetsRepsEditorProps {
   onSetsChange: (newSets: number) => void
   onRepsChange: (newReps: string) => void
   onUnitChange: (newUnit: RepUnit) => void
+  readOnly?: boolean
 }
 
 export function SetsRepsEditor({
@@ -20,6 +21,7 @@ export function SetsRepsEditor({
   onSetsChange,
   onRepsChange,
   onUnitChange,
+  readOnly = false,
 }: SetsRepsEditorProps) {
   const [editingSets, setEditingSets] = useState(false)
   const [editingReps, setEditingReps] = useState(false)
@@ -76,6 +78,29 @@ export function SetsRepsEditor({
 
   const handleToggleUnit = () => {
     onUnitChange(isSeconds ? 'reps' : 'seconds')
+  }
+
+  if (readOnly) {
+    return (
+      <div className="flex items-center gap-1 text-sm">
+        <span className="px-1.5 py-0.5 font-medium text-zinc-400">{sets}</span>
+        <span className="text-zinc-600">x</span>
+        <span className={cn(
+          'px-1.5 py-0.5 font-medium',
+          isCustom ? 'text-teal-400/70' : 'text-zinc-400',
+        )}>
+          {repsDisplay}
+        </span>
+        <span className={cn(
+          'rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide border',
+          isSeconds
+            ? 'border-blue-500/30 text-blue-400/60 bg-blue-500/5'
+            : 'border-zinc-700/40 text-zinc-500/60 bg-zinc-800/50',
+        )}>
+          {isSeconds ? 'sec' : 'reps'}
+        </span>
+      </div>
+    )
   }
 
   return (
