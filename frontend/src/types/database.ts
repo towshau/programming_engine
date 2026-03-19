@@ -12,6 +12,9 @@ export interface Member {
   current_status: string
 }
 
+export type ProgramStatus = 'has_program' | 'has_data' | 'new'
+export type MembershipStatus = 'active' | 'pending' | 'indefinite_hold' | 'inactive'
+
 export interface MemberWithCoach {
   member_id: string
   member_name: string
@@ -19,6 +22,8 @@ export interface MemberWithCoach {
   last_name: string
   gym: string
   programming_coach_id: string
+  program_status: ProgramStatus
+  membership_status: MembershipStatus
 }
 
 export interface ExerciseLibraryItem {

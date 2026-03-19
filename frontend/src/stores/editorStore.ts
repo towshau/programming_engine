@@ -244,23 +244,40 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   fetchMembers: async (coachId?: string | null) => {
     set((s) => ({ loading: { ...s.loading, members: true } }))
 
+    const statusRank: Record<string, number> = {
+      active: 0, pending: 1, indefinite_hold: 2, inactive: 3,
+    }
+    type MStatus = 'active' | 'pending' | 'indefinite_hold' | 'inactive'
+    const toMStatus = (s: string): MStatus =>
+      (statusRank[s] !== undefined ? s : 'inactive') as MStatus
+
     let query = supabase
       .from('member_memberships')
-      .select('member_id, member_name, gym, programming_coach_id')
-      .eq('status', 'active')
+      .select('member_id, member_name, gym, programming_coach_id, status')
       .order('member_name')
+      .limit(2000)
 
     if (coachId) {
       query = query.eq('programming_coach_id', coachId)
     }
 
-    const { data } = await query
+    const [membersRes, pgRes, tbRes] = await Promise.all([
+      query,
+      supabase.from('programming_generated').select('member_id').limit(5000),
+      supabase.from('member_tbresults').select('member_id').limit(5000),
+    ])
 
-    if (data) {
+    const pgSet = new Set((pgRes.data ?? []).map((r: { member_id: string }) => r.member_id))
+    const tbSet = new Set((tbRes.data ?? []).map((r: { member_id: string }) => r.member_id))
+
+    if (membersRes.data) {
       const unique = new Map<string, MemberWithCoach>()
-      for (const row of data as Record<string, unknown>[]) {
+      for (const row of membersRes.data as Record<string, unknown>[]) {
         const mid = row.member_id as string
-        if (!unique.has(mid)) {
+        const rowStatus = toMStatus((row.status as string) || 'inactive')
+        const existing = unique.get(mid)
+
+        if (!existing || statusRank[rowStatus] < statusRank[existing.membership_status]) {
           const fullName = (row.member_name as string) || ''
           const parts = fullName.split(' ')
           const firstName = parts[0] || ''
@@ -272,10 +289,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             last_name: lastName,
             gym: (row.gym as string) || '',
             programming_coach_id: row.programming_coach_id as string,
+            membership_status: rowStatus,
+            program_status: pgSet.has(mid) ? 'has_program' : tbSet.has(mid) ? 'has_data' : 'new',
           })
         }
       }
-      set({ members: Array.from(unique.values()) })
+
+      const programRank = { new: 0, has_data: 1, has_program: 2 }
+      const sorted = Array.from(unique.values()).sort((a, b) => {
+        const aActive = a.membership_status === 'active' ? 0 : 1
+        const bActive = b.membership_status === 'active' ? 0 : 1
+        if (aActive !== bActive) return aActive - bActive
+        if (aActive === 0) {
+          const ps = programRank[a.program_status] - programRank[b.program_status]
+          if (ps !== 0) return ps
+        }
+        return a.member_name.localeCompare(b.member_name)
+      })
+
+      set({ members: sorted })
     }
     set((s) => ({ loading: { ...s.loading, members: false } }))
   },
