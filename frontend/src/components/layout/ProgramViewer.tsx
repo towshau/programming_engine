@@ -34,6 +34,8 @@ export function ProgramViewer() {
     fetchProgressionSchemes,
     progressionSchemes,
     saveProgram,
+    finalizeProgram,
+    markUploaded,
     hasPendingChanges,
   } = useEditorStore()
 
@@ -128,31 +130,60 @@ export function ProgramViewer() {
         editCount={totalEditCount}
       />
 
-      {/* Day picker + Save button row */}
+      {/* Day picker + workflow buttons row */}
       <div className="flex items-center justify-between gap-4">
         <DayPicker days={days} selectedDay={selectedDay} onSelect={setSelectedDay} />
 
-        {pending && (
-          <button
-            onClick={saveProgram}
-            disabled={loading.saving}
-            className="flex-shrink-0 rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors flex items-center gap-2"
-          >
-            {loading.saving ? (
-              <>
-                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                Saving…
-              </>
-            ) : (
-              <>
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                </svg>
-                Save Program
-              </>
-            )}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {pending && (
+            <button
+              onClick={saveProgram}
+              disabled={loading.saving}
+              className="flex-shrink-0 rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              {loading.saving ? (
+                <>
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                  Save Program
+                </>
+              )}
+            </button>
+          )}
+
+          {!program.coach_approved && !pending && (
+            <button
+              onClick={async () => {
+                if (window.confirm('Finalize this program? This marks it as coach-approved and calculates the next due date.')) {
+                  await finalizeProgram()
+                }
+              }}
+              disabled={loading.saving}
+              className="flex-shrink-0 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+            >
+              Finalize
+            </button>
+          )}
+
+          {program.coach_approved && !program.uploaded_to_teambuildr && (
+            <button
+              onClick={() => markUploaded()}
+              disabled={loading.saving}
+              className="flex-shrink-0 rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+              Mark Uploaded
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Unsaved changes indicator */}

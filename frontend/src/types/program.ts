@@ -75,5 +75,10 @@ export interface GeneratedProgram {
   changes_summary: string | null
   rules_applied: string[] | null
   payload: ProgramPayload
+  coach_edited: boolean
+  coach_approved: boolean
+  uploaded_to_teambuildr: boolean
+  next_due_date: string | null
   created_at: string
+  updated_at: string
 }

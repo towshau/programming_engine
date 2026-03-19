@@ -77,11 +77,27 @@ export function ProgramHeader({
     <div className="space-y-4">
       <div className="flex items-start justify-between">
         <h2 className="text-xl font-semibold text-zinc-100">{memberName}</h2>
-        {editCount > 0 && (
-          <Badge variant="amber">
-            {editCount} edit{editCount !== 1 ? 's' : ''}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {program.coach_edited && (
+            <Badge variant="blue">Edited</Badge>
+          )}
+          {program.coach_approved && (
+            <Badge variant="emerald">Finalized</Badge>
+          )}
+          {program.uploaded_to_teambuildr && (
+            <Badge variant="default">Uploaded</Badge>
+          )}
+          {program.next_due_date && (
+            <Badge variant="teal">
+              Next: {new Date(program.next_due_date).toLocaleDateString('en-AU')}
+            </Badge>
+          )}
+          {editCount > 0 && (
+            <Badge variant="amber">
+              {editCount} edit{editCount !== 1 ? 's' : ''}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Last program (read-only) */}

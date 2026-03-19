@@ -52,6 +52,8 @@ interface EditorState {
   setSelectedDay: (day: number | null) => void
   addPendingEdit: (edit: PendingEdit) => void
   saveProgram: () => Promise<boolean>
+  finalizeProgram: () => Promise<boolean>
+  markUploaded: () => Promise<boolean>
   hasPendingChanges: () => boolean
   allEdits: () => (CoachEdit | PendingEdit)[]
   updateConfigDraft: (patch: Partial<NonNullable<EditorState['configDraft']>>) => void
@@ -301,9 +303,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       .select()
 
     if (!error && data) {
+      await supabase
+        .from('programming_generated')
+        .update({ coach_edited: true, updated_at: new Date().toISOString() })
+        .eq('id', program.id)
+
       set((s) => ({
         savedEdits: [...s.savedEdits, ...(data as CoachEdit[])],
         pendingEdits: [],
+        program: s.program ? { ...s.program, coach_edited: true } : null,
       }))
       set((s) => ({ loading: { ...s.loading, saving: false } }))
       return true
@@ -311,6 +319,74 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set((s) => ({ loading: { ...s.loading, saving: false } }))
     return false
+  },
+
+  finalizeProgram: async () => {
+    const { program } = get()
+    if (!program) return false
+
+    set((s) => ({ loading: { ...s.loading, saving: true } }))
+
+    let nextDueDate: string | null = null
+    const { data: mpData } = await supabase
+      .from('member_programs')
+      .select('due_date')
+      .eq('member_id', program.member_id)
+      .limit(1)
+      .single()
+
+    if (mpData?.due_date) {
+      const d = new Date(mpData.due_date)
+      d.setDate(d.getDate() + program.duration_weeks * 7)
+      const dow = d.getDay()
+      if (dow !== 1) {
+        d.setDate(d.getDate() + (dow === 0 ? 1 : 8 - dow))
+      }
+      nextDueDate = d.toISOString().slice(0, 10)
+    }
+
+    const { error } = await supabase
+      .from('programming_generated')
+      .update({
+        coach_approved: true,
+        next_due_date: nextDueDate,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', program.id)
+
+    if (!error) {
+      set((s) => ({
+        program: s.program
+          ? { ...s.program, coach_approved: true, next_due_date: nextDueDate }
+          : null,
+      }))
+    }
+
+    set((s) => ({ loading: { ...s.loading, saving: false } }))
+    return !error
+  },
+
+  markUploaded: async () => {
+    const { program } = get()
+    if (!program) return false
+
+    const { error } = await supabase
+      .from('programming_generated')
+      .update({
+        uploaded_to_teambuildr: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', program.id)
+
+    if (!error) {
+      set((s) => ({
+        program: s.program
+          ? { ...s.program, uploaded_to_teambuildr: true }
+          : null,
+      }))
+    }
+
+    return !error
   },
 
   hasPendingChanges: () => {
