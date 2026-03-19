@@ -325,7 +325,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     type PStatus = 'new_member' | 'needs_program' | 'has_program'
-    const programRank: Record<PStatus, number> = { new_member: 0, needs_program: 1, has_program: 2 }
+    const programRank: Record<PStatus, number> = { needs_program: 0, new_member: 1, has_program: 2 }
     members.sort((a, b) => {
       const aActive = a.membership_status === 'active' ? 0 : 1
       const bActive = b.membership_status === 'active' ? 0 : 1
