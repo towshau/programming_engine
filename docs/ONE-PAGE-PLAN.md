@@ -104,7 +104,9 @@ FastAPI app deployed on Railway. Wraps the existing Python pipeline (`tools/`) a
 - **Deploy** — `Dockerfile` at repo root; Railway connects to the same GitHub repo. Env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `API_SECRET`, `CORS_ORIGINS`.
 - **Run locally** — `python -m uvicorn api.main:app --port 8001` (needs `.env` at repo root with Supabase creds).
 
-## Admin and operations (Retool)
+## Admin and operations (Retool + upload)
+
+- **Admin upload (for AI):** Instructions for the admin task of uploading finalized programs to TeamBuildr and marking them uploaded. Written for a future AI agent (e.g. Manus + Playwright). See **docs/admin-upload-instructions-for-ai.md**.
 
 Retool page prompts and specs live in **retool/** (see `retool/README.md` for build order).
 
