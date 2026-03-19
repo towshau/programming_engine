@@ -244,86 +244,89 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   fetchMembers: async (coachId?: string | null) => {
     set((s) => ({ loading: { ...s.loading, members: true } }))
 
-    const statusRank: Record<string, number> = {
-      active: 0, pending: 1, indefinite_hold: 2, inactive: 3,
-    }
-    type MStatus = 'active' | 'pending' | 'indefinite_hold' | 'inactive'
-    const toMStatus = (s: string): MStatus =>
-      (statusRank[s] !== undefined ? s : 'inactive') as MStatus
-
     const NEW_MEMBER_DAYS = 28
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - NEW_MEMBER_DAYS)
     const cutoffStr = cutoff.toISOString().slice(0, 10)
+    const today = new Date().toISOString().slice(0, 10)
 
-    let query = supabase
-      .from('member_memberships')
-      .select('member_id, member_name, gym, programming_coach_id, status, start_date')
-      .order('member_name')
-      .limit(2000)
-
-    if (coachId) {
-      query = query.eq('programming_coach_id', coachId)
-    }
-
-    const [membersRes, pgRes] = await Promise.all([
-      query,
-      supabase.from('programming_generated').select('member_id').limit(5000),
+    const [allMembersRes, activeMembershipRes, pgRes] = await Promise.all([
+      supabase
+        .from('member_database')
+        .select('id, first_name, last_name, member_name')
+        .order('member_name')
+        .limit(2000),
+      supabase
+        .from('member_memberships')
+        .select('member_id, gym, programming_coach_id, start_date, end_date, journey_stage, status')
+        .gt('end_date', today)
+        .not('journey_stage', 'eq', 'no_sale')
+        .not('status', 'eq', 'f&f')
+        .limit(2000),
+      supabase
+        .from('programming_generated')
+        .select('member_id')
+        .limit(5000),
     ])
 
     const pgSet = new Set((pgRes.data ?? []).map((r: { member_id: string }) => r.member_id))
-    const today = new Date().toISOString().slice(0, 10)
 
-    if (membersRes.data) {
-      const unique = new Map<string, MemberWithCoach & { _startDate: string }>()
-      for (const row of membersRes.data as Record<string, unknown>[]) {
-        const mid = row.member_id as string
-        const rowStatus = toMStatus((row.status as string) || 'inactive')
-        const startDate = (row.start_date as string) || ''
-        const existing = unique.get(mid)
-
-        if (!existing || statusRank[rowStatus] < statusRank[existing.membership_status]) {
-          const fullName = (row.member_name as string) || ''
-          const parts = fullName.split(' ')
-          const firstName = parts[0] || ''
-          const lastName = parts.slice(1).join(' ') || ''
-
-          const isNew = (rowStatus === 'pending' && startDate > today) ||
-                        (startDate >= cutoffStr)
-          const hasProgram = pgSet.has(mid)
-
-          unique.set(mid, {
-            member_id: mid,
-            member_name: fullName,
-            first_name: firstName,
-            last_name: lastName,
-            gym: (row.gym as string) || '',
-            programming_coach_id: row.programming_coach_id as string,
-            membership_status: rowStatus,
-            program_status: hasProgram ? 'has_program' : isNew ? 'new_member' : 'needs_program',
-            is_new: isNew,
-            _startDate: startDate,
-          })
-        }
-      }
-
-      type PStatus = 'new_member' | 'needs_program' | 'has_program'
-      const programRank: Record<PStatus, number> = { new_member: 0, needs_program: 1, has_program: 2 }
-      const sorted = Array.from(unique.values())
-        .map(({ _startDate: _, ...member }) => member)
-        .sort((a, b) => {
-          const aActive = a.membership_status === 'active' ? 0 : 1
-          const bActive = b.membership_status === 'active' ? 0 : 1
-          if (aActive !== bActive) return aActive - bActive
-          if (aActive === 0) {
-            const ps = programRank[a.program_status] - programRank[b.program_status]
-            if (ps !== 0) return ps
-          }
-          return a.member_name.localeCompare(b.member_name)
+    const activeMap = new Map<string, { gym: string; programming_coach_id: string; start_date: string }>()
+    for (const row of (activeMembershipRes.data ?? []) as Record<string, unknown>[]) {
+      const mid = row.member_id as string
+      const existing = activeMap.get(mid)
+      const startDate = (row.start_date as string) || ''
+      if (!existing || startDate > existing.start_date) {
+        activeMap.set(mid, {
+          gym: (row.gym as string) || '',
+          programming_coach_id: (row.programming_coach_id as string) || '',
+          start_date: startDate,
         })
-
-      set({ members: sorted })
+      }
     }
+
+    const members: MemberWithCoach[] = []
+    for (const row of (allMembersRes.data ?? []) as Record<string, unknown>[]) {
+      const mid = row.id as string
+      const active = activeMap.get(mid)
+      const isActive = !!active
+
+      if (coachId && active?.programming_coach_id !== coachId) continue
+
+      const fullName = (row.member_name as string) || ''
+      const firstName = (row.first_name as string) || fullName.split(' ')[0] || ''
+      const lastName = (row.last_name as string) || fullName.split(' ').slice(1).join(' ') || ''
+      const startDate = active?.start_date || ''
+      const hasProgram = pgSet.has(mid)
+      const isNew = (startDate > today) || (!!startDate && startDate >= cutoffStr)
+
+      members.push({
+        member_id: mid,
+        member_name: fullName,
+        first_name: firstName,
+        last_name: lastName,
+        gym: active?.gym || '',
+        programming_coach_id: active?.programming_coach_id || '',
+        membership_status: isActive ? 'active' : 'inactive',
+        program_status: hasProgram ? 'has_program' : isNew ? 'new_member' : 'needs_program',
+        is_new: isNew,
+      })
+    }
+
+    type PStatus = 'new_member' | 'needs_program' | 'has_program'
+    const programRank: Record<PStatus, number> = { new_member: 0, needs_program: 1, has_program: 2 }
+    members.sort((a, b) => {
+      const aActive = a.membership_status === 'active' ? 0 : 1
+      const bActive = b.membership_status === 'active' ? 0 : 1
+      if (aActive !== bActive) return aActive - bActive
+      if (aActive === 0) {
+        const ps = programRank[a.program_status] - programRank[b.program_status]
+        if (ps !== 0) return ps
+      }
+      return a.member_name.localeCompare(b.member_name)
+    })
+
+    set({ members })
     set((s) => ({ loading: { ...s.loading, members: false } }))
   },
 
