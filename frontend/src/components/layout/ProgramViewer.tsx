@@ -38,6 +38,7 @@ export function ProgramViewer() {
     markUploaded,
     hasPendingChanges,
     saveValidationErrors,
+    saveError,
     clearSaveValidationError,
   } = useEditorStore()
 
@@ -228,6 +229,26 @@ export function ProgramViewer() {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Save error (Supabase / server) */}
+      {saveError && (
+        <div className="rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-300 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <svg className="h-4 w-4 flex-shrink-0 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            {saveError}
+          </div>
+          <button
+            onClick={clearSaveValidationError}
+            className="flex-shrink-0 rounded p-0.5 text-red-400 hover:bg-red-500/20 hover:text-red-200"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
 

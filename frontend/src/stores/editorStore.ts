@@ -29,6 +29,7 @@ interface EditorState {
   pendingRegen: RegenerationRequest | null
   regenError: string | null
   saveValidationErrors: RepsValidationError[] | null
+  saveError: string | null
   selectedDay: number | null
   configDraft: {
     scheme_name: string
@@ -83,6 +84,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   pendingRegen: null,
   regenError: null,
   saveValidationErrors: null,
+  saveError: null,
   selectedDay: null,
   configDraft: null,
   loading: { coaches: false, members: false, program: false, saving: false, regenerating: false },
@@ -297,7 +299,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return false
     }
 
-    set({ saveValidationErrors: null })
+    set({ saveValidationErrors: null, saveError: null })
     set((s) => ({ loading: { ...s.loading, saving: true } }))
 
     const rows = pendingEdits.map((edit) => ({
@@ -347,7 +349,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return true
     }
 
-    set((s) => ({ loading: { ...s.loading, saving: false } }))
+    set((s) => ({
+      loading: { ...s.loading, saving: false },
+      saveError: error?.message ?? 'Save failed. Please try again.',
+    }))
     return false
   },
 
@@ -529,7 +534,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   clearRegenError: () => set({ regenError: null }),
-  clearSaveValidationError: () => set({ saveValidationErrors: null }),
+  clearSaveValidationError: () => set({ saveValidationErrors: null, saveError: null }),
   hasRepsError: (sessionDay, seriesLabel) => {
     const errs = get().saveValidationErrors
     return !!errs?.some((e) => e.sessionDay === sessionDay && e.seriesLabel === seriesLabel)
