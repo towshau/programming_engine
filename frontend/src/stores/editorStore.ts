@@ -266,14 +266,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       query = query.eq('programming_coach_id', coachId)
     }
 
-    const [membersRes, pgRes, tbRes] = await Promise.all([
+    const [membersRes, pgRes] = await Promise.all([
       query,
       supabase.from('programming_generated').select('member_id').limit(5000),
-      supabase.from('member_tbresults').select('member_id').limit(5000),
     ])
 
     const pgSet = new Set((pgRes.data ?? []).map((r: { member_id: string }) => r.member_id))
-    const tbSet = new Set((tbRes.data ?? []).map((r: { member_id: string }) => r.member_id))
     const today = new Date().toISOString().slice(0, 10)
 
     if (membersRes.data) {
