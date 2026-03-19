@@ -94,6 +94,10 @@ export function ProgramHeader({
     ? computeExpiresDate(previousProgram, program)
     : null
 
+  const nextExpiresDate = program.next_due_date
+    ? (() => { const d = new Date(program.next_due_date); d.setDate(d.getDate() - 1); return d })()
+    : null
+
   const isLastActive = activeView === 'last'
   const isNextActive = activeView === 'next'
 
@@ -180,9 +184,19 @@ export function ProgramHeader({
           )}>
             {pastProgramInfo ? 'Next Program' : 'Current Program'}
           </span>
-          <span className="text-[10px] text-zinc-500">
-            Generated {formatDateAU(program.created_at)}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-zinc-500">
+              Generated {formatDateAU(program.created_at)}
+            </span>
+            {nextExpiresDate && (
+              <span className={cn(
+                'text-[10px]',
+                nextExpiresDate < new Date() ? 'text-red-400/70' : 'text-zinc-500',
+              )}>
+                Expires {nextExpiresDate.toLocaleDateString('en-AU')}
+              </span>
+            )}
+          </div>
         </div>
         {isNextActive && <ProgramConfigEditor />}
       </button>

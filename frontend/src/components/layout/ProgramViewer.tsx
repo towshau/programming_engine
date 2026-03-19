@@ -246,7 +246,11 @@ export function ProgramViewer() {
 
           {!isLastView && program.coach_approved && !program.uploaded_to_teambuildr && (
             <button
-              onClick={() => markUploaded()}
+              onClick={async () => {
+                if (window.confirm('This is an admin-only action.\n\nConfirm you are admin and this program has been uploaded to TeamBuildr.')) {
+                  await markUploaded()
+                }
+              }}
               disabled={loading.saving}
               className="flex-shrink-0 rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-1.5 text-sm font-medium text-zinc-200 hover:bg-zinc-700 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
