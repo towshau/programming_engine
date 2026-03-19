@@ -46,7 +46,11 @@ from normalize_one_member import (
 )
 from detect_phase import detect_phase_for_member
 from load_rules import load_config
-from generate_program import generate_next_program, detect_sessions_per_week
+from generate_program import (
+    generate_next_program,
+    detect_sessions_per_week,
+    fetch_latest_generated_program,
+)
 
 
 LOOKAHEAD_DAYS = 8
@@ -118,17 +122,25 @@ def fetch_recently_generated(sb):
 
 def run_pipeline_for_member(sb, member_id, scheme_name, exercise_lib, duration_weeks):
     """Run the full pipeline for one member. Returns (program_dict, phase_dict, config) or raises."""
-    rows = fetch_results_for_member(sb, member_id)
-    if not rows:
-        raise ValueError(f"No rows in member_tbresults")
+    generated_sessions = fetch_latest_generated_program(sb, member_id)
+    if generated_sessions:
+        sessions = generated_sessions
+    else:
+        rows = fetch_results_for_member(sb, member_id)
+        if not rows:
+            raise ValueError(f"No rows in member_tbresults")
+        past = normalize(rows, exercise_lib)
+        sessions = past["sessions"]
+        if not sessions:
+            raise ValueError("Normalization produced 0 sessions")
 
-    past = normalize(rows, exercise_lib)
-    sessions = past["sessions"]
-    if not sessions:
-        raise ValueError("Normalization produced 0 sessions")
+    rows_tb = fetch_results_for_member(sb, member_id)
+    sessions_tb = normalize(rows_tb, exercise_lib)["sessions"] if rows_tb else []
 
     spw = detect_sessions_per_week(sessions)
-    phase = detect_phase_for_member(sb, member_id, scheme_name, sessions)
+    phase = detect_phase_for_member(
+        sb, member_id, scheme_name, sessions_tb if sessions_tb else sessions
+    )
     config = load_config(sb, member_id=member_id, scheme_name=scheme_name)
 
     program = generate_next_program(

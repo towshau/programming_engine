@@ -9,7 +9,8 @@
 - **Supabase (source):** member_tbresults, member_tbhealthmax, exercise_library (trigger-built), member table with current_status = 'active' for cohort.
 - **Supabase (engine config):** All tables use `programming_` prefix; gym column uses enum `gym` (BLIGH, BRIDGE, COLLIN) where applicable.
 - **Retool:** Admin form for deleted-exercise reports. View programs (staging + generated) with readable layout. Feedback form for coaches. Flagged-programs counter. PDF export on demand.
-- **Output:** Normalised past programs -> programming_normalized_programs. Generated programs -> programming_generated. Single source of truth; view/audit in Retool; optional PDF to Supabase Storage or shared drive.
+- **Program Editor (Vercel):** LR Program Editor at `programming-engine.vercel.app` (source: `teambuildr-replacement/`). Coaches search members, view generated programs, edit exercises inline, Save and Finalize. Admin marks as uploaded. Replaces Retool for program viewing/editing.
+- **Output:** Normalised past programs -> programming_normalized_programs. Generated programs -> programming_generated. Coach edits saved back to programming_generated.payload. Single source of truth; view/edit in Program Editor; optional PDF to Supabase Storage or shared drive.
 
 ---
 
@@ -22,7 +23,7 @@
 | programming_removal_requests | Queue for "deleted exercise" reports; senior coach review | exercise_id, reason, submitted_by, status, reviewed_by. |
 | programming_rules | General engine rules (gym-scoped) | gym, category, rule_key, rule_value (jsonb), priority, active. **15 rules seeded.** |
 | programming_normalized_programs | Normalised past program per member per run | run_id, member_id, assigned_to, payload (jsonb). |
-| programming_generated | Generated program per member per run | run_id, member_id, assigned_to, sessions_per_week, duration_weeks, phase_number, scheme_name, rep_range, changes_summary, rules_applied (jsonb), payload (jsonb). |
+| programming_generated | Generated program per member per run | run_id, member_id, assigned_to, sessions_per_week, duration_weeks, phase_number, scheme_name, rep_range, changes_summary, rules_applied (jsonb), payload (jsonb), **coach_edited**, **coach_approved**, **uploaded_to_teambuildr**, **next_due_date**. |
 | programming_feedback | Coach feedback on generated programs | run_id, member_id, coach_id, feedback_type, details, exercise_id, resolved. |
 | programming_coach_edits | Individual coach edits to generated programs (differential learning) | program_id, member_id, coach_id, session_day, series_label, exercise_id, edit_type, old_value (jsonb), new_value (jsonb). |
 | programming_regeneration_requests | Queue for program regeneration when coaches change scheme/rep-range/sessions | member_id, program_id, requested_by, scheme_name, rep_range, sessions_per_week, status (pending/processing/completed/failed). |
@@ -40,11 +41,12 @@
 
 ## Pipeline
 
-1. **Ingest:** member_tbresults + exercise_library -> normalised past program per member (-> programming_normalized_programs).
+1. **Ingest:** Prefer latest `programming_generated` payload (coach-edited source) for the member; fall back to member_tbresults + exercise_library -> normalised past program (-> programming_normalized_programs) for first-time members with no generated record.
 2. **Cohort:** Member table current_status = 'active' -> member IDs.
 3. **Config:** Load programming_rules, programming_progression_schemes (by scheme name), programming_exercise_exclusions (by member). Never invent exercises.
-4. **Generate:** Past program + rules + progression + exclusions -> canonical program JSON per member (LLM or deterministic).
+4. **Generate:** Past program (from step 1) + rules + progression + exclusions -> canonical program JSON per member (deterministic). Phase detection always uses member_tbresults (actual logged reps), not the generated program.
 5. **Write:** Persist to programming_generated (with duration_weeks, phase_number, scheme_name, rep_range, changes_summary, rules_applied).
+6. **Coach review (Program Editor):** Coach views generated program, edits exercises/reps/sets, clicks Save (coach_edited=true) then Finalize (coach_approved=true, next_due_date calculated from member_programs.due_date + duration_weeks, snapped to Monday). Admin marks uploaded_to_teambuildr=true and member_programs.due_date is updated.
 
 ---
 
@@ -67,7 +69,7 @@
   - **normalize_one_member.py** — Ingest: member_tbresults + exercise_library → normalised sessions (by assigned_date), series labels (A1, A2, B1, …), write to programming_normalized_programs. Optional **phase detection**: pass `--scheme GPP|Strength|Hypertrophy` to detect current rep-range phase and next phase from A-series median reps; result in payload.phase_detection. See docs/data-model.md § Phase detection.
   - **detect_phase.py** — Standalone phase detection: given member_id and scheme name, normalises and returns current_rep_range, next_rep_range, confidence, direction. Used by normalize when --scheme is set; can be run alone: `python tools/detect_phase.py <member_id> Strength`.
   - **load_rules.py** — Load engine config: `programming_rules` (15 rules), `programming_progression_schemes` (by scheme name), `programming_exercise_exclusions` (by member). Returns rules dict + scheme steps + exclusion list. Standalone: `python tools/load_rules.py --member-id <uuid> --scheme Strength`.
-  - **generate_program.py** — Deterministic generator: past program + rules + phase detection + library → canonical program JSON. Carries forward exercises with updated rep ranges (A/B compounds at scheme range, C/D accessories at +2). Applies exclusions, avoids banned exercises, enforces C-series self-sufficiency. Standalone: `python tools/generate_program.py <member_id> --scheme Strength`.
+  - **generate_program.py** — Deterministic generator: past program + rules + phase detection + library → canonical program JSON. **Source priority:** reads latest `programming_generated` payload first (coach-edited); falls back to member_tbresults for first-time members. Phase detection always uses member_tbresults. Carries forward exercises with updated rep ranges (A/B compounds at scheme range, C/D accessories at +2). Applies exclusions, avoids banned exercises, enforces C-series self-sufficiency. Standalone: `python tools/generate_program.py <member_id> --scheme Strength`.
   - **write_programs.py** — Persist generated program JSON to `programming_generated`. Input: payload from file or stdin; required: --run-id, --member-id, --sessions-per-week; optional: phase_number, scheme_name, rep_range, changes_summary, rules_applied. See docs/data-model.md (canonical payload shape).
   - **run_pipeline.py** — End-to-end pipeline runner: Ingest → Phase detect → Load config → Generate → Write. Single command for one member: `python tools/run_pipeline.py <member_id> --scheme Strength --sessions-per-week 3`. Options: `--dry-run`, `--skip-staging`, `--output FILE`.
   - **apply_auto_exclusions.py** — Feedback → programming_exercise_exclusions (e.g. 3+ negative feedbacks → exclude exercise for member).
@@ -90,6 +92,7 @@ React app for coaches to review and edit generated programs. Stack: React 19 + T
 - **Program config editing** — dual-row header: "Last Program" (read-only badges, greyed) above "Next/Current Program" (editable). Last Program falls back to `programming_normalized_programs` (historical TeamBuildr data) when no previous generated program exists. Editable fields: scheme (GPP/Hypertrophy/Strength dropdown), rep range (filtered by selected scheme from `programming_progression_schemes`), sessions/week (2–6), duration (4–8 weeks, metadata-only UPDATE). Phase auto-derived from scheme + rep range. Confidence read-only.
 - **Regenerate Workout** — when scheme, rep range, or sessions/week differ from saved values, a "Regenerate Workout" button appears. Clicking calls the **Regeneration API** on Railway (`POST /regenerate`), which runs the full pipeline and writes a new program to `programming_generated`. Frontend re-fetches the program on success so the new program appears immediately. Falls back to inserting a row into `programming_regeneration_requests` if the API is not configured. **Regeneration rules:** (1) Coach's explicit rep-range selection overrides auto-detected phase. (2) Scheme changes keep exercises the same, only rep ranges/sets update. (3) Sessions-per-week changes regenerate exercises (different split required).
 - **Add Exercise** — dashed "+ Add Exercise" button below each day's exercises. Opens the exercise picker modal; selected exercise is added with a default series label (next available in sequence) and 3x8-10 prescription. Stored as `exercise_add` edit type in `programming_coach_edits`.
+- **Workflow columns (programming_generated):** Save sets `coach_edited = true`; Finalize sets `coach_approved = true` and `next_due_date` (from member_programs.due_date + duration_weeks, Monday); Mark Uploaded sets `uploaded_to_teambuildr = true` and syncs member_programs. Alternative UI: Vercel app at `programming-engine.vercel.app` (source: `teambuildr-replacement/`) with Save / Finalize / Mark Uploaded.
 
 ## Regeneration API (`api/`)
 
@@ -113,9 +116,9 @@ Retool page prompts and specs live in **retool/** (see `retool/README.md` for bu
 
 ---
 
-## Rules (16 active)
+## Rules (19 active)
 
-sources (only_exercise_library); composition (max_exercises_per_series, series_composition, avoid_exercises_when_possible); equipment (pairings_both_gyms, c_series_self_sufficient); exercise_pairing (**superset_press_pull_pairing** — pair press+pull in A/B series, press in slot 1; applied in generator after exercise collection); session (home_workouts_weekends, set_structures, daily_programming_sets, warm_up_sets, additional_work_on_own); timing (session_timing, rest_times); volume (rehab_integration); progression (default_rep_progression).
+sources (only_exercise_library); composition (max_exercises_per_series, series_composition, avoid_exercises_when_possible, **exercise_priority**, **prefer_b_series_and_beyond** — named exercises e.g. Press - Cable - Mid Pulley, Reverse Fly go in B or later, never A); equipment (pairings_both_gyms, c_series_self_sufficient); exercise_pairing (**superset_press_pull_pairing**, **superset_lower_body_pairing**); session (home_workouts_weekends, set_structures, daily_programming_sets, warm_up_sets, additional_work_on_own); timing (session_timing, rest_times); volume (rehab_integration); progression (default_rep_progression). Generator enforces **series_assignment** (only ["A","B"] in A slot; ["B","C"] in B/C; ["C","D"] in C/D+).
 
 ---
 
@@ -151,8 +154,8 @@ Two separate layers:
 
 - Sessions per week: member-level config?
 - Deleted exercises: user feedback vs system?
-- exercise_behavior values and semantics.
-- ~~Where does member goal / selected scheme live?~~ → `member_programs.scheme_name` (default GPP). Coaches update via Retool.
+- exercise_behavior values and semantics — `allow_exercise_changes` not yet implemented; future "Generate New" button.
+- ~~Where does member goal / selected scheme live?~~ → `member_programs.scheme_name` (default GPP). Coaches update via Program Editor (future) or Supabase.
 
 ---
 

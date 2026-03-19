@@ -63,6 +63,258 @@ AVOID_EXERCISES_DEFAULT = {"walking lunges", "farmer carries"}
 PRESS_TAGS = {"Vertical Press", "Horizontal Press"}
 PULL_TAGS = {"Vertical Pull", "Horizontal Pull"}
 
+LOWER_BODY_TAGS = {"Lower Body Push", "Lower Body Pull", "Hip Dominant", "Hip Abduction", "Lower Leg"}
+UPPER_BODY_TAGS = {
+    "Horizontal Press", "Vertical Press", "Horizontal Pull", "Vertical Pull",
+    "Dip", "Lateral & Front Raise", "Elbow Flexion", "Elbow Extension",
+}
+SERIES_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"]
+
+
+def _get_priority_tier(tags, rules):
+    """Return tier number (1=highest) for exercise by tag; higher tier = placed first."""
+    rule = rules.get("exercise_priority", {})
+    order = rule.get("priority_order") or []
+    tag = tags or ""
+    for i, entry in enumerate(order):
+        if tag in (entry.get("tags") or []):
+            return entry.get("tier", 99)
+    return 99
+
+
+def _sort_by_priority(exercises, rules):
+    """Sort exercises by global priority tier so compounds get A/B slots first."""
+    return sorted(exercises, key=lambda ex: _get_priority_tier(ex.get("tags"), rules))
+
+
+def _detect_session_type(exercises):
+    """Classify session as upper, lower, or full based on tag majority."""
+    lower_count = sum(1 for ex in exercises if (ex.get("tags") or "") in LOWER_BODY_TAGS)
+    upper_count = sum(1 for ex in exercises if (ex.get("tags") or "") in UPPER_BODY_TAGS)
+    total = len(exercises)
+    if total == 0:
+        return "upper"
+    if lower_count > upper_count and lower_count >= total / 2:
+        return "lower"
+    if upper_count > lower_count and upper_count >= total / 2:
+        return "upper"
+    return "full"
+
+
+def _apply_lower_body_pairing(exercises, rules):
+    """Pair lower body push + pull (or hip dominant) in A/B supersets.
+
+    Push-led: A1=Push, A2=Pull, B1=Push, B2=Accessory. Pull-led: A1=Pull, A2=Pull, B1=Push, B2=Accessory.
+    """
+    rule = rules.get("superset_lower_body_pairing")
+    if not rule:
+        return exercises
+
+    push_tags = set(rule.get("push_tags", ["Lower Body Push"]))
+    pull_tags = set(rule.get("pull_tags", ["Lower Body Pull", "Hip Dominant"]))
+    accessory_tags = set(rule.get("accessory_tags", ["Hip Abduction", "Lower Leg", "Hip Flexion"]))
+    push_first = rule.get("push_first", True)
+
+    pushes = [ex for ex in exercises if (ex.get("tags") or "") in push_tags]
+    pulls = [ex for ex in exercises if (ex.get("tags") or "") in pull_tags]
+    accessories = [ex for ex in exercises
+                   if (ex.get("tags") or "") in accessory_tags
+                   or (ex.get("tags") or "") not in push_tags | pull_tags | accessory_tags
+                   and ex.get("tags")]
+
+    # Determine push-led vs pull-led from first compound in original order
+    first_compound_tag = None
+    for ex in exercises:
+        t = ex.get("tags") or ""
+        if t in push_tags or t in pull_tags:
+            first_compound_tag = t
+            break
+    lead_is_push = first_compound_tag in push_tags if first_compound_tag else True
+
+    remaining_pulls = list(pulls)
+    pairs = []
+    for push in pushes:
+        if remaining_pulls:
+            pairs.append((push, remaining_pulls.pop(0)))
+        else:
+            pairs.append((push, None))
+    solo_pulls = remaining_pulls
+
+    result = []
+    si = 0
+
+    if lead_is_push and push_first:
+        for push, pull in pairs:
+            if si >= len(SERIES_LETTERS):
+                break
+            letter = SERIES_LETTERS[si]
+            push["series_label"] = f"{letter}1"
+            result.append(push)
+            if pull:
+                pull["series_label"] = f"{letter}2"
+                result.append(pull)
+            si += 1
+        for pull in solo_pulls:
+            if si >= len(SERIES_LETTERS):
+                break
+            pull["series_label"] = f"{SERIES_LETTERS[si]}1"
+            result.append(pull)
+            si += 1
+    else:
+        # Pull-led: A1=A2=Pulls, B1=Push B2=Accessory, then more pulls/pushes
+        for i in range(0, len(pulls), 2):
+            if si >= len(SERIES_LETTERS):
+                break
+            letter = SERIES_LETTERS[si]
+            result.append(pulls[i])
+            pulls[i]["series_label"] = f"{letter}1"
+            if i + 1 < len(pulls):
+                result.append(pulls[i + 1])
+                pulls[i + 1]["series_label"] = f"{letter}2"
+            si += 1
+        for push in pushes:
+            if si >= len(SERIES_LETTERS):
+                break
+            letter = SERIES_LETTERS[si]
+            push["series_label"] = f"{letter}1"
+            result.append(push)
+            if accessories:
+                acc = accessories.pop(0)
+                acc["series_label"] = f"{letter}2"
+                result.append(acc)
+            si += 1
+        for pull in solo_pulls:
+            if si >= len(SERIES_LETTERS):
+                break
+            pull["series_label"] = f"{SERIES_LETTERS[si]}1"
+            result.append(pull)
+            si += 1
+
+    for acc in accessories:
+        if si >= len(SERIES_LETTERS):
+            acc["series_label"] = "extra"
+            result.append(acc)
+            continue
+        letter = SERIES_LETTERS[si]
+        slot = sum(1 for r in result if (r.get("series_label") or "").startswith(letter)) + 1
+        acc["series_label"] = f"{letter}{slot}"
+        result.append(acc)
+        if slot >= 2:
+            si += 1
+
+    return result
+
+
+def _enforce_series_eligibility(exercises, exercise_lib):
+    """Ensure each exercise's series_label is within its series_assignment. Bump or drop violations."""
+    allowed_ab = []
+    allowed_bc = []
+    allowed_cd = []
+    overflow = []
+    for ex in exercises:
+        name = ex.get("exercise_name", "")
+        label = ex.get("series_label") or ""
+        if label == "extra":
+            overflow.append(ex)
+            continue
+        letter = label[0].upper() if label else "C"
+        info = exercise_lib.get(name) or {}
+        sa = info.get("series_assignment") or ex.get("_series_assignment") or []
+        if not sa:
+            allowed_cd.append(ex)
+            continue
+        sa_set = set(str(s).upper() for s in sa if s)
+        if "WARM UP" in sa_set:
+            allowed_cd.append(ex)
+            continue
+        if "A" in sa_set:
+            if letter in ("A", "B"):
+                allowed_ab.append(ex)
+            else:
+                ex["series_label"] = "A1"
+                allowed_ab.append(ex)
+        elif "B" in sa_set:
+            allowed_bc.append(ex)
+        elif "C" in sa_set or "D" in sa_set:
+            if letter in ("C", "D", "E", "F", "G", "H"):
+                allowed_cd.append(ex)
+            else:
+                ex["series_label"] = "C1"
+                allowed_cd.append(ex)
+        else:
+            allowed_bc.append(ex)
+
+    # Reassign series letters: A-only get A,B; B/C get B,C; C/D get C,D,E...
+    result = []
+    si = 0
+    for ex in allowed_ab:
+        if si >= 2:
+            overflow.append(ex)
+            continue
+        letter = SERIES_LETTERS[si]
+        slot = sum(1 for r in result if (r.get("series_label") or "").startswith(letter)) + 1
+        ex["series_label"] = f"{letter}{slot}"
+        result.append(ex)
+        if slot >= 2:
+            si += 1
+    si = 1
+    for ex in allowed_bc:
+        if si >= len(SERIES_LETTERS):
+            ex["series_label"] = "extra"
+            result.append(ex)
+            continue
+        letter = SERIES_LETTERS[si]
+        slot = sum(1 for r in result if (r.get("series_label") or "").startswith(letter)) + 1
+        ex["series_label"] = f"{letter}{slot}"
+        result.append(ex)
+        if slot >= 2:
+            si += 1
+    si = 2
+    for ex in allowed_cd:
+        if si >= len(SERIES_LETTERS):
+            ex["series_label"] = "extra"
+            result.append(ex)
+            continue
+        letter = SERIES_LETTERS[si]
+        slot = sum(1 for r in result if (r.get("series_label") or "").startswith(letter)) + 1
+        ex["series_label"] = f"{letter}{slot}"
+        result.append(ex)
+        if slot >= 2:
+            si += 1
+    for ex in overflow:
+        ex["series_label"] = "extra"
+        result.append(ex)
+    return result
+
+
+def _apply_downgrade_to_b(exercises, rules):
+    """Move exercises on the prefer_b_series_and_beyond list from A to B (and shift existing B)."""
+    rule = rules.get("prefer_b_series_and_beyond", {})
+    names = rule.get("exercise_names") or []
+    if not names:
+        return exercises
+    name_lower = [n.lower() for n in names]
+    in_a = [ex for ex in exercises if (ex.get("series_label") or "").upper().startswith("A")
+            and any(sub in (ex.get("exercise_name") or "").lower() for sub in name_lower)]
+    if not in_a:
+        return exercises
+    in_b = [ex for ex in exercises if (ex.get("series_label") or "").upper().startswith("B")]
+    others = [ex for ex in exercises if ex not in in_a and ex not in in_b]
+    k = len(in_a)
+    for i, ex in enumerate(sorted(in_a, key=lambda e: e.get("series_label") or "")):
+        ex["series_label"] = f"B{i + 1}"
+    for i, ex in enumerate(sorted(in_b, key=lambda e: e.get("series_label") or "")):
+        ex["series_label"] = f"B{k + i + 1}"
+    def _slot_key(e):
+        lab = (e.get("series_label") or "Z1")
+        letter = lab[0] if lab else "Z"
+        num = int(lab[1:]) if len(lab) > 1 and lab[1:].isdigit() else 0
+        li = SERIES_LETTERS.index(letter) if letter in SERIES_LETTERS else 99
+        return (li, num)
+    result = in_a + in_b + others
+    result.sort(key=_slot_key)
+    return result
+
 
 def _apply_press_pull_pairing(exercises, rules):
     """Re-pair so press+pull share A/B series; press in the '1' slot.
@@ -96,14 +348,13 @@ def _apply_press_pull_pairing(exercises, rules):
             pairs.append((press, None))
     solo_pulls = remaining_pulls
 
-    SERIES = ["A", "B", "C", "D", "E", "F", "G", "H"]
     result = []
     si = 0
 
     for press, pull in pairs:
-        if si >= len(SERIES):
+        if si >= len(SERIES_LETTERS):
             break
-        letter = SERIES[si]
+        letter = SERIES_LETTERS[si]
         if press_first:
             press["series_label"] = f"{letter}1"
             result.append(press)
@@ -119,18 +370,18 @@ def _apply_press_pull_pairing(exercises, rules):
         si += 1
 
     for pull in solo_pulls:
-        if si >= len(SERIES):
+        if si >= len(SERIES_LETTERS):
             break
-        pull["series_label"] = f"{SERIES[si]}1"
+        pull["series_label"] = f"{SERIES_LETTERS[si]}1"
         result.append(pull)
         si += 1
 
     for acc in others:
-        if si >= len(SERIES):
+        if si >= len(SERIES_LETTERS):
             acc["series_label"] = "extra"
             result.append(acc)
             continue
-        letter = SERIES[si]
+        letter = SERIES_LETTERS[si]
         slot = sum(1 for r in result
                    if (r.get("series_label") or "").startswith(letter)) + 1
         acc["series_label"] = f"{letter}{slot}"
@@ -217,6 +468,31 @@ def detect_sessions_per_week(sessions):
     elif distinct <= 2:
         return 2
     return 3
+
+
+# ── Source: programming_generated vs tbresults ───────────────────────────────
+
+def fetch_latest_generated_program(supabase, member_id):
+    """Fetch the most recent programming_generated row for this member.
+
+    Returns the payload['sessions'] list (same shape as normalized sessions), or None
+    if no row exists. Used so coach-edited programs carry forward into the next cycle.
+    """
+    r = (
+        supabase.table("programming_generated")
+        .select("payload")
+        .eq("member_id", member_id)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not r.data or len(r.data) == 0:
+        return None
+    payload = r.data[0].get("payload") or {}
+    sessions = payload.get("sessions") or []
+    if not sessions:
+        return None
+    return sessions
 
 
 # ── Core generator ───────────────────────────────────────────────────────────
@@ -324,13 +600,39 @@ def generate_next_program(
                 "exercise_id": info.get("exercise_id") or eid,
                 "series_label": label,
                 "tags": tags,
-                "_series_assignment": ex.get("series_assignment") or [],
+                "_series_assignment": ex.get("series_assignment") or info.get("series_assignment") or [],
             })
 
-        # Phase 2: apply press/pull superset pairing
-        collected = _apply_press_pull_pairing(collected, rules)
+        # Phase 2: sort by global priority (compounds first)
+        collected = _sort_by_priority(collected, rules)
 
-        # Phase 3: assign sets based on final series labels
+        # Phase 3: apply pairing by session type
+        session_type = _detect_session_type(collected)
+        if session_type == "upper":
+            collected = _apply_press_pull_pairing(collected, rules)
+        elif session_type == "lower":
+            collected = _apply_lower_body_pairing(collected, rules)
+        else:
+            upper = [ex for ex in collected if (ex.get("tags") or "") in UPPER_BODY_TAGS
+                     or (ex.get("tags") or "") in PRESS_TAGS or (ex.get("tags") or "") in PULL_TAGS]
+            lower = [ex for ex in collected if (ex.get("tags") or "") in LOWER_BODY_TAGS]
+            other = [ex for ex in collected if ex not in upper and ex not in lower]
+            upper = _apply_press_pull_pairing(upper + other, rules) if (upper or other) else []
+            lower = _apply_lower_body_pairing(lower, rules) if lower else []
+            relabel_map = {"A": "C", "B": "D", "C": "E", "D": "F", "E": "G", "F": "H", "G": "H", "H": "H"}
+            for ex in lower:
+                lab = ex.get("series_label") or ""
+                if len(lab) >= 1 and lab[0] in relabel_map:
+                    ex["series_label"] = relabel_map[lab[0]] + lab[1:]
+            collected = upper + lower
+
+        # Phase 3b: move prefer_b_series_and_beyond exercises from A to B
+        collected = _apply_downgrade_to_b(collected, rules)
+
+        # Phase 4: enforce series_assignment bounds (bump/drop violations)
+        collected = _enforce_series_eligibility(collected, exercise_lib)
+
+        # Phase 5: assign sets based on final series labels
         new_exercises = []
         for ex in collected:
             label = ex["series_label"]
@@ -395,25 +697,33 @@ def main():
     args = ap.parse_args()
 
     sb = get_supabase()
-
-    # 1. Ingest / normalize
-    print(f"Fetching data for member {args.member_id}...", file=sys.stderr)
-    rows = fetch_results_for_member(sb, args.member_id)
-    if not rows:
-        print(f"No data for member {args.member_id}", file=sys.stderr)
-        sys.exit(1)
-
     exercise_lib = fetch_exercise_library(sb)
-    payload = normalize(rows, exercise_lib)
-    sessions = payload["sessions"]
-    print(f"Normalised {len(sessions)} sessions.", file=sys.stderr)
+
+    # 1. Ingest: prefer coach-edited programming_generated; fallback to member_tbresults
+    generated_sessions = fetch_latest_generated_program(sb, args.member_id)
+    if generated_sessions:
+        sessions = generated_sessions
+        print(f"Using {len(sessions)} sessions from programming_generated (coach-edited source).", file=sys.stderr)
+    else:
+        print(f"Fetching data for member {args.member_id} from member_tbresults...", file=sys.stderr)
+        rows = fetch_results_for_member(sb, args.member_id)
+        if not rows:
+            print(f"No data for member {args.member_id}", file=sys.stderr)
+            sys.exit(1)
+        payload = normalize(rows, exercise_lib)
+        sessions = payload["sessions"]
+        print(f"Normalised {len(sessions)} sessions from tbresults.", file=sys.stderr)
+
+    # Phase detection always uses tbresults (actual logged reps)
+    rows_tb = fetch_results_for_member(sb, args.member_id)
+    sessions_tb = normalize(rows_tb, exercise_lib)["sessions"] if rows_tb else []
 
     # Auto-detect sessions per week if not overridden
     spw = args.sessions_per_week or detect_sessions_per_week(sessions)
     print(f"Sessions per week: {spw}" + (" (auto-detected)" if not args.sessions_per_week else " (override)"), file=sys.stderr)
 
-    # 2. Phase detection
-    phase = detect_phase_for_member(sb, args.member_id, args.scheme, sessions)
+    # 2. Phase detection (uses tbresults so next rep range reflects what member actually did)
+    phase = detect_phase_for_member(sb, args.member_id, args.scheme, sessions_tb) if sessions_tb else detect_phase_for_member(sb, args.member_id, args.scheme, sessions)
     print(f"Phase: current={phase.get('current_rep_range')}, next={phase.get('next_rep_range')}, confidence={phase.get('confidence')}", file=sys.stderr)
 
     # 3. Load config

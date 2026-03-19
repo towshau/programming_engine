@@ -44,7 +44,11 @@ from normalize_one_member import (
 )
 from detect_phase import detect_phase_for_member
 from load_rules import load_config
-from generate_program import generate_next_program, detect_sessions_per_week
+from generate_program import (
+    generate_next_program,
+    detect_sessions_per_week,
+    fetch_latest_generated_program,
+)
 
 
 def main():
@@ -65,35 +69,42 @@ def main():
 
     print(f"=== Pipeline run {run_id[:8]}... for member {member_id} ===\n")
 
-    # ── Step 1: Ingest / Normalize ──
+    # ── Step 1: Ingest ── prefer programming_generated, fallback to member_tbresults
     print("[1/4] Ingest: fetching member data...")
-    rows = fetch_results_for_member(sb, member_id)
-    if not rows:
-        print(f"  No rows in member_tbresults for {member_id}. Aborting.", file=sys.stderr)
-        sys.exit(1)
-
     exercise_lib = fetch_exercise_library(sb)
-    past = normalize(rows, exercise_lib)
-    sessions = past["sessions"]
-    print(f"  Normalised {len(sessions)} sessions.")
+    generated_sessions = fetch_latest_generated_program(sb, member_id)
+    if generated_sessions:
+        sessions = generated_sessions
+        print(f"  Using {len(sessions)} sessions from programming_generated (coach-edited source).")
+    else:
+        rows = fetch_results_for_member(sb, member_id)
+        if not rows:
+            print(f"  No rows in member_tbresults for {member_id}. Aborting.", file=sys.stderr)
+            sys.exit(1)
+        past = normalize(rows, exercise_lib)
+        sessions = past["sessions"]
+        print(f"  Normalised {len(sessions)} sessions from tbresults.")
+        if not args.skip_staging and not args.dry_run:
+            staging_row = {
+                "run_id": run_id,
+                "member_id": member_id,
+                "assigned_to": None,
+                "payload": past,
+            }
+            sb.table("programming_normalized_programs").insert(staging_row).execute()
+            print(f"  Written to programming_normalized_programs.")
 
     # Auto-detect sessions per week if not overridden
     spw = args.sessions_per_week or detect_sessions_per_week(sessions)
     print(f"  Sessions per week: {spw}" + (" (auto-detected)" if not args.sessions_per_week else " (override)"))
 
-    if not args.skip_staging and not args.dry_run:
-        staging_row = {
-            "run_id": run_id,
-            "member_id": member_id,
-            "assigned_to": None,
-            "payload": past,
-        }
-        sb.table("programming_normalized_programs").insert(staging_row).execute()
-        print(f"  Written to programming_normalized_programs.")
+    # Phase detection uses tbresults (actual logged reps)
+    rows_tb = fetch_results_for_member(sb, member_id)
+    sessions_tb = normalize(rows_tb, exercise_lib)["sessions"] if rows_tb else []
 
     # ── Step 2: Phase Detection ──
     print(f"\n[2/4] Phase detection (scheme={args.scheme})...")
-    phase = detect_phase_for_member(sb, member_id, args.scheme, sessions)
+    phase = detect_phase_for_member(sb, member_id, args.scheme, sessions_tb if sessions_tb else sessions)
     print(f"  Current: {phase.get('current_rep_range')}  Next: {phase.get('next_rep_range')}  Confidence: {phase.get('confidence')}")
     if phase.get("confidence") == "low":
         print("  WARNING: Low confidence -- consider coach review before using this program.", file=sys.stderr)
