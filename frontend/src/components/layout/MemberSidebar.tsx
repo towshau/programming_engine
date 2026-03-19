@@ -27,16 +27,6 @@ export function MemberSidebar() {
     )
   }, [members, debouncedQuery])
 
-  if (!selectedCoach) {
-    return (
-      <aside className="w-72 border-r border-zinc-800 bg-zinc-900/50 flex flex-col items-center justify-center p-6">
-        <p className="text-sm text-zinc-500 text-center">
-          Select a coach to view their clients
-        </p>
-      </aside>
-    )
-  }
-
   return (
     <aside className="w-72 border-r border-zinc-800 bg-zinc-900/50 flex flex-col">
       <div className="p-3 border-b border-zinc-800">
@@ -47,6 +37,7 @@ export function MemberSidebar() {
         />
         <p className="mt-2 text-xs text-zinc-500">
           {members.length} {members.length === 1 ? 'member' : 'members'}
+          {!selectedCoach && ' (all coaches)'}
         </p>
       </div>
 

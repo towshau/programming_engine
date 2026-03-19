@@ -156,7 +156,7 @@ interface EditorState {
 
   fetchCoaches: () => Promise<void>
   selectCoach: (coach: Coach | null) => void
-  fetchMembers: (coachId: string) => Promise<void>
+  fetchMembers: (coachId?: string | null) => Promise<void>
   selectMember: (member: MemberWithCoach | null) => void
   fetchProgram: (memberId: string) => Promise<void>
   fetchEdits: (programId: string) => Promise<void>
@@ -238,17 +238,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       configDraft: null,
       pendingRegen: null,
     })
-    if (coach) get().fetchMembers(coach.id)
+    get().fetchMembers(coach?.id ?? null)
   },
 
-  fetchMembers: async (coachId: string) => {
+  fetchMembers: async (coachId?: string | null) => {
     set((s) => ({ loading: { ...s.loading, members: true } }))
-    const { data } = await supabase
+
+    let query = supabase
       .from('member_memberships')
       .select('member_id, member_name, gym, programming_coach_id')
-      .eq('programming_coach_id', coachId)
       .eq('status', 'active')
       .order('member_name')
+
+    if (coachId) {
+      query = query.eq('programming_coach_id', coachId)
+    }
+
+    const { data } = await query
 
     if (data) {
       const unique = new Map<string, MemberWithCoach>()
