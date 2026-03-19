@@ -62,8 +62,14 @@ export function applyEdits(
         if (!exercise) break
         const newUnit = edit.new_value.unit as RepUnit
         const display = exercise.sets[0]?.reps_display ?? exercise.sets[0]?.reps ?? '8-10'
-        const numeric = display.replace(/[^\d,\-\s]/g, '').trim() || display
-        exercise.sets = buildSetsFromInput(numeric, newUnit, exercise.sets.length)
+        let cleaned: string
+        if (newUnit === 'seconds') {
+          const firstNum = display.match(/\d+/)
+          cleaned = firstNum ? firstNum[0] : '30'
+        } else {
+          cleaned = display.replace(/[^\d,\-\s]/g, '').trim() || display
+        }
+        exercise.sets = buildSetsFromInput(cleaned, newUnit, exercise.sets.length)
         break
       }
       case 'notes_change': {
