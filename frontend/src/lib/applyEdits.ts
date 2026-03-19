@@ -1,4 +1,5 @@
-import type { CoachEdit, ProgramExercise, ProgramSession } from '../types'
+import type { CoachEdit, ProgramExercise, ProgramSession, RepUnit } from '../types'
+import { buildSetsFromInput, enrichSet, getUnit } from './reps'
 
 /**
  * Applies saved coach edits on top of the generated program sessions,
@@ -8,9 +9,15 @@ export function applyEdits(
   sessions: ProgramSession[],
   edits: CoachEdit[]
 ): ProgramSession[] {
-  if (!edits.length) return sessions
-
   const result: ProgramSession[] = JSON.parse(JSON.stringify(sessions))
+
+  for (const session of result) {
+    for (let i = 0; i < session.exercises.length; i++) {
+      session.exercises[i].sets = session.exercises[i].sets.map(enrichSet)
+    }
+  }
+
+  if (!edits.length) return result
 
   for (const edit of edits) {
     const session = result.find((s) => s.day === edit.session_day)
@@ -39,25 +46,24 @@ export function applyEdits(
       case 'sets_change': {
         if (!exercise) break
         const newSetCount = edit.new_value.sets as number
-        const currentReps = exercise.sets[0]?.reps ?? '8-10'
-        exercise.sets = Array.from({ length: newSetCount }, (_, i) => ({
-          set_number: i + 1,
-          reps: currentReps,
-        }))
+        const currentUnit = getUnit(exercise.sets)
+        const currentReps = exercise.sets[0]?.reps_display ?? exercise.sets[0]?.reps ?? '8-10'
+        exercise.sets = buildSetsFromInput(currentReps, currentUnit, newSetCount)
         break
       }
       case 'reps_change': {
         if (!exercise) break
         const newReps = edit.new_value.reps as string
-        const parts = newReps.split(',').map((p) => p.trim())
-        if (parts.length > 1) {
-          exercise.sets = exercise.sets.map((s, i) => ({
-            ...s,
-            reps: parts[i] ?? parts[parts.length - 1],
-          }))
-        } else {
-          exercise.sets = exercise.sets.map((s) => ({ ...s, reps: newReps }))
-        }
+        const unit = (edit.new_value.unit as RepUnit) ?? getUnit(exercise.sets)
+        exercise.sets = buildSetsFromInput(newReps, unit, exercise.sets.length)
+        break
+      }
+      case 'unit_change': {
+        if (!exercise) break
+        const newUnit = edit.new_value.unit as RepUnit
+        const display = exercise.sets[0]?.reps_display ?? exercise.sets[0]?.reps ?? '8-10'
+        const numeric = display.replace(/[^\d,\-\s]/g, '').trim() || display
+        exercise.sets = buildSetsFromInput(numeric, newUnit, exercise.sets.length)
         break
       }
       case 'notes_change': {
@@ -77,11 +83,8 @@ export function applyEdits(
           exercise_name: edit.new_value.exercise_name as string,
           series_label: edit.new_value.series_label as string,
           tags: (edit.new_value.tags as string) || undefined,
-          sets: (edit.new_value.sets as { set_number: number; reps: string }[]) ?? [
-            { set_number: 1, reps: '8-10' },
-            { set_number: 2, reps: '8-10' },
-            { set_number: 3, reps: '8-10' },
-          ],
+          sets: (edit.new_value.sets as ProgramExercise['sets']) ??
+            buildSetsFromInput('8-10', 'reps', 3),
         }
         session.exercises.push(newExercise)
         break

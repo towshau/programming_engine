@@ -3,6 +3,7 @@ import { useEditorStore } from '../../stores/editorStore'
 import { ExerciseSwapModal } from './ExerciseSwapModal'
 import type { ExerciseLibraryItem, ProgramExercise } from '../../types'
 import { seriesGroup, seriesSortKey } from '../../lib/utils'
+import { buildSetsFromInput } from '../../lib/reps'
 
 interface AddExerciseButtonProps {
   sessionDay: number
@@ -54,12 +55,7 @@ export function AddExerciseButton({
 
   const handleSelect = (exercise: ExerciseLibraryItem) => {
     const seriesLabel = nextSeriesLabel(existingExercises)
-    const defaultReps = '8-10'
-    const defaultSets = [
-      { set_number: 1, reps: defaultReps },
-      { set_number: 2, reps: defaultReps },
-      { set_number: 3, reps: defaultReps },
-    ]
+    const defaultSets = buildSetsFromInput('8-10', 'reps', 3)
 
     addPendingEdit({
       session_day: sessionDay,

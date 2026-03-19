@@ -1,19 +1,13 @@
 import { useState } from 'react'
-import type { ProgramExercise, CoachEdit, ExerciseLibraryItem, SetPrescription } from '../../types'
+import type { ProgramExercise, CoachEdit, ExerciseLibraryItem, RepUnit } from '../../types'
 import { useEditorStore } from '../../stores/editorStore'
 import { isExerciseEdited } from '../../lib/applyEdits'
+import { buildRepsDisplay, getUnit } from '../../lib/reps'
 import { cn } from '../../lib/utils'
 import { SeriesLabelDropdown } from './SeriesLabelDropdown'
 import { SetsRepsEditor } from './SetsRepsEditor'
 import { NotesInput } from './NotesInput'
 import { ExerciseSwapModal } from './ExerciseSwapModal'
-
-function buildRepsString(sets: SetPrescription[]): string {
-  if (sets.length === 0) return ''
-  const allSame = sets.every((s) => s.reps === sets[0].reps)
-  if (allSame) return sets[0].reps
-  return sets.map((s) => s.reps).join(', ')
-}
 
 interface ExerciseRowProps {
   exercise: ProgramExercise
@@ -78,14 +72,27 @@ export function ExerciseRow({
     })
   }
 
+  const currentUnit = getUnit(exercise.sets)
+
   const handleRepsChange = (newReps: string) => {
     addPendingEdit({
       session_day: sessionDay,
       series_label: exercise.series_label,
       exercise_id: exercise.exercise_id,
       edit_type: 'reps_change',
-      old_value: { reps: exercise.sets[0]?.reps ?? '' },
-      new_value: { reps: newReps },
+      old_value: { reps: exercise.sets[0]?.reps ?? '', unit: currentUnit },
+      new_value: { reps: newReps, unit: currentUnit },
+    })
+  }
+
+  const handleUnitChange = (newUnit: RepUnit) => {
+    addPendingEdit({
+      session_day: sessionDay,
+      series_label: exercise.series_label,
+      exercise_id: exercise.exercise_id,
+      edit_type: 'unit_change',
+      old_value: { unit: currentUnit },
+      new_value: { unit: newUnit },
     })
   }
 
@@ -146,9 +153,11 @@ export function ExerciseRow({
 
         <SetsRepsEditor
           sets={exercise.sets.length}
-          reps={buildRepsString(exercise.sets)}
+          repsDisplay={buildRepsDisplay(exercise.sets)}
+          unit={currentUnit}
           onSetsChange={handleSetsChange}
           onRepsChange={handleRepsChange}
+          onUnitChange={handleUnitChange}
         />
 
         <NotesInput

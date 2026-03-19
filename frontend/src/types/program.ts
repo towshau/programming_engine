@@ -1,6 +1,12 @@
+export type RepUnit = 'reps' | 'seconds'
+
 export interface SetPrescription {
   set_number: number
   reps: string
+  reps_min?: number | null
+  reps_max?: number | null
+  reps_display?: string
+  unit?: RepUnit
 }
 
 export interface ProgramExercise {

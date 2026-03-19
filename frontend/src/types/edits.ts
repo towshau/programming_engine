@@ -3,6 +3,7 @@ export type EditType =
   | 'series_change'
   | 'sets_change'
   | 'reps_change'
+  | 'unit_change'
   | 'notes_change'
   | 'exercise_add'
   | 'exercise_delete'

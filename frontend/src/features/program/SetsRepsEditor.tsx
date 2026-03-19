@@ -1,76 +1,84 @@
 import { useState, useMemo } from 'react'
 import { cn } from '../../lib/utils'
+import type { RepUnit } from '../../types'
 
 interface SetsRepsEditorProps {
   sets: number
-  reps: string
+  repsDisplay: string
+  unit: RepUnit
   onSetsChange: (newSets: number) => void
   onRepsChange: (newReps: string) => void
-}
-
-function isSecondsMode(reps: string): boolean {
-  return /\d+s$/.test(reps.trim().split(',')[0]?.trim() ?? '')
-}
-
-function stripUnit(val: string): string {
-  return val.replace(/s$/, '').trim()
-}
-
-function formatDisplay(reps: string): { display: string; isSeconds: boolean; isCustom: boolean } {
-  const isSeconds = isSecondsMode(reps)
-  const parts = reps.split(',').map((p) => p.trim())
-  const isCustom = parts.length > 1
-  const cleaned = parts.map((p) => (isSeconds ? stripUnit(p) : p))
-  const display = cleaned.join(', ')
-  return { display, isSeconds, isCustom }
+  onUnitChange: (newUnit: RepUnit) => void
 }
 
 export function SetsRepsEditor({
   sets,
-  reps,
+  repsDisplay,
+  unit,
   onSetsChange,
   onRepsChange,
+  onUnitChange,
 }: SetsRepsEditorProps) {
   const [editingSets, setEditingSets] = useState(false)
   const [editingReps, setEditingReps] = useState(false)
   const [setsValue, setSetsValue] = useState(sets)
   const [repsValue, setRepsValue] = useState('')
+  const [inputError, setInputError] = useState(false)
 
-  const { display, isSeconds, isCustom } = useMemo(() => formatDisplay(reps), [reps])
+  const isCustom = useMemo(() => repsDisplay.includes(','), [repsDisplay])
+  const isSeconds = unit === 'seconds'
 
-  const handleToggleUnit = () => {
-    const parts = reps.split(',').map((p) => p.trim())
-    let newReps: string
-    if (isSeconds) {
-      newReps = parts.map((p) => stripUnit(p)).join(', ')
-    } else {
-      newReps = parts.map((p) => `${p}s`).join(', ')
+  const handleRepsKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+    if (e.key === 'Escape') {
+      setEditingReps(false)
+      setInputError(false)
     }
-    onRepsChange(newReps)
+
+    if (isSeconds) {
+      if (!/[\d]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Escape'].includes(e.key)) {
+        e.preventDefault()
+      }
+    } else {
+      if (!/[\d\-,\s]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Escape'].includes(e.key)) {
+        e.preventDefault()
+      }
+    }
   }
 
   const handleRepsBlur = () => {
     setEditingReps(false)
+    setInputError(false)
     const raw = repsValue.trim()
-    if (!raw) {
+    if (!raw) return
+
+    if (isSeconds && !/^\d+$/.test(raw)) {
+      setInputError(true)
       return
     }
-    const parts = raw.split(',').map((p) => p.trim()).filter(Boolean)
-    const withUnit = isSeconds
-      ? parts.map((p) => (/s$/.test(p) ? p : `${p}s`)).join(', ')
-      : parts.join(', ')
-    if (withUnit !== reps) {
-      onRepsChange(withUnit)
+    if (!isSeconds && !/^[\d\s,\-]+$/.test(raw)) {
+      setInputError(true)
+      return
+    }
+
+    if (raw !== repsDisplay) {
+      onRepsChange(raw)
     }
   }
 
   const startEditingReps = () => {
-    setRepsValue(display)
+    setRepsValue(repsDisplay)
+    setInputError(false)
     setEditingReps(true)
+  }
+
+  const handleToggleUnit = () => {
+    onUnitChange(isSeconds ? 'reps' : 'seconds')
   }
 
   return (
     <div className="flex items-center gap-1 text-sm">
+      {/* Sets */}
       {editingSets ? (
         <input
           type="number"
@@ -111,21 +119,21 @@ export function SetsRepsEditor({
 
       <span className="text-zinc-600">x</span>
 
+      {/* Reps / seconds value */}
       {editingReps ? (
         <input
           type="text"
+          inputMode={isSeconds ? 'numeric' : 'text'}
           value={repsValue}
           onChange={(e) => setRepsValue(e.target.value)}
           onBlur={handleRepsBlur}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-            if (e.key === 'Escape') {
-              setEditingReps(false)
-            }
-          }}
+          onKeyDown={handleRepsKeyDown}
           autoFocus
-          placeholder={isCustom ? 'e.g. 10, 8, 6' : 'e.g. 8-10'}
-          className="w-24 rounded bg-zinc-700 border border-emerald-500 px-1.5 py-0.5 text-center text-zinc-200 text-sm focus:outline-none"
+          placeholder={isSeconds ? 'e.g. 30' : isCustom ? 'e.g. 10, 8, 6' : 'e.g. 8-10'}
+          className={cn(
+            'w-24 rounded bg-zinc-700 border px-1.5 py-0.5 text-center text-zinc-200 text-sm focus:outline-none',
+            inputError ? 'border-red-500' : 'border-emerald-500'
+          )}
         />
       ) : (
         <button
@@ -137,10 +145,11 @@ export function SetsRepsEditor({
           )}
           title={isCustom ? 'Custom reps per set — click to edit' : 'Edit reps'}
         >
-          {display}
+          {repsDisplay}
         </button>
       )}
 
+      {/* Unit toggle */}
       <button
         onClick={handleToggleUnit}
         className={cn(
