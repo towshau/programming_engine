@@ -303,15 +303,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       .select()
 
     if (!error && data) {
+      const wasUploaded = program.uploaded_to_teambuildr
+      const patch: Record<string, unknown> = {
+        coach_edited: true,
+        updated_at: new Date().toISOString(),
+      }
+      if (wasUploaded) {
+        patch.uploaded_to_teambuildr = false
+      }
+
       await supabase
         .from('programming_generated')
-        .update({ coach_edited: true, updated_at: new Date().toISOString() })
+        .update(patch)
         .eq('id', program.id)
 
       set((s) => ({
         savedEdits: [...s.savedEdits, ...(data as CoachEdit[])],
         pendingEdits: [],
-        program: s.program ? { ...s.program, coach_edited: true } : null,
+        program: s.program
+          ? {
+              ...s.program,
+              coach_edited: true,
+              uploaded_to_teambuildr: wasUploaded ? false : s.program.uploaded_to_teambuildr,
+            }
+          : null,
       }))
       set((s) => ({ loading: { ...s.loading, saving: false } }))
       return true
