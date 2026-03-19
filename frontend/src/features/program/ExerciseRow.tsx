@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ProgramExercise, CoachEdit, ExerciseLibraryItem } from '../../types'
+import type { ProgramExercise, CoachEdit, ExerciseLibraryItem, SetPrescription } from '../../types'
 import { useEditorStore } from '../../stores/editorStore'
 import { isExerciseEdited } from '../../lib/applyEdits'
 import { cn } from '../../lib/utils'
@@ -7,6 +7,13 @@ import { SeriesLabelDropdown } from './SeriesLabelDropdown'
 import { SetsRepsEditor } from './SetsRepsEditor'
 import { NotesInput } from './NotesInput'
 import { ExerciseSwapModal } from './ExerciseSwapModal'
+
+function buildRepsString(sets: SetPrescription[]): string {
+  if (sets.length === 0) return ''
+  const allSame = sets.every((s) => s.reps === sets[0].reps)
+  if (allSame) return sets[0].reps
+  return sets.map((s) => s.reps).join(', ')
+}
 
 interface ExerciseRowProps {
   exercise: ProgramExercise
@@ -139,7 +146,7 @@ export function ExerciseRow({
 
         <SetsRepsEditor
           sets={exercise.sets.length}
-          reps={exercise.sets[0]?.reps ?? ''}
+          reps={buildRepsString(exercise.sets)}
           onSetsChange={handleSetsChange}
           onRepsChange={handleRepsChange}
         />

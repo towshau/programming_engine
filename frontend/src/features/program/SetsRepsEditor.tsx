@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { cn } from '../../lib/utils'
 
 interface SetsRepsEditorProps {
@@ -6,6 +6,23 @@ interface SetsRepsEditorProps {
   reps: string
   onSetsChange: (newSets: number) => void
   onRepsChange: (newReps: string) => void
+}
+
+function isSecondsMode(reps: string): boolean {
+  return /\d+s$/.test(reps.trim().split(',')[0]?.trim() ?? '')
+}
+
+function stripUnit(val: string): string {
+  return val.replace(/s$/, '').trim()
+}
+
+function formatDisplay(reps: string): { display: string; isSeconds: boolean; isCustom: boolean } {
+  const isSeconds = isSecondsMode(reps)
+  const parts = reps.split(',').map((p) => p.trim())
+  const isCustom = parts.length > 1
+  const cleaned = parts.map((p) => (isSeconds ? stripUnit(p) : p))
+  const display = cleaned.join(', ')
+  return { display, isSeconds, isCustom }
 }
 
 export function SetsRepsEditor({
@@ -17,7 +34,40 @@ export function SetsRepsEditor({
   const [editingSets, setEditingSets] = useState(false)
   const [editingReps, setEditingReps] = useState(false)
   const [setsValue, setSetsValue] = useState(sets)
-  const [repsValue, setRepsValue] = useState(reps)
+  const [repsValue, setRepsValue] = useState('')
+
+  const { display, isSeconds, isCustom } = useMemo(() => formatDisplay(reps), [reps])
+
+  const handleToggleUnit = () => {
+    const parts = reps.split(',').map((p) => p.trim())
+    let newReps: string
+    if (isSeconds) {
+      newReps = parts.map((p) => stripUnit(p)).join(', ')
+    } else {
+      newReps = parts.map((p) => `${p}s`).join(', ')
+    }
+    onRepsChange(newReps)
+  }
+
+  const handleRepsBlur = () => {
+    setEditingReps(false)
+    const raw = repsValue.trim()
+    if (!raw) {
+      return
+    }
+    const parts = raw.split(',').map((p) => p.trim()).filter(Boolean)
+    const withUnit = isSeconds
+      ? parts.map((p) => (/s$/.test(p) ? p : `${p}s`)).join(', ')
+      : parts.join(', ')
+    if (withUnit !== reps) {
+      onRepsChange(withUnit)
+    }
+  }
+
+  const startEditingReps = () => {
+    setRepsValue(display)
+    setEditingReps(true)
+  }
 
   return (
     <div className="flex items-center gap-1 text-sm">
@@ -66,36 +116,43 @@ export function SetsRepsEditor({
           type="text"
           value={repsValue}
           onChange={(e) => setRepsValue(e.target.value)}
-          onBlur={() => {
-            setEditingReps(false)
-            if (repsValue !== reps && repsValue.trim()) {
-              onRepsChange(repsValue.trim())
-            } else {
-              setRepsValue(reps)
-            }
-          }}
+          onBlur={handleRepsBlur}
           onKeyDown={(e) => {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
             if (e.key === 'Escape') {
-              setRepsValue(reps)
               setEditingReps(false)
             }
           }}
           autoFocus
-          className="w-16 rounded bg-zinc-700 border border-emerald-500 px-1.5 py-0.5 text-center text-zinc-200 text-sm focus:outline-none"
+          placeholder={isCustom ? 'e.g. 10, 8, 6' : 'e.g. 8-10'}
+          className="w-24 rounded bg-zinc-700 border border-emerald-500 px-1.5 py-0.5 text-center text-zinc-200 text-sm focus:outline-none"
         />
       ) : (
         <button
-          onClick={() => setEditingReps(true)}
+          onClick={startEditingReps}
           className={cn(
             'rounded px-1.5 py-0.5 font-medium text-zinc-300',
-            'hover:bg-zinc-700 hover:text-emerald-400 transition-colors cursor-pointer'
+            'hover:bg-zinc-700 hover:text-emerald-400 transition-colors cursor-pointer',
+            isCustom && 'text-teal-400'
           )}
-          title="Edit reps"
+          title={isCustom ? 'Custom reps per set — click to edit' : 'Edit reps'}
         >
-          {reps}
+          {display}
         </button>
       )}
+
+      <button
+        onClick={handleToggleUnit}
+        className={cn(
+          'rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide border transition-colors',
+          isSeconds
+            ? 'border-blue-500/40 text-blue-400 bg-blue-500/10 hover:bg-blue-500/20'
+            : 'border-zinc-600/40 text-zinc-500 bg-zinc-800 hover:bg-zinc-700 hover:text-zinc-300'
+        )}
+        title={isSeconds ? 'Switch to reps' : 'Switch to seconds'}
+      >
+        {isSeconds ? 'sec' : 'reps'}
+      </button>
     </div>
   )
 }

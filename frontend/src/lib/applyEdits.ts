@@ -49,7 +49,15 @@ export function applyEdits(
       case 'reps_change': {
         if (!exercise) break
         const newReps = edit.new_value.reps as string
-        exercise.sets = exercise.sets.map((s) => ({ ...s, reps: newReps }))
+        const parts = newReps.split(',').map((p) => p.trim())
+        if (parts.length > 1) {
+          exercise.sets = exercise.sets.map((s, i) => ({
+            ...s,
+            reps: parts[i] ?? parts[parts.length - 1],
+          }))
+        } else {
+          exercise.sets = exercise.sets.map((s) => ({ ...s, reps: newReps }))
+        }
         break
       }
       case 'notes_change': {
