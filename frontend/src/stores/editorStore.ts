@@ -258,7 +258,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .limit(2000),
       supabase
         .from('member_memberships')
-        .select('member_id, gym, programming_coach_id, start_date, end_date, journey_stage, status')
+        .select('member_id, gym, programming_coach_id, start_date, end_date, journey_stage, status, membership_stage, pipeline_lost')
         .gt('end_date', today)
         .not('journey_stage', 'eq', 'no_sale')
         .not('status', 'eq', 'f&f')
@@ -271,16 +271,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const pgSet = new Set((pgRes.data ?? []).map((r: { member_id: string }) => r.member_id))
 
-    const activeMap = new Map<string, { gym: string; programming_coach_id: string; start_date: string }>()
+    interface ActiveInfo {
+      gym: string
+      programming_coach_id: string
+      start_date: string
+      membership_stage: string
+      not_renewing: boolean
+    }
+    const activeMap = new Map<string, ActiveInfo>()
     for (const row of (activeMembershipRes.data ?? []) as Record<string, unknown>[]) {
       const mid = row.member_id as string
       const existing = activeMap.get(mid)
       const startDate = (row.start_date as string) || ''
+      const notRenewing = !!(row.pipeline_lost)
       if (!existing || startDate > existing.start_date) {
         activeMap.set(mid, {
           gym: (row.gym as string) || '',
           programming_coach_id: (row.programming_coach_id as string) || '',
           start_date: startDate,
+          membership_stage: (row.membership_stage as string) || '',
+          not_renewing: notRenewing,
         })
       }
     }
@@ -289,7 +299,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     for (const row of (allMembersRes.data ?? []) as Record<string, unknown>[]) {
       const mid = row.id as string
       const active = activeMap.get(mid)
-      const isActive = !!active
+      const isActive = !!active && !active.not_renewing
 
       if (coachId && active?.programming_coach_id !== coachId) continue
 
@@ -298,7 +308,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const lastName = (row.last_name as string) || fullName.split(' ').slice(1).join(' ') || ''
       const startDate = active?.start_date || ''
       const hasProgram = pgSet.has(mid)
-      const isNew = (startDate > today) || (!!startDate && startDate >= cutoffStr)
+      const withinNewWindow = (startDate > today) || (!!startDate && startDate >= cutoffStr)
+      const isNew = withinNewWindow && active?.membership_stage === 'newsale'
 
       members.push({
         member_id: mid,
