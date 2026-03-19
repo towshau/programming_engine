@@ -9,10 +9,113 @@ import type {
   RegenerationRequest,
   PastProgramInfo,
   PendingEdit,
+  EditType,
 } from '../types'
 import { supabase } from '../lib/supabase'
 import { applyEdits } from '../lib/applyEdits'
 import { validateSessionsReps, type RepsValidationError } from '../lib/reps'
+
+/**
+ * Detect when an incoming edit reverses a chain of pending edits on the same
+ * exercise/field back to its original value.  Returns the indices to remove,
+ * or null if no cancellation applies.
+ */
+function findCancellableChain(
+  pending: PendingEdit[],
+  incoming: PendingEdit,
+): number[] | null {
+  const { edit_type, session_day, series_label } = incoming
+
+  if (edit_type === 'exercise_delete') {
+    const idx = pending.findIndex(
+      (e) =>
+        e.edit_type === 'exercise_add' &&
+        e.session_day === session_day &&
+        e.series_label === series_label,
+    )
+    return idx !== -1 ? [idx] : null
+  }
+
+  if (edit_type === 'exercise_add') return null
+
+  if (edit_type === 'series_change') {
+    const chainIndices: number[] = []
+    let traceLabel = series_label
+    for (let i = pending.length - 1; i >= 0; i--) {
+      const e = pending[i]
+      if (
+        e.edit_type === 'series_change' &&
+        e.session_day === session_day &&
+        String(e.new_value.series_label) === traceLabel
+      ) {
+        chainIndices.unshift(i)
+        traceLabel = e.series_label
+      }
+    }
+    if (chainIndices.length > 0) {
+      const first = pending[chainIndices[0]]
+      if (
+        String(incoming.new_value.series_label) ===
+        String(first.old_value.series_label)
+      ) {
+        return chainIndices
+      }
+    }
+    return null
+  }
+
+  if (edit_type === 'exercise_swap') {
+    const chainIndices = collectChain(pending, edit_type, session_day, series_label)
+    if (chainIndices.length > 0) {
+      const first = pending[chainIndices[0]]
+      if (
+        String(incoming.new_value.exercise_id) ===
+        String(first.old_value.exercise_id)
+      ) {
+        return chainIndices
+      }
+    }
+    return null
+  }
+
+  const keyMap: Partial<Record<EditType, string>> = {
+    unit_change: 'unit',
+    reps_change: 'reps',
+    sets_change: 'sets',
+    notes_change: 'notes',
+  }
+  const key = keyMap[edit_type]
+  if (!key) return null
+
+  const chainIndices = collectChain(pending, edit_type, session_day, series_label)
+  if (chainIndices.length > 0) {
+    const first = pending[chainIndices[0]]
+    if (String(incoming.new_value[key]) === String(first.old_value[key])) {
+      return chainIndices
+    }
+  }
+  return null
+}
+
+function collectChain(
+  pending: PendingEdit[],
+  editType: EditType,
+  sessionDay: number,
+  seriesLabel: string,
+): number[] {
+  const indices: number[] = []
+  for (let i = 0; i < pending.length; i++) {
+    const e = pending[i]
+    if (
+      e.edit_type === editType &&
+      e.session_day === sessionDay &&
+      e.series_label === seriesLabel
+    ) {
+      indices.push(i)
+    }
+  }
+  return indices
+}
 
 interface EditorState {
   coaches: Coach[]
@@ -284,7 +387,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedDay: (day) => set({ selectedDay: day }),
 
   addPendingEdit: (edit: PendingEdit) => {
-    set((s) => ({ pendingEdits: [...s.pendingEdits, edit] }))
+    set((s) => {
+      const cancellable = findCancellableChain(s.pendingEdits, edit)
+      if (cancellable) {
+        const kept = s.pendingEdits.filter((_, i) => !cancellable.includes(i))
+        return { pendingEdits: kept }
+      }
+      return { pendingEdits: [...s.pendingEdits, edit] }
+    })
   },
 
   saveProgram: async () => {
