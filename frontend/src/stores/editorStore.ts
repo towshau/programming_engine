@@ -11,6 +11,8 @@ import type {
   PendingEdit,
 } from '../types'
 import { supabase } from '../lib/supabase'
+import { applyEdits } from '../lib/applyEdits'
+import { validateSessionsReps, type RepsValidationError } from '../lib/reps'
 
 interface EditorState {
   coaches: Coach[]
@@ -26,6 +28,7 @@ interface EditorState {
   progressionSchemes: ProgressionScheme[]
   pendingRegen: RegenerationRequest | null
   regenError: string | null
+  saveValidationErrors: RepsValidationError[] | null
   selectedDay: number | null
   configDraft: {
     scheme_name: string
@@ -61,6 +64,8 @@ interface EditorState {
   requestRegeneration: () => Promise<void>
   hasConfigChanges: () => boolean
   clearRegenError: () => void
+  clearSaveValidationError: () => void
+  hasRepsError: (sessionDay: number, seriesLabel: string) => boolean
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -77,6 +82,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   progressionSchemes: [],
   pendingRegen: null,
   regenError: null,
+  saveValidationErrors: null,
   selectedDay: null,
   configDraft: null,
   loading: { coaches: false, members: false, program: false, saving: false, regenerating: false },
@@ -280,9 +286,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   saveProgram: async () => {
-    const { program, pendingEdits, selectedCoach } = get()
+    const { program, pendingEdits, savedEdits, selectedCoach } = get()
     if (!program || pendingEdits.length === 0) return false
 
+    const combinedEdits = [...savedEdits, ...pendingEdits]
+    const editedSessions = applyEdits(program.payload.sessions, combinedEdits)
+    const validationErrors = validateSessionsReps(editedSessions)
+    if (validationErrors.length > 0) {
+      set({ saveValidationErrors: validationErrors })
+      return false
+    }
+
+    set({ saveValidationErrors: null })
     set((s) => ({ loading: { ...s.loading, saving: true } }))
 
     const rows = pendingEdits.map((edit) => ({
@@ -514,4 +529,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   clearRegenError: () => set({ regenError: null }),
+  clearSaveValidationError: () => set({ saveValidationErrors: null }),
+  hasRepsError: (sessionDay, seriesLabel) => {
+    const errs = get().saveValidationErrors
+    return !!errs?.some((e) => e.sessionDay === sessionDay && e.seriesLabel === seriesLabel)
+  },
 }))

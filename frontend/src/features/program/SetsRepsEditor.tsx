@@ -6,6 +6,7 @@ interface SetsRepsEditorProps {
   sets: number
   repsDisplay: string
   unit: RepUnit
+  hasError?: boolean
   onSetsChange: (newSets: number) => void
   onRepsChange: (newReps: string) => void
   onUnitChange: (newUnit: RepUnit) => void
@@ -15,6 +16,7 @@ export function SetsRepsEditor({
   sets,
   repsDisplay,
   unit,
+  hasError = false,
   onSetsChange,
   onRepsChange,
   onUnitChange,
@@ -139,11 +141,14 @@ export function SetsRepsEditor({
         <button
           onClick={startEditingReps}
           className={cn(
-            'rounded px-1.5 py-0.5 font-medium text-zinc-300',
-            'hover:bg-zinc-700 hover:text-emerald-400 transition-colors cursor-pointer',
-            isCustom && 'text-teal-400'
+            'rounded px-1.5 py-0.5 font-medium transition-colors cursor-pointer',
+            hasError
+              ? 'ring-1 ring-red-500 bg-red-500/10 text-red-300 hover:bg-red-500/20'
+              : isCustom
+                ? 'text-teal-400 hover:bg-zinc-700 hover:text-emerald-400'
+                : 'text-zinc-300 hover:bg-zinc-700 hover:text-emerald-400'
           )}
-          title={isCustom ? 'Custom reps per set — click to edit' : 'Edit reps'}
+          title={hasError ? 'Invalid — fix before saving' : isCustom ? 'Custom reps per set — click to edit' : 'Edit reps'}
         >
           {repsDisplay}
         </button>
@@ -154,6 +159,7 @@ export function SetsRepsEditor({
         onClick={handleToggleUnit}
         className={cn(
           'rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide border transition-colors',
+          hasError && 'ring-1 ring-red-500 border-red-500/50',
           isSeconds
             ? 'border-blue-500/40 text-blue-400 bg-blue-500/10 hover:bg-blue-500/20'
             : 'border-zinc-600/40 text-zinc-500 bg-zinc-800 hover:bg-zinc-700 hover:text-zinc-300'

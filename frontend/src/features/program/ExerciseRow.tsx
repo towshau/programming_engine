@@ -27,9 +27,10 @@ export function ExerciseRow({
   coachId: _coachId,
 }: ExerciseRowProps) {
   void _programId; void _memberId; void _coachId;
-  const { addPendingEdit } = useEditorStore()
+  const { addPendingEdit, hasRepsError } = useEditorStore()
   const [showSwapModal, setShowSwapModal] = useState(false)
   const edited = isExerciseEdited(edits, sessionDay, exercise.series_label)
+  const repsInvalid = hasRepsError(sessionDay, exercise.series_label)
 
   const handleSeriesChange = (newLabel: string) => {
     addPendingEdit({
@@ -128,7 +129,8 @@ export function ExerciseRow({
         className={cn(
           'flex items-center gap-3 rounded-lg px-3 py-2 transition-colors group',
           'bg-zinc-800/30 hover:bg-zinc-800/60',
-          edited && 'ring-1 ring-emerald-500/40 bg-emerald-500/5'
+          edited && !repsInvalid && 'ring-1 ring-emerald-500/40 bg-emerald-500/5',
+          repsInvalid && 'ring-1 ring-red-500/60 bg-red-500/5'
         )}
       >
         <SeriesLabelDropdown
@@ -155,6 +157,7 @@ export function ExerciseRow({
           sets={exercise.sets.length}
           repsDisplay={buildRepsDisplay(exercise.sets)}
           unit={currentUnit}
+          hasError={repsInvalid}
           onSetsChange={handleSetsChange}
           onRepsChange={handleRepsChange}
           onUnitChange={handleUnitChange}

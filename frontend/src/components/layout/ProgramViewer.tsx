@@ -37,6 +37,8 @@ export function ProgramViewer() {
     finalizeProgram,
     markUploaded,
     hasPendingChanges,
+    saveValidationErrors,
+    clearSaveValidationError,
   } = useEditorStore()
 
   useEffect(() => {
@@ -196,6 +198,36 @@ export function ProgramViewer() {
             <span>Program edited after upload — re-upload to TeamBuildr required</span>
             <p className="text-[10px] text-amber-500/70 italic mt-0.5">No coach action required (admin to adjust member-facing program)</p>
           </div>
+        </div>
+      )}
+
+      {/* Save validation errors — block save until fixed */}
+      {saveValidationErrors && saveValidationErrors.length > 0 && (
+        <div className="rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-3 text-sm text-red-200 flex flex-col gap-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 font-medium">
+              <svg className="h-5 w-5 flex-shrink-0 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              Fix the following before saving:
+            </div>
+            <button
+              onClick={clearSaveValidationError}
+              className="flex-shrink-0 rounded p-0.5 text-red-400 hover:bg-red-500/20 hover:text-red-200"
+              title="Dismiss"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <ul className="list-disc list-inside space-y-0.5 text-xs text-red-300/90">
+            {saveValidationErrors.map((e) => (
+              <li key={`${e.sessionDay}-${e.seriesLabel}`}>
+                <strong>{e.seriesLabel}</strong> (Day {e.sessionDay}): {e.message}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

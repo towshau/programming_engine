@@ -90,3 +90,43 @@ export function validateRepsInput(value: string, unit: RepUnit): boolean {
   }
   return /^[\d\s,\-]+$/.test(value.trim()) && value.trim().length > 0
 }
+
+/**
+ * Check if a display value is invalid for the given unit.
+ * Used to show red highlight and block save.
+ */
+export function isRepsInvalidForUnit(display: string, unit: RepUnit): boolean {
+  if (!display.trim()) return true
+  return !validateRepsInput(display, unit)
+}
+
+export interface RepsValidationError {
+  sessionDay: number
+  seriesLabel: string
+  message: string
+}
+
+/**
+ * Validate all exercises in edited sessions. Returns list of errors for save blocking.
+ */
+export function validateSessionsReps(
+  sessions: { day: number; exercises: { series_label: string; sets: SetPrescription[] }[] }[]
+): RepsValidationError[] {
+  const errors: RepsValidationError[] = []
+  for (const session of sessions) {
+    for (const ex of session.exercises) {
+      const unit = getUnit(ex.sets)
+      const display = buildRepsDisplay(ex.sets)
+      if (isRepsInvalidForUnit(display, unit)) {
+        errors.push({
+          sessionDay: session.day,
+          seriesLabel: ex.series_label,
+          message: unit === 'seconds'
+            ? 'Seconds must be a single number (e.g. 30).'
+            : 'Reps can only contain numbers, hyphens, and commas (e.g. 8-10 or 10, 8, 6).',
+        })
+      }
+    }
+  }
+  return errors
+}
