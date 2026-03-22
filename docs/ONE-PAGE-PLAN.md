@@ -14,7 +14,7 @@
 
 ---
 
-## Tables (9 total, all created and applied)
+## Tables (10 total, all created and applied)
 
 | Table | Purpose | Key columns |
 |-------|---------|-------------|
@@ -27,6 +27,7 @@
 | programming_feedback | Coach feedback on generated programs | run_id, member_id, coach_id, feedback_type, details, exercise_id, resolved. |
 | programming_coach_edits | Individual coach edits to generated programs (differential learning) | program_id, member_id, coach_id, session_day, series_label, exercise_id, edit_type, old_value (jsonb), new_value (jsonb). |
 | programming_regeneration_requests | Queue for program regeneration when coaches change scheme/rep-range/sessions | member_id, program_id, requested_by, scheme_name, rep_range, sessions_per_week, status (pending/processing/completed/failed). |
+| programming_sync_log | Audit trail for TeamBuilder → Supabase batch sync runs | run_id, member_id, member_name, status (success/failed/skipped), days_synced, exercises_synced, error, synced_at. |
 
 ---
 
@@ -75,6 +76,11 @@
   - **apply_auto_exclusions.py** — Feedback → programming_exercise_exclusions (e.g. 3+ negative feedbacks → exclude exercise for member).
   - **run_weekly_batch.py** — Weekly batch generator: queries `member_programs` for members due within 8 days (`update_stage`/`complete`) or `awaiting_program`; skips members with a `programming_generated` row from the last 7 days; runs normalize → phase detect → generate for each; writes to `programming_generated` only (stage/due_date updates are manual). Options: `--dry-run`, `--limit N`, `--member-id <uuid>`, `--duration-weeks N`. Uses `scheme_name` from `member_programs` per member.
 - **Workflows:** Chronological order: Ingest → Load config → Generate → Write. See **workflows/README.md**. Batch generation runs weekly via GitHub Actions (Monday 09:00 UTC) or on demand via `workflow_dispatch`.
+
+### Standalone apps
+
+- **exercise-library-sheet-sync/** — Node app that syncs `exercise_library` to Google Sheet. See `exercise-library-sheet-sync/.env.example`.
+- **teambuilder-sync/** — Playwright-based scraper that syncs exercises from TeamBuilder into `programming_generated`. Single-member: `npm run sync -- --member="Last, First" --date=YYYY-MM-DD --day=N`. Full-week: add `--sync-week`. **Batch sync** (`npm run batch`): iterates all members with `uploaded_to_teambuildr = true`, scrapes Mon–Fri, overwrites `programming_generated`. Logs results to `programming_sync_log`. Supports `--dry-run`, `--limit N`, `--reset`, and resume via `batch-progress.json`. See `teambuilder-sync/README.md`.
 
 ---
 

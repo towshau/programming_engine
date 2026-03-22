@@ -1,0 +1,25 @@
+{
+  "name": "teambuilder-sync",
+  "version": "1.0.0",
+  "description": "Sync exercise programs from TeamBuilder to Supabase",
+  "scripts": {
+    "sync": "npx ts-node sync-exercises.ts",
+    "sync:dry": "npx ts-node sync-exercises.ts --dry-run",
+    "batch": "npx ts-node batch-sync.ts",
+    "batch:dry": "npx ts-node batch-sync.ts --dry-run",
+    "batch:reset": "npx ts-node batch-sync.ts --reset",
+    "inspect": "npx ts-node inspect-teambuilder.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "chalk": "^4.1.2",
+    "commander": "^12.0.0",
+    "dotenv": "^16.4.5",
+    "playwright": "^1.48.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.0"
+  }
+}
