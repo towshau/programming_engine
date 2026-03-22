@@ -93,3 +93,7 @@ Supabase `programming_normalized_programs.payload` structure:
 ```
 
 The sync reorders the `exercises` array within a session to match TeamBuilder's order.
+
+## Planned: Supabase → TeamBuildr upload (not implemented)
+
+A future Playwright script will push finalized programs from `programming_generated` into TeamBuildr (after coach **Finalize** / admin approval flow). **Upload-only rule:** only create or overwrite workouts on calendar dates **≥ today** (gym timezone); never change past days in TeamBuildr. The existing **pull** sync in this folder does **not** use that rule. Details: `docs/admin-upload-instructions-for-ai.md` §6.1.

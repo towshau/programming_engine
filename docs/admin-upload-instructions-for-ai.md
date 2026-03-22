@@ -108,13 +108,28 @@ The above steps are intended to be automated by an AI agent (e.g. Manus) using b
 
 **Recommended tool:** **Playwright** (or Puppeteer). Use a single browser context; log into TeamBuildr once per run (or reuse a session if secure and compliant with your policies).
 
+### 6.1 Calendar rule — upload script only (today onward)
+
+**Scope:** This rule applies **only** to the planned **Supabase → TeamBuildr** Playwright **upload** automation (pushing `programming_generated` into TeamBuildr). It does **not** apply to the existing **TeamBuildr → Supabase** sync (`teambuilder-sync` `batch-sync.ts` / `sync-exercises.ts`), which may continue to scrape the full Mon–Fri window for alignment.
+
+**Rule:** When creating or updating workouts in TeamBuildr from `payload.sessions`, **do not** change calendar days **before** “today”:
+
+- Pick one **timezone** for “today” (e.g. `Australia/Sydney` for Lockeroom) and use it consistently.
+- For each program session, map `day` (1…N in the payload) to a **concrete calendar date** using the same anchor the product uses for “when this block starts” (e.g. `programming_generated.next_due_date`, or the Monday of the current cycle — align with coach-facing behaviour).
+- If that calendar date is **strictly before** today in that timezone → **skip** TeamBuildr edits for that day (leave whatever is already there).
+- If the date is **today or in the future** → create/update the workout from the payload.
+
+**Why:** Past days may already be logged or completed; overwriting them in TeamBuildr risks confusion or wiping history members care about.
+
+**Implementation note:** Mid-week first uploads will only populate “remaining” days until the script also handles “backfill” as a separate explicit mode (if ever needed).
+
 **High-level flow for the AI:**
 
 1. **Query** Supabase for programs with `coach_approved = true` and `uploaded_to_teambuildr = false` (see §2).
 2. For each program:
    - **Navigate** to TeamBuildr (e.g. login page), log in with credentials provided via environment or secrets.
    - **Resolve member:** Search or navigate to the member (by name/email from `member_database` or the query result).
-   - **Create/update program:** For each day in `payload.sessions`, create or update the workout with the exercises and set/rep prescriptions. Map our `exercise_id` / `exercise_name` to TeamBuildr’s exercise picker or IDs as needed.
+   - **Create/update program:** For each day in `payload.sessions`, create or update the workout with the exercises and set/rep prescriptions — **subject to §6.1** (skip calendar dates before today). Map our `exercise_id` / `exercise_name` to TeamBuildr’s exercise picker or IDs as needed.
    - **Verify:** Confirm the program is visible and matches the payload (e.g. same number of days, same exercises per day). If verification fails, do not mark as uploaded.
    - **Record success:** Call Supabase to set `uploaded_to_teambuildr = true` for this `programming_generated.id` (and optionally update `member_programs.due_date` as in §4).
 3. If any step fails, log and optionally retry; if still failing, leave `uploaded_to_teambuildr = false` and report for human admin.
@@ -131,7 +146,7 @@ The above steps are intended to be automated by an AI agent (e.g. Manus) using b
 
 - [ ] Query `programming_generated` for rows with `coach_approved = true` and `uploaded_to_teambuildr = false`.
 - [ ] For each row, get `payload`, `member_id`, and member identity (name, email) from `member_database`.
-- [ ] In TeamBuildr, find the member and create/update their program to match `payload.sessions`.
+- [ ] In TeamBuildr, find the member and create/update their program to match `payload.sessions` (**§6.1:** only calendar days ≥ today for the **upload** automation; not required for manual admin process unless you adopt the same rule).
 - [ ] Verify the program in TeamBuildr matches the payload.
 - [ ] Update `programming_generated` set `uploaded_to_teambuildr = true` (and `updated_at`) for that program’s `id`.
 - [ ] Optionally update `member_programs.due_date` from `programming_generated.next_due_date`.

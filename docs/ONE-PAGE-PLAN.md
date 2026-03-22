@@ -80,7 +80,7 @@
 ### Standalone apps
 
 - **exercise-library-sheet-sync/** — Node app that syncs `exercise_library` to Google Sheet. See `exercise-library-sheet-sync/.env.example`.
-- **teambuilder-sync/** — Playwright-based scraper that syncs exercises from TeamBuilder into `programming_generated`. Single-member: `npm run sync -- --member="Last, First" --date=YYYY-MM-DD --day=N`. Full-week: add `--sync-week`. **Batch sync** (`npm run batch`): iterates all members with `uploaded_to_teambuildr = true`, scrapes Mon–Fri, overwrites `programming_generated`. Logs results to `programming_sync_log`. Supports `--dry-run`, `--limit N`, `--reset`, and resume via `batch-progress.json`. See `teambuilder-sync/README.md`.
+- **teambuilder-sync/** — Playwright-based scraper that syncs exercises from TeamBuilder into `programming_generated`. Single-member: `npm run sync -- --member="Last, First" --date=YYYY-MM-DD --day=N`. Full-week: add `--sync-week`. **Batch sync** (`npm run batch`): iterates all members with `uploaded_to_teambuildr = true`, scrapes Mon–Fri, overwrites `programming_generated`. Logs results to `programming_sync_log`. Supports `--dry-run`, `--limit N`, `--reset`, and resume via `batch-progress.json`. **Planned (not built):** reverse direction — Playwright upload from Supabase → TeamBuildr; **only** writes calendar days ≥ today (see `docs/admin-upload-instructions-for-ai.md` §6.1); does **not** apply to pull sync. See `teambuilder-sync/README.md`.
 
 ---
 
