@@ -1,5 +1,5 @@
 # Programming engine: weekly batch — normalize, exclusions, generate programs.
-# Runs every Monday at 09:00 UTC or on demand.
+# Runs every Monday 09:00 UTC (= Monday 7:00pm AEST) or on demand.
 # Add secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (repo Settings → Secrets and variables → Actions).
 
 name: Programming engine weekly

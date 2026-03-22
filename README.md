@@ -9,7 +9,7 @@ Repo for gym programming tooling: (1) syncing the exercise library to a Google S
 | Part | Location | Description |
 |------|----------|--------------|
 | **Exercise library → Sheet sync** | `exercise-library-sheet-sync/` | Node app. Syncs Supabase `exercise_library` to a Google Sheet. Run: `cd exercise-library-sheet-sync && npm install && npm run sync-exercise-library`. CI: `.github/workflows/sync-exercise-library-to-sheet.yml`. |
-| **Programming engine (in progress)** | `docs/`, `tools/` | Pipeline: normalize past programs → staging, phase detection (optional), apply auto-exclusions from feedback. **Scripts:** `python tools/normalize_one_member.py [member_id] [--scheme GPP|Strength|Hypertrophy]`, `python tools/detect_phase.py <member_id> <scheme>`, `python tools/apply_auto_exclusions.py`. Phase detection: A-series median reps → current/next rep range and confidence (see docs/data-model.md). **Weekly CI:** `.github/workflows/programming-engine-weekly.yml` (Monday 9am UTC; needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in repo secrets). |
+| **Programming engine (in progress)** | `docs/`, `tools/` | Pipeline: normalize past programs → staging, phase detection (optional), apply auto-exclusions from feedback. **Scripts:** `python tools/normalize_one_member.py [member_id] [--scheme GPP|Strength|Hypertrophy]`, `python tools/detect_phase.py <member_id> <scheme>`, `python tools/apply_auto_exclusions.py`. Phase detection: A-series median reps → current/next rep range and confidence (see docs/data-model.md). **Weekly CI:** `.github/workflows/programming-engine-weekly.yml` (Monday 7:00pm AEST / `09:00 UTC`; needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in repo secrets). |
 
 ---
 

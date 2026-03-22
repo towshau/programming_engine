@@ -75,7 +75,7 @@
   - **run_pipeline.py** — End-to-end pipeline runner: Ingest → Phase detect → Load config → Generate → Write. Single command for one member: `python tools/run_pipeline.py <member_id> --scheme Strength --sessions-per-week 3`. Options: `--dry-run`, `--skip-staging`, `--output FILE`.
   - **apply_auto_exclusions.py** — Feedback → programming_exercise_exclusions (e.g. 3+ negative feedbacks → exclude exercise for member).
   - **run_weekly_batch.py** — Weekly batch generator: queries `member_programs` for members due within 8 days (`update_stage`/`complete`) or `awaiting_program`; skips members with a `programming_generated` row from the last 7 days; runs normalize → phase detect → generate for each; writes to `programming_generated` only (stage/due_date updates are manual). Options: `--dry-run`, `--limit N`, `--member-id <uuid>`, `--duration-weeks N`. Uses `scheme_name` from `member_programs` per member.
-- **Workflows:** Chronological order: Ingest → Load config → Generate → Write. See **workflows/README.md**. Batch generation runs weekly via GitHub Actions (Monday 09:00 UTC) or on demand via `workflow_dispatch`.
+- **Workflows:** Chronological order: Ingest → Load config → Generate → Write. See **workflows/README.md**. Batch generation runs weekly via GitHub Actions (**Monday 7:00pm AEST**; cron `09:00 UTC` Monday) or on demand via `workflow_dispatch`.
 
 ### Standalone apps
 
