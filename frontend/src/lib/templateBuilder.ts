@@ -1,25 +1,62 @@
 import type { ExerciseLibraryItem, ProgramPayload, ProgramSession } from '../types'
 
-type DayType = 'upper' | 'lower'
+type DayType = 'upper' | 'lower' | 'full'
 
-const UPPER_PRESS_TAGS = ['Horizontal Press', 'Vertical Press']
-const UPPER_PULL_TAGS = ['Horizontal Pull', 'Vertical Pull']
-const LOWER_PUSH_TAGS = ['Lower Body Push', 'Hip Dominant']
-const LOWER_PULL_TAGS = ['Lower Body Pull', 'Hip Dominant']
-const UPPER_ACCESSORY_TAGS = [
-  'Elbow Flexion',
-  'Elbow Extension',
-  'Lateral & Front Raise',
-  'External Rotation',
-  'Core Stability',
+const SPLIT_MAP: Record<number, DayType[]> = {
+  1: ['full'],
+  2: ['upper', 'lower'],
+  3: ['upper', 'lower', 'full'],
+  4: ['upper', 'lower', 'upper', 'lower'],
+  5: ['upper', 'lower', 'upper', 'lower', 'full'],
+  6: ['upper', 'lower', 'upper', 'lower', 'upper', 'lower'],
+}
+
+// ── Slot definitions per day type ─────────────────────────────────────────────
+// Each slot: [seriesLabel, sets, tagFilter[], seriesFilter[], cursorKey]
+
+interface SlotDef {
+  label: string
+  sets: number
+  accessory: boolean
+  tags: string[]
+  series: string[]
+  cursor: string
+}
+
+const UPPER_SLOTS: SlotDef[] = [
+  { label: 'A1', sets: 3, accessory: false, tags: ['Horizontal Press'], series: ['A', 'B'], cursor: 'hpress' },
+  { label: 'A2', sets: 3, accessory: false, tags: ['Horizontal Pull'], series: ['A', 'B'], cursor: 'hpull' },
+  { label: 'B1', sets: 3, accessory: false, tags: ['Vertical Press'], series: ['A', 'B'], cursor: 'vpress' },
+  { label: 'B2', sets: 3, accessory: false, tags: ['Vertical Pull'], series: ['A', 'B'], cursor: 'vpull' },
+  { label: 'C1', sets: 2, accessory: true, tags: ['Elbow Flexion', 'Elbow Extension', 'Lateral & Front Raise', 'External Rotation'], series: ['C', 'D', 'B'], cursor: 'upper_acc1' },
+  { label: 'C2', sets: 2, accessory: true, tags: ['Core Stability', 'Elbow Flexion', 'Elbow Extension', 'Lateral & Front Raise'], series: ['C', 'D', 'B'], cursor: 'upper_acc2' },
 ]
-const LOWER_ACCESSORY_TAGS = [
-  'Hip Abduction',
-  'Lower Leg',
-  'Core Stability',
-  'Spinal Flexion',
-  'Mobility',
+
+const LOWER_SLOTS: SlotDef[] = [
+  { label: 'A1', sets: 3, accessory: false, tags: ['Lower Body Push'], series: ['A', 'B'], cursor: 'lbpush' },
+  { label: 'A2', sets: 3, accessory: false, tags: ['Lower Body Pull'], series: ['A', 'B'], cursor: 'lbpull' },
+  { label: 'B1', sets: 3, accessory: false, tags: ['Hip Dominant'], series: ['A', 'B'], cursor: 'hipdominant' },
+  { label: 'B2', sets: 3, accessory: false, tags: ['Lower Body Push', 'Lower Body Pull', 'Hip Dominant'], series: ['B', 'C'], cursor: 'lower_b2' },
+  { label: 'C1', sets: 2, accessory: true, tags: ['Hip Abduction', 'Lower Leg', 'Core Stability'], series: ['C', 'D', 'B'], cursor: 'lower_acc1' },
+  { label: 'C2', sets: 2, accessory: true, tags: ['Spinal Flexion', 'Mobility', 'Core Stability'], series: ['C', 'D', 'B'], cursor: 'lower_acc2' },
 ]
+
+const FULL_SLOTS: SlotDef[] = [
+  { label: 'A1', sets: 3, accessory: false, tags: ['Horizontal Press'], series: ['A', 'B'], cursor: 'full_hpress' },
+  { label: 'A2', sets: 3, accessory: false, tags: ['Horizontal Pull'], series: ['A', 'B'], cursor: 'full_hpull' },
+  { label: 'B1', sets: 3, accessory: false, tags: ['Lower Body Push'], series: ['A', 'B'], cursor: 'full_lbpush' },
+  { label: 'B2', sets: 3, accessory: false, tags: ['Lower Body Pull'], series: ['A', 'B'], cursor: 'full_lbpull' },
+  { label: 'C1', sets: 2, accessory: true, tags: ['Core Stability', 'Elbow Flexion', 'Lateral & Front Raise'], series: ['C', 'D', 'B'], cursor: 'full_acc1' },
+  { label: 'C2', sets: 2, accessory: true, tags: ['Hip Abduction', 'Lower Leg', 'Spinal Flexion', 'Mobility'], series: ['C', 'D', 'B'], cursor: 'full_acc2' },
+]
+
+const DAY_TYPE_SLOTS: Record<DayType, SlotDef[]> = {
+  upper: UPPER_SLOTS,
+  lower: LOWER_SLOTS,
+  full: FULL_SLOTS,
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function parseRepRange(repRange: string): [number, number] {
   const m = repRange.match(/(\d+)\s*-\s*(\d+)/)
@@ -31,12 +68,13 @@ function formatRange(low: number, high: number): string {
   return `${low}-${high}`
 }
 
-function hasSeries(item: ExerciseLibraryItem, target: string): boolean {
-  return !!item.series_assignment?.includes(target)
-}
-
-function hasTag(item: ExerciseLibraryItem, tags: string[]): boolean {
-  return !!item.tags && tags.includes(item.tags)
+function shuffle<T>(arr: T[]): T[] {
+  const result = [...arr]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
 }
 
 function buildPool(
@@ -46,12 +84,12 @@ function buildPool(
 ): ExerciseLibraryItem[] {
   return exerciseLibrary.filter(
     (item) =>
-      series.some((s) => hasSeries(item, s)) &&
-      (tags.length === 0 || hasTag(item, tags)),
+      item.series_assignment?.some((s) => series.includes(s)) &&
+      (tags.length === 0 || (!!item.tags && tags.includes(item.tags))),
   )
 }
 
-function dedupeByExerciseId(items: ExerciseLibraryItem[]): ExerciseLibraryItem[] {
+function dedupeAndShuffle(items: ExerciseLibraryItem[]): ExerciseLibraryItem[] {
   const seen = new Set<string>()
   const result: ExerciseLibraryItem[] = []
   for (const item of items) {
@@ -59,10 +97,10 @@ function dedupeByExerciseId(items: ExerciseLibraryItem[]): ExerciseLibraryItem[]
     seen.add(item.exercise_id)
     result.push(item)
   }
-  return result
+  return shuffle(result)
 }
 
-function rotatePick(
+function pickFromPool(
   pool: ExerciseLibraryItem[],
   cursorMap: Record<string, number>,
   cursorKey: string,
@@ -88,29 +126,7 @@ function rotatePick(
   return fallback
 }
 
-function dayTypeFor(day: number): DayType {
-  return day % 2 === 1 ? 'upper' : 'lower'
-}
-
-function addExercise(
-  session: ProgramSession,
-  item: ExerciseLibraryItem | null,
-  seriesLabel: string,
-  sets: number,
-  reps: string,
-) {
-  if (!item) return
-  session.exercises.push({
-    exercise_name: item.exercise_name,
-    exercise_id: item.exercise_id,
-    series_label: seriesLabel,
-    tags: item.tags ?? undefined,
-    sets: Array.from({ length: sets }, (_, i) => ({
-      set_number: i + 1,
-      reps,
-    })),
-  })
-}
+// ── Main builder ──────────────────────────────────────────────────────────────
 
 export function buildTemplateProgram(
   sessionsPerWeek: number,
@@ -118,115 +134,77 @@ export function buildTemplateProgram(
   exerciseLibrary: ExerciseLibraryItem[],
 ): ProgramPayload {
   const [repLow, repHigh] = parseRepRange(repRange)
-  const accessoryRange = formatRange(Math.min(repLow + 2, 12), Math.min(repHigh + 2, 14))
-
-  const warmUpPool = dedupeByExerciseId(buildPool(exerciseLibrary, ['Warm Up'], []))
-  const anyAPool = dedupeByExerciseId(buildPool(exerciseLibrary, ['A'], []))
-  const anyBPool = dedupeByExerciseId(buildPool(exerciseLibrary, ['B'], []))
-  const anyCPool = dedupeByExerciseId(buildPool(exerciseLibrary, ['C', 'D'], []))
-  const anyPool = dedupeByExerciseId(exerciseLibrary)
-
-  const upperPressPool = dedupeByExerciseId(buildPool(exerciseLibrary, ['A', 'B'], UPPER_PRESS_TAGS))
-  const upperPullPool = dedupeByExerciseId(buildPool(exerciseLibrary, ['A', 'B'], UPPER_PULL_TAGS))
-  const lowerPushPool = dedupeByExerciseId(buildPool(exerciseLibrary, ['A', 'B'], LOWER_PUSH_TAGS))
-  const lowerPullPool = dedupeByExerciseId(buildPool(exerciseLibrary, ['A', 'B'], LOWER_PULL_TAGS))
-  const upperAccessoryPool = dedupeByExerciseId(
-    buildPool(exerciseLibrary, ['C', 'D', 'B'], UPPER_ACCESSORY_TAGS),
+  const compoundRange = repRange
+  const accessoryRange = formatRange(
+    Math.min(repLow + 2, 12),
+    Math.min(repHigh + 2, 14),
   )
-  const lowerAccessoryPool = dedupeByExerciseId(
-    buildPool(exerciseLibrary, ['C', 'D', 'B'], LOWER_ACCESSORY_TAGS),
+
+  const clamped = Math.max(1, Math.min(6, sessionsPerWeek))
+  const dayTypes = SPLIT_MAP[clamped]
+
+  const warmUpPool = dedupeAndShuffle(
+    buildPool(exerciseLibrary, ['Warm Up'], []),
   )
+  const fallbackPool = dedupeAndShuffle(exerciseLibrary)
+
+  const slotPools = new Map<string, ExerciseLibraryItem[]>()
+  function getPool(slot: SlotDef): ExerciseLibraryItem[] {
+    const key = `${slot.cursor}__${slot.tags.join(',')}__${slot.series.join(',')}`
+    if (!slotPools.has(key)) {
+      const pool = dedupeAndShuffle(buildPool(exerciseLibrary, slot.series, slot.tags))
+      slotPools.set(key, pool)
+    }
+    return slotPools.get(key)!
+  }
 
   const cursors: Record<string, number> = {}
   const sessions: ProgramSession[] = []
-  const maxSessions = Math.max(1, Math.min(6, sessionsPerWeek))
 
-  for (let day = 1; day <= maxSessions; day++) {
-    const type = dayTypeFor(day)
+  for (let dayIdx = 0; dayIdx < dayTypes.length; dayIdx++) {
+    const dayType = dayTypes[dayIdx]
+    const slots = DAY_TYPE_SLOTS[dayType]
     const usedIds = new Set<string>()
-    const session: ProgramSession = { day, exercises: [] }
+    const session: ProgramSession = { day: dayIdx + 1, exercises: [] }
 
-    const warmUp = rotatePick(
-      warmUpPool.length > 0 ? warmUpPool : anyPool,
+    const warmUp = pickFromPool(
+      warmUpPool.length > 0 ? warmUpPool : fallbackPool,
       cursors,
       'warmup',
       usedIds,
     )
-    addExercise(session, warmUp, 'WU1', 1, repRange)
+    if (warmUp) {
+      session.exercises.push({
+        exercise_name: warmUp.exercise_name,
+        exercise_id: warmUp.exercise_id,
+        series_label: 'WU1',
+        tags: warmUp.tags ?? undefined,
+        sets: [{ set_number: 1, reps: repRange }],
+      })
+    }
 
-    const a1 =
-      type === 'upper'
-        ? rotatePick(
-            upperPressPool.length > 0 ? upperPressPool : anyAPool.length > 0 ? anyAPool : anyPool,
-            cursors,
-            'a1_upper',
-            usedIds,
-          )
-        : rotatePick(
-            lowerPushPool.length > 0 ? lowerPushPool : anyAPool.length > 0 ? anyAPool : anyPool,
-            cursors,
-            'a1_lower',
-            usedIds,
-          )
-    addExercise(session, a1, 'A1', 3, repRange)
+    for (const slot of slots) {
+      const pool = getPool(slot)
+      const picked = pickFromPool(
+        pool.length > 0 ? pool : fallbackPool,
+        cursors,
+        slot.cursor,
+        usedIds,
+      )
+      if (!picked) continue
 
-    const a2 =
-      type === 'upper'
-        ? rotatePick(
-            upperPullPool.length > 0 ? upperPullPool : anyAPool.length > 0 ? anyAPool : anyPool,
-            cursors,
-            'a2_upper',
-            usedIds,
-          )
-        : rotatePick(
-            lowerPullPool.length > 0 ? lowerPullPool : anyAPool.length > 0 ? anyAPool : anyPool,
-            cursors,
-            'a2_lower',
-            usedIds,
-          )
-    addExercise(session, a2, 'A2', 3, repRange)
-
-    const b1 = rotatePick(
-      anyBPool.length > 0 ? anyBPool : anyAPool.length > 0 ? anyAPool : anyPool,
-      cursors,
-      `b1_${type}`,
-      usedIds,
-    )
-    addExercise(session, b1, 'B1', 3, repRange)
-
-    const b2 = rotatePick(
-      anyBPool.length > 0 ? anyBPool : anyCPool.length > 0 ? anyCPool : anyPool,
-      cursors,
-      `b2_${type}`,
-      usedIds,
-    )
-    addExercise(session, b2, 'B2', 3, repRange)
-
-    const c1 = rotatePick(
-      type === 'upper'
-        ? upperAccessoryPool.length > 0
-          ? upperAccessoryPool
-          : anyCPool.length > 0
-            ? anyCPool
-            : anyPool
-        : lowerAccessoryPool.length > 0
-          ? lowerAccessoryPool
-          : anyCPool.length > 0
-            ? anyCPool
-            : anyPool,
-      cursors,
-      `c1_${type}`,
-      usedIds,
-    )
-    addExercise(session, c1, 'C1', 2, accessoryRange)
-
-    const c2 = rotatePick(
-      anyCPool.length > 0 ? anyCPool : anyPool,
-      cursors,
-      `c2_${type}`,
-      usedIds,
-    )
-    addExercise(session, c2, 'C2', 2, accessoryRange)
+      const reps = slot.accessory ? accessoryRange : compoundRange
+      session.exercises.push({
+        exercise_name: picked.exercise_name,
+        exercise_id: picked.exercise_id,
+        series_label: slot.label,
+        tags: picked.tags ?? undefined,
+        sets: Array.from({ length: slot.sets }, (_, i) => ({
+          set_number: i + 1,
+          reps,
+        })),
+      })
+    }
 
     if (session.exercises.length >= 3) {
       sessions.push(session)
@@ -238,7 +216,7 @@ export function buildTemplateProgram(
     metadata: {
       next_rep_range: repRange,
       confidence: 'none',
-      sessions_per_week: maxSessions,
+      sessions_per_week: clamped,
     },
   }
 }

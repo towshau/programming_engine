@@ -463,19 +463,20 @@ def detect_sessions_per_week(sessions):
             signatures.add(sig)
 
     distinct = len(signatures)
-    if distinct >= 4:
-        return 4
-    elif distinct <= 2:
-        return 2
-    return 3
+    return max(1, min(distinct, 6))
 
 
 def resolve_sessions_per_week(sessions, cli_override=None, stored_from_row=None):
-    """Pick 2/3/4 for generation: CLI override, then DB/metadata from latest row, else detect."""
-    if cli_override in (2, 3, 4):
+    """Pick sessions/week for generation: CLI override, then DB/metadata, else detect."""
+    if cli_override is not None and 1 <= cli_override <= 6:
         return cli_override
-    if stored_from_row in (2, 3, 4):
-        return int(stored_from_row)
+    if stored_from_row is not None:
+        try:
+            v = int(stored_from_row)
+            if 1 <= v <= 6:
+                return v
+        except (TypeError, ValueError):
+            pass
     return detect_sessions_per_week(sessions)
 
 
@@ -510,14 +511,14 @@ def fetch_latest_generated_program(supabase, member_id):
             spw = int(raw_spw)
         except (TypeError, ValueError):
             spw = None
-    if spw not in (2, 3, 4):
+    if spw is None or not (1 <= spw <= 6):
         meta = payload.get("metadata") or {}
         m = meta.get("sessions_per_week")
         try:
             m = int(m) if m is not None else None
         except (TypeError, ValueError):
             m = None
-        spw = m if m in (2, 3, 4) else None
+        spw = m if (m is not None and 1 <= m <= 6) else None
     return {"sessions": sessions, "sessions_per_week": spw}
 
 
@@ -611,7 +612,7 @@ def generate_next_program(
             eid = ex.get("exercise_id")
             tags = ex.get("tags")
 
-            if not label or label == "Warm Up":
+            if not label or label == "Warm Up" or label.upper().startswith("WU"):
                 continue
             if _is_excluded(name, eid, exclusions, avoid_list):
                 continue
@@ -716,7 +717,7 @@ def main():
     ap = argparse.ArgumentParser(description="Generate next program for a member")
     ap.add_argument("member_id", help="Member UUID")
     ap.add_argument("--scheme", default="GPP", help="Scheme: GPP, Strength, Hypertrophy")
-    ap.add_argument("--sessions-per-week", type=int, default=None, choices=[2, 3, 4],
+    ap.add_argument("--sessions-per-week", type=int, default=None, choices=[1, 2, 3, 4, 5, 6],
                     help="Override; auto-detected from history if omitted")
     ap.add_argument("--output", default=None, help="Write JSON to file (default: stdout)")
     ap.add_argument("--pretty", action="store_true", help="Pretty-print JSON")
