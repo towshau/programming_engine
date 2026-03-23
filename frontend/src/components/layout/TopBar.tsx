@@ -3,13 +3,11 @@ import { useEditorStore } from '../../stores/editorStore'
 import { formatDate } from '../../lib/utils'
 
 export function TopBar() {
-  const { coaches, selectedCoach, selectCoach, fetchCoaches, fetchMembers, loading } =
-    useEditorStore()
+  const { coaches, selectedCoach, selectCoach, fetchCoaches, loading } = useEditorStore()
 
   useEffect(() => {
-    fetchCoaches()
-    fetchMembers()
-  }, [fetchCoaches, fetchMembers])
+    void fetchCoaches()
+  }, [fetchCoaches])
 
   return (
     <header className="flex items-center justify-between px-6 py-3 bg-zinc-900 border-b border-zinc-800">
@@ -31,7 +29,7 @@ export function TopBar() {
           className="rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 min-w-[200px]"
         >
           <option value="">
-            {loading.coaches ? 'Loading coaches...' : 'All Members'}
+            {loading.coaches ? 'Loading coaches...' : 'All Coaches'}
           </option>
           {coaches.map((c) => (
             <option key={c.id} value={c.id}>

@@ -15,6 +15,18 @@ import { supabase } from '../lib/supabase'
 import { applyEdits } from '../lib/applyEdits'
 import { validateSessionsReps, type RepsValidationError } from '../lib/reps'
 
+/** `staff_database.role` values shown in the Program Editor coach filter (exact strings). */
+export const PROGRAMMING_COACH_ROLES = [
+  'Coach',
+  'Advanced Coach',
+  'Gym Manager',
+  'Senior Coach',
+  'Casual Coach',
+  'Head of Exercise',
+] as const
+
+export const SELECTED_COACH_STORAGE_KEY = 'lr-selected-coach-id'
+
 /**
  * Detect when an incoming edit reverses a chain of pending edits on the same
  * exercise/field back to its original value.  Returns the indices to remove,
@@ -207,20 +219,47 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   fetchCoaches: async () => {
     set((s) => ({ loading: { ...s.loading, coaches: true } }))
-    const { data } = await supabase.rpc('get_programming_coaches')
-    if (data) {
-      set({ coaches: data })
-    } else {
-      const { data: fallback } = await supabase
-        .from('staff_database')
-        .select('id, first_name, last_name')
-        .order('first_name')
-      if (fallback) set({ coaches: fallback })
-    }
+    const { data } = await supabase
+      .from('staff_database')
+      .select('id, first_name, last_name')
+      .in('role', [...PROGRAMMING_COACH_ROLES])
+      .eq('staff_status', 'active')
+      .order('first_name')
+
+    set({ coaches: (data as Coach[] | null) ?? [] })
     set((s) => ({ loading: { ...s.loading, coaches: false } }))
+
+    let storedId: string | null = null
+    try {
+      storedId = localStorage.getItem(SELECTED_COACH_STORAGE_KEY)
+    } catch {
+      /* ignore */
+    }
+    if (storedId) {
+      const coach = get().coaches.find((c) => c.id === storedId) ?? null
+      if (coach) {
+        get().selectCoach(coach)
+        return
+      }
+      try {
+        localStorage.removeItem(SELECTED_COACH_STORAGE_KEY)
+      } catch {
+        /* ignore */
+      }
+    }
+    get().fetchMembers()
   },
 
   selectCoach: (coach) => {
+    try {
+      if (coach?.id) {
+        localStorage.setItem(SELECTED_COACH_STORAGE_KEY, coach.id)
+      } else {
+        localStorage.removeItem(SELECTED_COACH_STORAGE_KEY)
+      }
+    } catch {
+      /* ignore */
+    }
     set({
       selectedCoach: coach,
       selectedMember: null,
