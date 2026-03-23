@@ -48,8 +48,8 @@ from detect_phase import detect_phase_for_member
 from load_rules import load_config
 from generate_program import (
     generate_next_program,
-    detect_sessions_per_week,
     fetch_latest_generated_program,
+    resolve_sessions_per_week,
 )
 
 
@@ -122,9 +122,11 @@ def fetch_recently_generated(sb):
 
 def run_pipeline_for_member(sb, member_id, scheme_name, exercise_lib, duration_weeks):
     """Run the full pipeline for one member. Returns (program_dict, phase_dict, config) or raises."""
-    generated_sessions = fetch_latest_generated_program(sb, member_id)
-    if generated_sessions:
-        sessions = generated_sessions
+    gen = fetch_latest_generated_program(sb, member_id)
+    stored_spw = None
+    if gen:
+        sessions = gen["sessions"]
+        stored_spw = gen.get("sessions_per_week")
     else:
         rows = fetch_results_for_member(sb, member_id)
         if not rows:
@@ -137,7 +139,11 @@ def run_pipeline_for_member(sb, member_id, scheme_name, exercise_lib, duration_w
     rows_tb = fetch_results_for_member(sb, member_id)
     sessions_tb = normalize(rows_tb, exercise_lib)["sessions"] if rows_tb else []
 
-    spw = detect_sessions_per_week(sessions)
+    spw = resolve_sessions_per_week(
+        sessions,
+        cli_override=None,
+        stored_from_row=stored_spw,
+    )
     phase = detect_phase_for_member(
         sb, member_id, scheme_name, sessions_tb if sessions_tb else sessions
     )

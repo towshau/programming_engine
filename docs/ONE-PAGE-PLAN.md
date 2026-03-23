@@ -8,9 +8,9 @@
 
 - **Supabase (source):** member_tbresults, member_tbhealthmax, exercise_library (trigger-built), member table with current_status = 'active' for cohort.
 - **Supabase (engine config):** All tables use `programming_` prefix; gym column uses enum `gym` (BLIGH, BRIDGE, COLLIN) where applicable.
-- **Retool:** Admin form for deleted-exercise reports. View programs (staging + generated) with readable layout. Feedback form for coaches. Flagged-programs counter. PDF export on demand.
-- **Program Editor (Vercel):** LR Program Editor at `programming-engine.vercel.app` (source: `teambuildr-replacement/`). Coaches search members, view generated programs, edit exercises inline, Save and Finalize. Admin marks as uploaded. Replaces Retool for program viewing/editing.
-- **Output:** Normalised past programs -> programming_normalized_programs. Generated programs -> programming_generated. Coach edits saved back to programming_generated.payload. Single source of truth; view/edit in Program Editor; optional PDF to Supabase Storage or shared drive.
+- **Retool:** **Planned:** one **admin check-in / upload queue** — pending programs after coach finalization, support manual TeamBuildr load, mark `uploaded_to_teambuildr`. **Not planned:** separate Retool program viewer, coach feedback form, flagged counter, PDF export, or deleted-exercise form (coaches stay in Program Editor).
+- **Program Editor (Vercel):** LR Program Editor at `programming-engine.vercel.app` (source: `teambuildr-replacement/`). Coaches search members, view generated programs, edit exercises inline, Save and Finalize. Admin marks as uploaded (or uses Retool check-in when built). Primary surface for coach view/edit.
+- **Output:** Normalised past programs -> programming_normalized_programs. Generated programs -> programming_generated. Coach edits saved back to programming_generated.payload. Single source of truth; view/edit in Program Editor.
 
 ---
 
@@ -53,12 +53,11 @@
 
 ## Self-improving features
 
-- **Coach feedback:** programming_feedback table + Retool form. Coaches flag exercise_swap, pairing_issue, too_hard, too_easy, positive, other.
-- **Coach edits (differential):** programming_coach_edits table + frontend editor. Each edit (exercise swap, series change, sets/reps/notes) stored with old_value/new_value jsonb. Original generated program is never mutated. Enables: "which exercises get swapped most?", "do edits decrease over time?", "which coaches make the most changes?".
+- **Coach feedback:** `programming_feedback` table exists; `apply_auto_exclusions.py` can consume rows if feedback is recorded elsewhere. No Retool coach feedback UI planned.
+- **Coach edits (differential):** programming_coach_edits table + Program Editor. Each edit (exercise swap, series change, sets/reps/notes) stored with old_value/new_value jsonb. Original generated program is never mutated. Enables: "which exercises get swapped most?", "do edits decrease over time?", "which coaches make the most changes?".
 - **Auto-exclusion:** If exercise gets 3+ negative feedbacks for a member, auto-create row in programming_exercise_exclusions. Future: extend to also read coach_edits (3+ swaps = auto-exclude).
-- **Rule hit tracking:** rules_applied jsonb on programming_generated; track which rules fire, correlate with feedback.
+- **Rule hit tracking:** rules_applied jsonb on programming_generated; track which rules fire; optional correlation if feedback exists.
 - **Changes summary:** Human-readable "what changed from last phase" on every generated program.
-- **Flagged programs counter:** Retool badge/count of unresolved feedback per member or run.
 
 ---
 
@@ -70,7 +69,7 @@
   - **normalize_one_member.py** — Ingest: member_tbresults + exercise_library → normalised sessions (by assigned_date), series labels (A1, A2, B1, …), write to programming_normalized_programs. Optional **phase detection**: pass `--scheme GPP|Strength|Hypertrophy` to detect current rep-range phase and next phase from A-series median reps; result in payload.phase_detection. See docs/data-model.md § Phase detection.
   - **detect_phase.py** — Standalone phase detection: given member_id and scheme name, normalises and returns current_rep_range, next_rep_range, confidence, direction. Used by normalize when --scheme is set; can be run alone: `python tools/detect_phase.py <member_id> Strength`.
   - **load_rules.py** — Load engine config: `programming_rules` (15 rules), `programming_progression_schemes` (by scheme name), `programming_exercise_exclusions` (by member). Returns rules dict + scheme steps + exclusion list. Standalone: `python tools/load_rules.py --member-id <uuid> --scheme Strength`.
-  - **generate_program.py** — Deterministic generator: past program + rules + phase detection + library → canonical program JSON. **Source priority:** reads latest `programming_generated` payload first (coach-edited); falls back to member_tbresults for first-time members. Phase detection always uses member_tbresults. Carries forward exercises with updated rep ranges (A/B compounds at scheme range, C/D accessories at +2). Applies exclusions, avoids banned exercises, enforces C-series self-sufficiency. Standalone: `python tools/generate_program.py <member_id> --scheme Strength`.
+  - **generate_program.py** — Deterministic generator: past program + rules + phase detection + library → canonical program JSON. **Source priority:** reads latest `programming_generated` payload first (coach-edited); falls back to member_tbresults for first-time members. **Sessions/week:** `resolve_sessions_per_week()` — CLI override if any, else `sessions_per_week` from latest `programming_generated` row (or `payload.metadata`), else `detect_sessions_per_week()` on ingest sessions (long tb history can over-count; stored row preserves batch-sync/coach truth). Phase detection always uses member_tbresults. Carries forward exercises with updated rep ranges (A/B compounds at scheme range, C/D accessories at +2). Applies exclusions, avoids banned exercises, enforces C-series self-sufficiency. Standalone: `python tools/generate_program.py <member_id> --scheme Strength`.
   - **write_programs.py** — Persist generated program JSON to `programming_generated`. Input: payload from file or stdin; required: --run-id, --member-id, --sessions-per-week; optional: phase_number, scheme_name, rep_range, changes_summary, rules_applied. See docs/data-model.md (canonical payload shape).
   - **run_pipeline.py** — End-to-end pipeline runner: Ingest → Phase detect → Load config → Generate → Write. Single command for one member: `python tools/run_pipeline.py <member_id> --scheme Strength --sessions-per-week 3`. Options: `--dry-run`, `--skip-staging`, `--output FILE`.
   - **apply_auto_exclusions.py** — Feedback → programming_exercise_exclusions (e.g. 3+ negative feedbacks → exclude exercise for member).
@@ -112,15 +111,10 @@ FastAPI app deployed on Railway. Wraps the existing Python pipeline (`tools/`) a
 
 ## Admin and operations (Retool + upload)
 
-- **Admin upload (for AI):** Instructions for the admin task of uploading finalized programs to TeamBuildr and marking them uploaded. Written for a future AI agent (e.g. Manus + Playwright). See **docs/admin-upload-instructions-for-ai.md**.
+- **Admin upload (for AI):** Instructions for the admin task of uploading finalized programs to TeamBuildr and marking them uploaded. See **docs/admin-upload-instructions-for-ai.md** (human or agent-assisted; browser automation for **push** is de-scoped).
+- **teambuilder-sync:** Node + Playwright. **Pull:** `sync-exercises.ts` / `batch-sync.ts` (TeamBuildr → Supabase). **Push:** Primary path is **admin manual load** — `upload-programs.ts` **plan mode** prints pending programs (`coach_approved && !uploaded_to_teambuildr`), dates, exercises, sets/reps; admin enters in TeamBuildr; then `npm run upload:done` / `--mark-uploaded`. `--live` Playwright push and `.github/workflows/upload-to-teambuildr.yml` are **experimental / not the plan** (fragile TB UI).
 
-Retool page prompts and specs live in **retool/** (see `retool/README.md` for build order).
-
-- **Program Viewer** (`retool/01-view-programs.md`) — Card-based view of generated + staging programs; filter by member, scheme, date. Unpacks payload into readable day/exercise/set cards.
-- **Coach Feedback** (`retool/02-feedback-form.md`) — Slide-out form on the program viewer; flags exercise_swap, pairing_issue, too_hard, too_easy, positive, other in 30 seconds.
-- **Flagged Counter** (`retool/03-flagged-counter.md`) — Badge + breakdown of unresolved feedback by member; mark resolved; bulk resolve.
-- **Exercise Removal Requests** (`retool/04-deleted-exercise-form.md`) — Submit form + senior coach review queue; approve/reject (no direct delete).
-- **PDF Export** (`retool/05-pdf-export.md`) — Export selected program to PDF via Retool's built-in PDF or Edge Function.
+**Retool — build:** **Admin check-in / upload queue** (queue + mark-uploaded workflow; align queries with `upload-programs.ts`). Specs under **retool/**: `01`–`05` are **legacy prompts** for canceled pages (viewer, feedback, counter, removal form, PDF); see `retool/README.md`.
 
 ---
 

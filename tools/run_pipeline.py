@@ -46,8 +46,8 @@ from detect_phase import detect_phase_for_member
 from load_rules import load_config
 from generate_program import (
     generate_next_program,
-    detect_sessions_per_week,
     fetch_latest_generated_program,
+    resolve_sessions_per_week,
 )
 
 
@@ -72,10 +72,12 @@ def main():
     # ── Step 1: Ingest ── prefer programming_generated, fallback to member_tbresults
     print("[1/4] Ingest: fetching member data...")
     exercise_lib = fetch_exercise_library(sb)
-    generated_sessions = fetch_latest_generated_program(sb, member_id)
-    if generated_sessions:
-        sessions = generated_sessions
-        print(f"  Using {len(sessions)} sessions from programming_generated (coach-edited source).")
+    gen = fetch_latest_generated_program(sb, member_id)
+    stored_spw = None
+    if gen:
+        sessions = gen["sessions"]
+        stored_spw = gen.get("sessions_per_week")
+        print(f"  Using {len(sessions)} sessions from programming_generated (latest row).")
     else:
         rows = fetch_results_for_member(sb, member_id)
         if not rows:
@@ -94,9 +96,18 @@ def main():
             sb.table("programming_normalized_programs").insert(staging_row).execute()
             print(f"  Written to programming_normalized_programs.")
 
-    # Auto-detect sessions per week if not overridden
-    spw = args.sessions_per_week or detect_sessions_per_week(sessions)
-    print(f"  Sessions per week: {spw}" + (" (auto-detected)" if not args.sessions_per_week else " (override)"))
+    spw = resolve_sessions_per_week(
+        sessions,
+        cli_override=args.sessions_per_week,
+        stored_from_row=stored_spw,
+    )
+    if args.sessions_per_week in (2, 3, 4):
+        spw_note = "override"
+    elif stored_spw in (2, 3, 4) and spw == stored_spw:
+        spw_note = "from latest programming_generated row"
+    else:
+        spw_note = "auto-detected"
+    print(f"  Sessions per week: {spw} ({spw_note})")
 
     # Phase detection uses tbresults (actual logged reps)
     rows_tb = fetch_results_for_member(sb, member_id)

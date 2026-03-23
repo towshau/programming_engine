@@ -242,6 +242,12 @@ WHERE (gym = :gym OR gym IS NULL) AND active = true
 ORDER BY priority DESC;
 ```
 
+**Notable rules (among 18 active):**
+- `exercise_priority` — tiered by tag (Lower Body Push/Pull, Press/Pull → A; Hip Dominant, etc. → B; accessories → C). Compounds fill A/B first.
+- `superset_press_pull_pairing` — upper body: pair Vertical/Horizontal Press with Pull in A/B, press in slot 1.
+- `superset_lower_body_pairing` — lower body days: pair Lower Body Push with Lower Body Pull/Hip Dominant; push-led (A1=Push A2=Pull) or pull-led (A1=A2=Pulls, B1=Push B2=Accessory). Session type (upper/lower/full) is inferred from tag majority.
+- Generator enforces `exercise_library.series_assignment`: exercises with `["A","B"]` stay in A/B; `["C","D"]` stay in C/D+.
+
 ---
 
 ### programming_progression_schemes

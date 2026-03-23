@@ -1,6 +1,9 @@
-# TeamBuilder → Supabase Exercise Sync
+# TeamBuilder Sync
 
-Syncs exercise programs from TeamBuilder into the `programming_normalized_programs` table in Supabase. Compares exercise lists, flags differences, and auto-updates Supabase to match TeamBuilder's order and exercise selection.
+Two-way sync between TeamBuildr and Supabase using Playwright browser automation.
+
+- **Pull** (`sync-exercises.ts`, `batch-sync.ts`): scrape workouts from TeamBuildr into Supabase.
+- **Push** (`upload-programs.ts`): plan pending uploads and print exercises/reps for admin manual entry into TeamBuildr. Flags programs as uploaded after entry.
 
 ## Setup
 
@@ -23,6 +26,8 @@ npm run inspect
 ```
 
 This opens a browser, lets you log in and navigate to a member's program, then dumps the page structure. Use the output to update the `TODO` sections in `sync-exercises.ts`.
+
+If the terminal cannot receive Enter (e.g. some IDE runners), use a timed wait instead: `npm run inspect:auto` (waits 90s before dumping, then 15s before closing; override with `TEAMBUILDER_INSPECT_AUTO_SECONDS` / `TEAMBUILDER_INSPECT_CLOSE_SECONDS`).
 
 ### Step 2: Dry run
 
@@ -53,7 +58,9 @@ This will update Supabase to match TeamBuilder.
 
 | File | Purpose |
 |------|---------|
-| `sync-exercises.ts` | Main sync script |
+| `sync-exercises.ts` | Main pull sync script |
+| `batch-sync.ts` | Batch pull for many members |
+| `upload-programs.ts` | Push planner: show pending programs with exercises/reps; mark uploaded after manual entry |
 | `inspect-teambuilder.ts` | Helper to find DOM selectors |
 | `.env` | Credentials (not committed) |
 
@@ -94,6 +101,27 @@ Supabase `programming_normalized_programs.payload` structure:
 
 The sync reorders the `exercises` array within a session to match TeamBuilder's order.
 
-## Planned: Supabase → TeamBuildr upload (not implemented)
+## Supabase → TeamBuildr upload (push)
 
-A future Playwright script will push finalized programs from `programming_generated` into TeamBuildr (after coach **Finalize** / admin approval flow). **Upload-only rule:** only create or overwrite workouts on calendar dates **≥ today** (gym timezone); never change past days in TeamBuildr. The existing **pull** sync in this folder does **not** use that rule. Details: `docs/admin-upload-instructions-for-ai.md` §6.1.
+`upload-programs.ts` targets rows in `programming_generated` where `coach_approved = true` and `uploaded_to_teambuildr = false`.
+
+**Workflow: admin uploads exercises manually in TeamBuildr, then marks done.**
+
+1. `npm run upload` — prints every pending program with dates, exercises, sets and reps.
+2. Admin opens TeamBuildr, enters exercises per day.
+3. `npm run upload:done` (or `-- --program-id <uuid> --mark-uploaded`) — sets `uploaded_to_teambuildr = true`.
+
+```bash
+# Plan: show what needs uploading (exercises, sets, reps per date)
+npm run upload
+npm run upload -- --program-id <uuid>
+
+# After manual entry: mark program(s) as uploaded
+npm run upload:done
+npm run upload:done -- --program-id <uuid>
+
+# (Experimental) Playwright automation — fragile, not recommended
+npm run upload:live -- --program-id <uuid>
+```
+
+**Date mapping:** sessions map to weekday dates from the Monday of the current week (or `next_due_date` if future, or `--week-start`). Past dates are skipped.

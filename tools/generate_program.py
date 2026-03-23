@@ -470,17 +470,27 @@ def detect_sessions_per_week(sessions):
     return 3
 
 
+def resolve_sessions_per_week(sessions, cli_override=None, stored_from_row=None):
+    """Pick 2/3/4 for generation: CLI override, then DB/metadata from latest row, else detect."""
+    if cli_override in (2, 3, 4):
+        return cli_override
+    if stored_from_row in (2, 3, 4):
+        return int(stored_from_row)
+    return detect_sessions_per_week(sessions)
+
+
 # ── Source: programming_generated vs tbresults ───────────────────────────────
 
 def fetch_latest_generated_program(supabase, member_id):
     """Fetch the most recent programming_generated row for this member.
 
-    Returns the payload['sessions'] list (same shape as normalized sessions), or None
-    if no row exists. Used so coach-edited programs carry forward into the next cycle.
+    Returns ``{"sessions": [...], "sessions_per_week": int|None}`` or None if no row.
+    ``sessions_per_week`` is taken from the row column when 2–4, else from
+    ``payload.metadata.sessions_per_week``. Used so coach/batch-sync truth carries forward.
     """
     r = (
         supabase.table("programming_generated")
-        .select("payload")
+        .select("payload, sessions_per_week")
         .eq("member_id", member_id)
         .order("created_at", desc=True)
         .limit(1)
@@ -488,11 +498,27 @@ def fetch_latest_generated_program(supabase, member_id):
     )
     if not r.data or len(r.data) == 0:
         return None
-    payload = r.data[0].get("payload") or {}
+    row = r.data[0]
+    payload = row.get("payload") or {}
     sessions = payload.get("sessions") or []
     if not sessions:
         return None
-    return sessions
+    raw_spw = row.get("sessions_per_week")
+    spw = None
+    if raw_spw is not None:
+        try:
+            spw = int(raw_spw)
+        except (TypeError, ValueError):
+            spw = None
+    if spw not in (2, 3, 4):
+        meta = payload.get("metadata") or {}
+        m = meta.get("sessions_per_week")
+        try:
+            m = int(m) if m is not None else None
+        except (TypeError, ValueError):
+            m = None
+        spw = m if m in (2, 3, 4) else None
+    return {"sessions": sessions, "sessions_per_week": spw}
 
 
 # ── Core generator ───────────────────────────────────────────────────────────
@@ -699,11 +725,13 @@ def main():
     sb = get_supabase()
     exercise_lib = fetch_exercise_library(sb)
 
-    # 1. Ingest: prefer coach-edited programming_generated; fallback to member_tbresults
-    generated_sessions = fetch_latest_generated_program(sb, args.member_id)
-    if generated_sessions:
-        sessions = generated_sessions
-        print(f"Using {len(sessions)} sessions from programming_generated (coach-edited source).", file=sys.stderr)
+    # 1. Ingest: prefer latest programming_generated; fallback to member_tbresults
+    gen = fetch_latest_generated_program(sb, args.member_id)
+    stored_spw = None
+    if gen:
+        sessions = gen["sessions"]
+        stored_spw = gen.get("sessions_per_week")
+        print(f"Using {len(sessions)} sessions from programming_generated (latest row).", file=sys.stderr)
     else:
         print(f"Fetching data for member {args.member_id} from member_tbresults...", file=sys.stderr)
         rows = fetch_results_for_member(sb, args.member_id)
@@ -718,9 +746,18 @@ def main():
     rows_tb = fetch_results_for_member(sb, args.member_id)
     sessions_tb = normalize(rows_tb, exercise_lib)["sessions"] if rows_tb else []
 
-    # Auto-detect sessions per week if not overridden
-    spw = args.sessions_per_week or detect_sessions_per_week(sessions)
-    print(f"Sessions per week: {spw}" + (" (auto-detected)" if not args.sessions_per_week else " (override)"), file=sys.stderr)
+    spw = resolve_sessions_per_week(
+        sessions,
+        cli_override=args.sessions_per_week,
+        stored_from_row=stored_spw,
+    )
+    if args.sessions_per_week in (2, 3, 4):
+        spw_note = "override"
+    elif stored_spw in (2, 3, 4) and spw == stored_spw:
+        spw_note = "from latest programming_generated row"
+    else:
+        spw_note = "auto-detected"
+    print(f"Sessions per week: {spw} ({spw_note})", file=sys.stderr)
 
     # 2. Phase detection (uses tbresults so next rep range reflects what member actually did)
     phase = detect_phase_for_member(sb, args.member_id, args.scheme, sessions_tb) if sessions_tb else detect_phase_for_member(sb, args.member_id, args.scheme, sessions)

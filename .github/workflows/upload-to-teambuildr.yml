@@ -1,0 +1,47 @@
+# Upload finalized programs from Supabase → TeamBuildr via Playwright.
+# Runs Mon-Fri at 8:00 AM AEST (22:00 UTC previous day) or on manual dispatch.
+#
+# Required secrets (repo Settings → Secrets and variables → Actions):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  (already exist from weekly workflow)
+#   TEAMBUILDER_EMAIL, TEAMBUILDER_PASSWORD  (personal account)
+#
+# NOTE: This workflow is DISABLED by default. Remove the `if: false` line
+# from the upload job when ready to go live.
+
+name: Upload programs to TeamBuildr
+
+on:
+  schedule:
+    - cron: '0 22 * * 0-4'   # Mon-Fri 8:00 AM AEST (22:00 UTC previous day)
+  workflow_dispatch:
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  TEAMBUILDER_EMAIL: ${{ secrets.TEAMBUILDER_EMAIL }}
+  TEAMBUILDER_PASSWORD: ${{ secrets.TEAMBUILDER_PASSWORD }}
+  GYM_TIMEZONE: Australia/Sydney
+  PLAYWRIGHT_HEADLESS: '1'
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    if: false  # ← REMOVE THIS LINE to enable the workflow
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: teambuilder-sync
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: teambuilder-sync
+        run: npx playwright install --with-deps chromium
+
+      - name: Upload pending programs
+        working-directory: teambuilder-sync
+        run: npx ts-node upload-programs.ts --live --mark-uploaded

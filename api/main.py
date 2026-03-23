@@ -35,7 +35,12 @@ from normalize_one_member import (
 )
 from detect_phase import detect_phase_for_member
 from load_rules import load_config
-from generate_program import generate_next_program, detect_sessions_per_week
+from generate_program import (
+    generate_next_program,
+    detect_sessions_per_week,
+    fetch_latest_generated_program,
+    resolve_sessions_per_week,
+)
 
 app = FastAPI(title="Programming Engine API", version="1.0.0")
 
@@ -108,19 +113,37 @@ async def regenerate(req: RegenerateRequest, _creds=Depends(verify_api_key)):
         pass
 
     try:
-        rows = fetch_results_for_member(sb, req.member_id)
-        if not rows:
-            _fail_regen(sb, regen_row_id)
-            raise HTTPException(status_code=404, detail=f"No training history for member {req.member_id}")
-
         exercise_lib = fetch_exercise_library(sb)
-        past = normalize(rows, exercise_lib)
-        sessions = past["sessions"]
+        rows = fetch_results_for_member(sb, req.member_id)
+        gen = fetch_latest_generated_program(sb, req.member_id)
+        stored_spw = None
+        if gen:
+            sessions = gen["sessions"]
+            stored_spw = gen.get("sessions_per_week")
+        elif rows:
+            past = normalize(rows, exercise_lib)
+            sessions = past["sessions"]
+        else:
+            _fail_regen(sb, regen_row_id)
+            raise HTTPException(
+                status_code=404,
+                detail=f"No training history and no programming_generated for member {req.member_id}",
+            )
 
-        detected_spw = detect_sessions_per_week(sessions)
-        spw = req.sessions_per_week or detected_spw
+        sessions_tb = normalize(rows, exercise_lib)["sessions"] if rows else []
+        auto_spw = detect_sessions_per_week(sessions)
+        spw = resolve_sessions_per_week(
+            sessions,
+            cli_override=req.sessions_per_week,
+            stored_from_row=stored_spw,
+        )
 
-        phase = detect_phase_for_member(sb, req.member_id, req.scheme_name, sessions)
+        phase = detect_phase_for_member(
+            sb,
+            req.member_id,
+            req.scheme_name,
+            sessions_tb if sessions_tb else sessions,
+        )
 
         # Coach override: if a rep_range was explicitly selected, use it
         # instead of the auto-detected next phase.
@@ -147,8 +170,8 @@ async def regenerate(req: RegenerateRequest, _creds=Depends(verify_api_key)):
                 f"Phase detection: {phase.get('current_rep_range')} -> "
                 f"{phase.get('next_rep_range')} (confidence: {phase.get('confidence')})"
             )
-        if req.sessions_per_week and req.sessions_per_week != detected_spw:
-            changes.append(f"Sessions/week changed from {detected_spw} to {req.sessions_per_week}")
+        if req.sessions_per_week and req.sessions_per_week != auto_spw:
+            changes.append(f"Sessions/week changed from {auto_spw} to {req.sessions_per_week}")
 
         final_rep_range = rep_range_override or phase.get("next_rep_range")
 

@@ -108,22 +108,19 @@ The above steps are intended to be automated by an AI agent (e.g. Manus) using b
 
 **Recommended tool:** **Playwright** (or Puppeteer). Use a single browser context; log into TeamBuildr once per run (or reuse a session if secure and compliant with your policies).
 
-### 6.1 Calendar rule — upload script only (today onward)
+### 6.1 Upload-only date rule (Supabase → TeamBuildr)
 
-**Scope:** This rule applies **only** to the planned **Supabase → TeamBuildr** Playwright **upload** automation (pushing `programming_generated` into TeamBuildr). It does **not** apply to the existing **TeamBuildr → Supabase** sync (`teambuilder-sync` `batch-sync.ts` / `sync-exercises.ts`), which may continue to scrape the full Mon–Fri window for alignment.
+**Scope:** This rule applies **only** to **pushing** `programming_generated` into TeamBuildr (Playwright upload or manual admin process if you adopt the same rule). It does **not** apply to the **TeamBuildr → Supabase** pull sync (`teambuilder-sync/sync-exercises.ts`, `batch-sync.ts`), which may scrape the full Mon–Fri window for alignment.
 
-**Rule:** When creating or updating workouts in TeamBuildr from `payload.sessions`, **do not** change calendar days **before** “today”:
+**Rule:** Do **not** create, overwrite, or delete workouts on calendar dates **before “today”** in the gym’s timezone. Only touch dates **≥ today**. Default timezone for the upload script is `Australia/Sydney` (override with `GYM_TIMEZONE` in `teambuilder-sync/.env`).
 
-- Pick one **timezone** for “today” (e.g. `Australia/Sydney` for Lockeroom) and use it consistently.
-- For each program session, map `day` (1…N in the payload) to a **concrete calendar date** using the same anchor the product uses for “when this block starts” (e.g. `programming_generated.next_due_date`, or the Monday of the current cycle — align with coach-facing behaviour).
-- If that calendar date is **strictly before** today in that timezone → **skip** TeamBuildr edits for that day (leave whatever is already there).
+- For each program session, map `day` (1…N in the payload) to a **concrete calendar date** using the same anchor the product uses (e.g. Monday of the current week, or `next_due_date` when future — see `upload-programs.ts`).
+- If that calendar date is **strictly before** today → **skip** TeamBuildr edits for that day.
 - If the date is **today or in the future** → create/update the workout from the payload.
 
-**Why:** Past days may already be logged or completed; overwriting them in TeamBuildr risks confusion or wiping history members care about.
+**Why:** Past days may already be logged; overwriting them risks confusion or wiping history.
 
-**Implementation note:** Mid-week first uploads will only populate “remaining” days until the script also handles “backfill” as a separate explicit mode (if ever needed).
-
-**High-level flow for the AI:**
+### 6.2 High-level flow for the AI
 
 1. **Query** Supabase for programs with `coach_approved = true` and `uploaded_to_teambuildr = false` (see §2).
 2. For each program:
@@ -133,6 +130,8 @@ The above steps are intended to be automated by an AI agent (e.g. Manus) using b
    - **Verify:** Confirm the program is visible and matches the payload (e.g. same number of days, same exercises per day). If verification fails, do not mark as uploaded.
    - **Record success:** Call Supabase to set `uploaded_to_teambuildr = true` for this `programming_generated.id` (and optionally update `member_programs.due_date` as in §4).
 3. If any step fails, log and optionally retry; if still failing, leave `uploaded_to_teambuildr = false` and report for human admin.
+
+**Repo implementation:** `teambuilder-sync/upload-programs.ts` queries pending rows, maps session days to weekday dates, and applies §6.1. **Primary mode:** dry run / plan — prints exercises, sets, and reps per date for **manual** TeamBuildr entry; `--mark-uploaded` (or `npm run upload:done`) flags the row after admin confirms. **`--live`** Playwright automation exists but is **experimental** (fragile against TeamBuildr UI). GitHub Actions workflow `.github/workflows/upload-to-teambuildr.yml` is **disabled** by default. See `teambuilder-sync/README.md`.
 
 **Security:**
 
