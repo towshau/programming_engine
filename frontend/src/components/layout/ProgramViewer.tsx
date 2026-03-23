@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { applyEdits } from '../../lib/applyEdits'
 import { DayPicker } from '../ui/DayPicker'
@@ -31,6 +31,9 @@ function computeExpiresDate(
   return d
 }
 
+const SESSION_OPTIONS = [1, 2, 3, 4, 5, 6]
+const DURATION_OPTIONS = [4, 5, 6, 7, 8]
+
 export function ProgramViewer() {
   const {
     selectedCoach,
@@ -49,7 +52,12 @@ export function ProgramViewer() {
     setSelectedDay,
     loading,
     fetchProgressionSchemes,
+    fetchExerciseLibrary,
     progressionSchemes,
+    exerciseLibrary,
+    regenError,
+    clearRegenError,
+    generateFirstProgram,
     saveProgram,
     finalizeProgram,
     markUploaded,
@@ -58,12 +66,69 @@ export function ProgramViewer() {
     saveError,
     clearSaveValidationError,
   } = useEditorStore()
+  const [firstProgramConfig, setFirstProgramConfig] = useState({
+    sessions_per_week: 3,
+    scheme_name: '',
+    rep_range: '',
+    duration_weeks: 6,
+  })
 
   useEffect(() => {
     if (progressionSchemes.length === 0) {
-      fetchProgressionSchemes()
+      void fetchProgressionSchemes()
     }
-  }, [fetchProgressionSchemes, progressionSchemes.length])
+    if (exerciseLibrary.length === 0) {
+      void fetchExerciseLibrary()
+    }
+  }, [
+    exerciseLibrary.length,
+    fetchExerciseLibrary,
+    fetchProgressionSchemes,
+    progressionSchemes.length,
+  ])
+
+  const schemeNames = useMemo(() => {
+    const names = new Set(progressionSchemes.map((s) => s.name))
+    return Array.from(names).sort()
+  }, [progressionSchemes])
+
+  const availableRepRanges = useMemo(() => {
+    if (!firstProgramConfig.scheme_name) return []
+    return progressionSchemes
+      .filter((s) => s.name === firstProgramConfig.scheme_name)
+      .sort((a, b) => a.order - b.order)
+      .map((s) => s.from_rep_range)
+  }, [firstProgramConfig.scheme_name, progressionSchemes])
+
+  useEffect(() => {
+    if (schemeNames.length === 0) return
+    setFirstProgramConfig((prev) => {
+      const schemeName = prev.scheme_name && schemeNames.includes(prev.scheme_name)
+        ? prev.scheme_name
+        : schemeNames.includes('GPP')
+          ? 'GPP'
+          : schemeNames[0]
+
+      const repRanges = progressionSchemes
+        .filter((s) => s.name === schemeName)
+        .sort((a, b) => a.order - b.order)
+        .map((s) => s.from_rep_range)
+      const repRange =
+        prev.rep_range && repRanges.includes(prev.rep_range)
+          ? prev.rep_range
+          : (repRanges[0] ?? '8-10')
+
+      if (schemeName === prev.scheme_name && repRange === prev.rep_range) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        scheme_name: schemeName,
+        rep_range: repRange,
+      }
+    })
+  }, [progressionSchemes, schemeNames])
 
   const isLastView = activeView === 'last'
 
@@ -156,11 +221,120 @@ export function ProgramViewer() {
   if (!program) {
     return (
       <main className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-zinc-400 text-sm">No program generated yet</p>
-          <p className="text-zinc-600 text-xs mt-1">
-            Run the pipeline for {selectedMember.first_name} to generate a program
-          </p>
+        <div className="w-full max-w-xl rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 space-y-4">
+          <div>
+            <p className="text-zinc-200 text-sm font-semibold">No program generated yet</p>
+            <p className="text-zinc-500 text-xs mt-1">
+              Set the starter config for {selectedMember.first_name}, then generate their first program.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={firstProgramConfig.sessions_per_week}
+              onChange={(e) => {
+                clearRegenError()
+                setFirstProgramConfig((prev) => ({
+                  ...prev,
+                  sessions_per_week: Number(e.target.value),
+                }))
+              }}
+              className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-500/60"
+            >
+              {SESSION_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}x / week
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={firstProgramConfig.scheme_name}
+              onChange={(e) => {
+                clearRegenError()
+                const scheme = e.target.value
+                const repRanges = progressionSchemes
+                  .filter((s) => s.name === scheme)
+                  .sort((a, b) => a.order - b.order)
+                  .map((s) => s.from_rep_range)
+                setFirstProgramConfig((prev) => ({
+                  ...prev,
+                  scheme_name: scheme,
+                  rep_range: repRanges[0] ?? prev.rep_range,
+                }))
+              }}
+              className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs font-medium text-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500/60"
+            >
+              {schemeNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={firstProgramConfig.rep_range}
+              onChange={(e) => {
+                clearRegenError()
+                setFirstProgramConfig((prev) => ({
+                  ...prev,
+                  rep_range: e.target.value,
+                }))
+              }}
+              className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs font-medium text-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-500/60"
+            >
+              {availableRepRanges.map((range) => (
+                <option key={range} value={range}>
+                  {range} reps
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={firstProgramConfig.duration_weeks}
+              onChange={(e) => {
+                clearRegenError()
+                setFirstProgramConfig((prev) => ({
+                  ...prev,
+                  duration_weeks: Number(e.target.value),
+                }))
+              }}
+              className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-500/60"
+            >
+              {DURATION_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n} weeks
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {regenError && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+              {regenError}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end">
+            <button
+              onClick={() => void generateFirstProgram(firstProgramConfig)}
+              disabled={
+                loading.regenerating ||
+                !firstProgramConfig.scheme_name ||
+                !firstProgramConfig.rep_range
+              }
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              {loading.regenerating ? (
+                <>
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Generating...
+                </>
+              ) : (
+                'Generate First Program'
+              )}
+            </button>
+          </div>
         </div>
       </main>
     )

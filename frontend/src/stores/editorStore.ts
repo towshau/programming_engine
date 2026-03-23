@@ -14,6 +14,7 @@ import type {
 import { supabase } from '../lib/supabase'
 import { applyEdits } from '../lib/applyEdits'
 import { validateSessionsReps, type RepsValidationError } from '../lib/reps'
+import { buildTemplateProgram } from '../lib/templateBuilder'
 
 /** `staff_database.role` values shown in the Program Editor coach filter (exact strings). */
 export const PROGRAMMING_COACH_ROLES = [
@@ -187,6 +188,12 @@ interface EditorState {
   updateConfigDraft: (patch: Partial<NonNullable<EditorState['configDraft']>>) => void
   saveDurationWeeks: (weeks: number) => Promise<void>
   requestRegeneration: () => Promise<void>
+  generateFirstProgram: (config: {
+    sessions_per_week: number
+    scheme_name: string
+    rep_range: string
+    duration_weeks: number
+  }) => Promise<void>
   hasConfigChanges: () => boolean
   clearRegenError: () => void
   clearSaveValidationError: () => void
@@ -807,6 +814,127 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     set((s) => ({ loading: { ...s.loading, regenerating: false } }))
+  },
+
+  generateFirstProgram: async (config) => {
+    const { selectedMember, selectedCoach } = get()
+    if (!selectedMember) return
+
+    let exerciseLibrary = get().exerciseLibrary
+    if (exerciseLibrary.length === 0) {
+      await get().fetchExerciseLibrary()
+      exerciseLibrary = get().exerciseLibrary
+    }
+
+    if (exerciseLibrary.length === 0) {
+      set({ regenError: 'No exercise library found. Please try again.' })
+      return
+    }
+
+    const apiUrl = import.meta.env.VITE_REGEN_API_URL
+    const apiSecret = import.meta.env.VITE_REGEN_API_SECRET
+
+    set((s) => ({ loading: { ...s.loading, regenerating: true }, regenError: null }))
+
+    try {
+      const templatePayload = buildTemplateProgram(
+        config.sessions_per_week,
+        config.rep_range,
+        exerciseLibrary,
+      )
+
+      if ((templatePayload.sessions ?? []).length === 0) {
+        set({
+          regenError:
+            'Could not build a starter template from the exercise library.',
+        })
+        return
+      }
+
+      const runId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
+      const { data: seededRows, error: seedError } = await supabase
+        .from('programming_generated')
+        .insert({
+          run_id: runId,
+          member_id: selectedMember.member_id,
+          assigned_to: selectedCoach?.id ?? null,
+          sessions_per_week: config.sessions_per_week,
+          duration_weeks: config.duration_weeks,
+          phase_number: null,
+          scheme_name: config.scheme_name,
+          rep_range: config.rep_range,
+          changes_summary: 'Cold-start seed template created in Program Editor',
+          rules_applied: [],
+          payload: templatePayload,
+          coach_edited: false,
+          coach_approved: false,
+          uploaded_to_teambuildr: false,
+        })
+        .select('id')
+        .single()
+
+      if (seedError || !seededRows) {
+        set({
+          regenError:
+            seedError?.message ?? 'Failed to create starter template program.',
+        })
+        return
+      }
+
+      if (apiUrl && apiSecret) {
+        const res = await fetch(`${apiUrl}/regenerate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiSecret}`,
+          },
+          body: JSON.stringify({
+            member_id: selectedMember.member_id,
+            program_id: seededRows.id,
+            requested_by: selectedCoach?.id ?? null,
+            scheme_name: config.scheme_name,
+            rep_range: config.rep_range,
+            sessions_per_week: config.sessions_per_week,
+            duration_weeks: config.duration_weeks,
+          }),
+        })
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ detail: res.statusText }))
+          const msg = body.detail ?? JSON.stringify(body)
+          set({ regenError: `Regeneration failed after seeding: ${msg}` })
+          return
+        }
+      } else {
+        const { data, error } = await supabase
+          .from('programming_regeneration_requests')
+          .insert({
+            member_id: selectedMember.member_id,
+            program_id: seededRows.id,
+            requested_by: selectedCoach?.id ?? null,
+            scheme_name: config.scheme_name,
+            rep_range: config.rep_range,
+            sessions_per_week: config.sessions_per_week,
+          })
+          .select()
+          .single()
+
+        if (!error && data) {
+          set({ pendingRegen: data as RegenerationRequest })
+        }
+      }
+
+      await get().fetchProgram(selectedMember.member_id)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ regenError: `First program generation error: ${msg}` })
+    } finally {
+      set((s) => ({ loading: { ...s.loading, regenerating: false } }))
+    }
   },
 
   hasConfigChanges: () => {
