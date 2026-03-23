@@ -56,8 +56,9 @@ C_SERIES_GOOD_TAGS = {
 }
 C_SERIES_BAD_TAGS = {
     "Horizontal Press", "Vertical Press", "Lower Body Push",
-    "Lower Body Pull", "Hip Dominant",
+    "Lower Body Pull", "Hip Dominant", "Plyometric",
 }
+WARMUP_ONLY_TAGS = {"Mobility", "Plyometric", "Rehab", "External Rotation"}
 AVOID_EXERCISES_DEFAULT = {"walking lunges", "farmer carries"}
 
 PRESS_TAGS = {"Vertical Press", "Horizontal Press"}
@@ -224,8 +225,7 @@ def _enforce_series_eligibility(exercises, exercise_lib):
             allowed_cd.append(ex)
             continue
         sa_set = set(str(s).upper() for s in sa if s)
-        if "WARM UP" in sa_set:
-            allowed_cd.append(ex)
+        if sa_set == {"WARM UP"}:
             continue
         if "A" in sa_set:
             if letter in ("A", "B"):
@@ -617,17 +617,23 @@ def generate_next_program(
             if _is_excluded(name, eid, exclusions, avoid_list):
                 continue
 
+            info = exercise_lib.get(name) or {}
+            sa = ex.get("series_assignment") or info.get("series_assignment") or []
+            sa_upper = {str(s).upper() for s in sa if s}
+
+            if sa_upper == {"WARM UP"}:
+                continue
+
             series_letter = label[0].upper() if label else "C"
             if series_letter in ("C", "D") and not _is_c_series_ok(name, tags):
                 continue
 
-            info = exercise_lib.get(name) or {}
             collected.append({
                 "exercise_name": name,
                 "exercise_id": info.get("exercise_id") or eid,
                 "series_label": label,
                 "tags": tags,
-                "_series_assignment": ex.get("series_assignment") or info.get("series_assignment") or [],
+                "_series_assignment": sa,
             })
 
         # Phase 2: sort by global priority (compounds first)
