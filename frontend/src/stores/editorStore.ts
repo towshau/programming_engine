@@ -655,7 +655,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     if (!error && data) {
       const wasUploaded = targetProgram.uploaded_to_teambuildr
+      const bakedPayload = {
+        ...targetProgram.payload,
+        sessions: editedSessions,
+      }
       const patch: Record<string, unknown> = {
+        payload: bakedPayload,
         coach_edited: true,
         updated_at: new Date().toISOString(),
       }
@@ -663,18 +668,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         patch.uploaded_to_teambuildr = false
       }
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('programming_generated')
         .update(patch)
         .eq('id', targetProgram.id)
 
+      if (!updateError) {
+        await supabase
+          .from('programming_coach_edits')
+          .delete()
+          .eq('program_id', targetProgram.id)
+      }
+
       if (isLast) {
         set((s) => ({
-          previousSavedEdits: [...s.previousSavedEdits, ...(data as CoachEdit[])],
+          previousSavedEdits: [],
           previousPendingEdits: [],
           previousProgram: s.previousProgram
             ? {
                 ...s.previousProgram,
+                payload: bakedPayload,
                 coach_edited: true,
                 uploaded_to_teambuildr: wasUploaded ? false : s.previousProgram.uploaded_to_teambuildr,
               }
@@ -682,11 +695,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }))
       } else {
         set((s) => ({
-          savedEdits: [...s.savedEdits, ...(data as CoachEdit[])],
+          savedEdits: [],
           pendingEdits: [],
           program: s.program
             ? {
                 ...s.program,
+                payload: bakedPayload,
                 coach_edited: true,
                 uploaded_to_teambuildr: wasUploaded ? false : s.program.uploaded_to_teambuildr,
               }

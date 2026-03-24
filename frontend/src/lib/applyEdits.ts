@@ -23,9 +23,17 @@ export function applyEdits(
     const session = result.find((s) => s.day === edit.session_day)
     if (!session) continue
 
-    const exerciseIdx = session.exercises.findIndex(
-      (e) => e.series_label === edit.series_label
-    )
+    let exerciseIdx = -1
+    if (edit.exercise_id) {
+      exerciseIdx = session.exercises.findIndex(
+        (e) => e.exercise_id === edit.exercise_id
+      )
+    }
+    if (exerciseIdx === -1) {
+      exerciseIdx = session.exercises.findIndex(
+        (e) => e.series_label === edit.series_label
+      )
+    }
     if (exerciseIdx === -1 && edit.edit_type !== 'series_change' && edit.edit_type !== 'exercise_add' && edit.edit_type !== 'exercise_delete') continue
 
     const exercise: ProgramExercise | undefined = session.exercises[exerciseIdx]
