@@ -3,7 +3,7 @@ import { useEditorStore } from '../../stores/editorStore'
 import { Badge } from '../../components/ui/Badge'
 
 const SESSION_OPTIONS = [1, 2, 3, 4, 5, 6]
-const DURATION_OPTIONS = [4, 5, 6, 7, 8]
+const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8]
 
 function derivePhase(
   schemes: { name: string; from_rep_range: string; order: number }[],

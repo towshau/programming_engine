@@ -88,21 +88,23 @@ export function ProgramHeader({
   memberName,
   editCount,
 }: ProgramHeaderProps) {
-  const { activeView, setActiveView } = useEditorStore()
+  const { activeView, setActiveView, configDraft } = useEditorStore()
 
   const expiresDate = pastProgramInfo && previousProgram
     ? computeExpiresDate(previousProgram, program)
     : null
 
+  const durationWeeks = configDraft?.duration_weeks ?? program.duration_weeks
+
   const nextExpiresDate = (() => {
+    if (program.created_at && durationWeeks) {
+      const d = new Date(program.created_at)
+      d.setDate(d.getDate() + durationWeeks * 7)
+      return d
+    }
     if (program.next_due_date) {
       const d = new Date(program.next_due_date)
       d.setDate(d.getDate() - 1)
-      return d
-    }
-    if (program.created_at && program.duration_weeks) {
-      const d = new Date(program.created_at)
-      d.setDate(d.getDate() + program.duration_weeks * 7)
       return d
     }
     return null
