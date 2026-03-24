@@ -1,7 +1,6 @@
 import type { GeneratedProgram, PastProgramInfo } from '../../types'
 import { useEditorStore } from '../../stores/editorStore'
 import { Badge } from '../../components/ui/Badge'
-import { ProgramConfigEditor } from './ProgramConfigEditor'
 import { cn } from '../../lib/utils'
 
 interface ProgramHeaderProps {
@@ -88,27 +87,11 @@ export function ProgramHeader({
   memberName,
   editCount,
 }: ProgramHeaderProps) {
-  const { lastProgramExpanded, toggleLastProgram, configDraft } = useEditorStore()
+  const { lastProgramExpanded, toggleLastProgram } = useEditorStore()
 
   const expiresDate = pastProgramInfo && previousProgram
     ? computeExpiresDate(previousProgram, program)
     : null
-
-  const durationWeeks = configDraft?.duration_weeks ?? program.duration_weeks
-
-  const nextExpiresDate = (() => {
-    if (program.created_at && durationWeeks) {
-      const d = new Date(program.created_at)
-      d.setDate(d.getDate() + durationWeeks * 7)
-      return d
-    }
-    if (program.next_due_date) {
-      const d = new Date(program.next_due_date)
-      d.setDate(d.getDate() - 1)
-      return d
-    }
-    return null
-  })()
 
   return (
     <div className="space-y-4">
@@ -187,37 +170,6 @@ export function ProgramHeader({
           </div>
           <PastProgramBadges info={pastProgramInfo} />
         </button>
-      )}
-
-      {/* Next / current program card — always active */}
-      <div
-        className="w-full text-left rounded-lg p-3 space-y-2 border border-emerald-500/50 bg-emerald-500/5 ring-1 ring-emerald-500/20"
-      >
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
-            {pastProgramInfo ? 'Next Program' : 'Current Program'}
-          </span>
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] text-zinc-500">
-              Generated {formatDateAU(program.created_at)}
-            </span>
-            {nextExpiresDate && (
-              <span className={cn(
-                'text-[10px]',
-                nextExpiresDate < new Date() ? 'text-red-400/70' : 'text-blue-400/70',
-              )}>
-                Expires {nextExpiresDate.toLocaleDateString('en-AU')}
-              </span>
-            )}
-          </div>
-        </div>
-        <ProgramConfigEditor />
-      </div>
-
-      {program.changes_summary && (
-        <div className="rounded-lg bg-zinc-800/50 border border-zinc-700 px-3 py-2 text-sm text-zinc-300">
-          {program.changes_summary}
-        </div>
       )}
     </div>
   )
