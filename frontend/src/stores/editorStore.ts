@@ -576,7 +576,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     if (data) {
       const dates = [
-        ...new Set(data.map((r: { completed_date: string }) => r.completed_date)),
+        ...new Set(
+          data.map((r: { completed_date: string }) =>
+            String(r.completed_date).slice(0, 10),
+          ),
+        ),
       ].sort()
       set({ complianceDates: dates })
     }

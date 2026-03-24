@@ -9,8 +9,12 @@ interface ComplianceHeatmapProps {
   durationWeeks: number | null
 }
 
-function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10)
+/** Calendar YYYY-MM-DD in the user's local timezone (not UTC — avoids weekday shift in AU etc.). */
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function addDays(d: Date, n: number): Date {
@@ -28,7 +32,10 @@ export function ComplianceHeatmap({
   sessionsPerWeek,
   durationWeeks,
 }: ComplianceHeatmapProps) {
-  const loggedSet = useMemo(() => new Set(complianceDates), [complianceDates])
+  const loggedSet = useMemo(
+    () => new Set(complianceDates.map((d) => d.slice(0, 10))),
+    [complianceDates],
+  )
 
   const { weeks, totalDaysLogged, expectedSessions } = useMemo(() => {
     const start = new Date(startDate + 'T00:00:00')
@@ -45,7 +52,7 @@ export function ComplianceHeatmap({
     while (cursor <= end || cursor < addDays(end, 7)) {
       const week: { date: string; inRange: boolean; logged: boolean }[] = []
       for (let d = 0; d < 7; d++) {
-        const ds = toDateStr(cursor)
+        const ds = toLocalDateStr(cursor)
         const inRange = cursor >= start && cursor <= end
         week.push({ date: ds, inRange, logged: loggedSet.has(ds) })
         cursor = addDays(cursor, 1)
@@ -59,7 +66,8 @@ export function ComplianceHeatmap({
 
     let logged = 0
     for (const date of complianceDates) {
-      if (date >= startDate && date <= endDate) logged++
+      const d = date.slice(0, 10)
+      if (d >= startDate && d <= endDate) logged++
     }
 
     const expected =
