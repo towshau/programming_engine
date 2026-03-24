@@ -41,12 +41,12 @@ function findCancellableChain(
   const { edit_type, session_day, series_label } = incoming
 
   if (edit_type === 'exercise_delete') {
-    const idx = pending.findIndex(
-      (e) =>
-        e.edit_type === 'exercise_add' &&
-        e.session_day === session_day &&
-        e.series_label === series_label,
-    )
+    const idx = pending.findIndex((e) => {
+      if (e.edit_type !== 'exercise_add' || e.session_day !== session_day) return false
+      if (incoming.exercise_id && e.exercise_id) return e.exercise_id === incoming.exercise_id
+      if (incoming.exercise_index != null && e.exercise_index != null) return e.exercise_index === incoming.exercise_index
+      return e.series_label === series_label
+    })
     return idx !== -1 ? [idx] : null
   }
 
@@ -57,14 +57,12 @@ function findCancellableChain(
     let traceLabel = series_label
     for (let i = pending.length - 1; i >= 0; i--) {
       const e = pending[i]
-      if (
-        e.edit_type === 'series_change' &&
-        e.session_day === session_day &&
-        String(e.new_value.series_label) === traceLabel
-      ) {
-        chainIndices.unshift(i)
-        traceLabel = e.series_label
-      }
+      if (e.edit_type !== 'series_change' || e.session_day !== session_day) continue
+      if (String(e.new_value.series_label) !== traceLabel) continue
+      if (incoming.exercise_id && e.exercise_id && e.exercise_id !== incoming.exercise_id) continue
+      if (incoming.exercise_index != null && e.exercise_index != null && e.exercise_index !== incoming.exercise_index) continue
+      chainIndices.unshift(i)
+      traceLabel = e.series_label
     }
     if (chainIndices.length > 0) {
       const first = pending[chainIndices[0]]
@@ -79,7 +77,7 @@ function findCancellableChain(
   }
 
   if (edit_type === 'exercise_swap') {
-    const chainIndices = collectChain(pending, edit_type, session_day, series_label)
+    const chainIndices = collectChain(pending, edit_type, session_day, series_label, incoming.exercise_id, incoming.exercise_index)
     if (chainIndices.length > 0) {
       const first = pending[chainIndices[0]]
       if (
@@ -101,7 +99,7 @@ function findCancellableChain(
   const key = keyMap[edit_type]
   if (!key) return null
 
-  const chainIndices = collectChain(pending, edit_type, session_day, series_label)
+  const chainIndices = collectChain(pending, edit_type, session_day, series_label, incoming.exercise_id, incoming.exercise_index)
   if (chainIndices.length > 0) {
     const first = pending[chainIndices[0]]
     if (String(incoming.new_value[key]) === String(first.old_value[key])) {
@@ -116,15 +114,18 @@ function collectChain(
   editType: EditType,
   sessionDay: number,
   seriesLabel: string,
+  exerciseId?: string | null,
+  exerciseIndex?: number,
 ): number[] {
   const indices: number[] = []
   for (let i = 0; i < pending.length; i++) {
     const e = pending[i]
-    if (
-      e.edit_type === editType &&
-      e.session_day === sessionDay &&
-      e.series_label === seriesLabel
-    ) {
+    if (e.edit_type !== editType || e.session_day !== sessionDay) continue
+    if (exerciseId && e.exercise_id) {
+      if (e.exercise_id === exerciseId) indices.push(i)
+    } else if (exerciseIndex != null && e.exercise_index != null) {
+      if (e.exercise_index === exerciseIndex) indices.push(i)
+    } else if (e.series_label === seriesLabel) {
       indices.push(i)
     }
   }

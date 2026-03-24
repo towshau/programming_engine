@@ -16,6 +16,7 @@ export interface ProgramExercise {
   tags?: string
   sets: SetPrescription[]
   notes?: string
+  exercise_index?: number
 }
 
 export interface ProgramSession {

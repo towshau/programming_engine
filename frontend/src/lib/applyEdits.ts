@@ -14,6 +14,7 @@ export function applyEdits(
   for (const session of result) {
     for (let i = 0; i < session.exercises.length; i++) {
       session.exercises[i].sets = session.exercises[i].sets.map(enrichSet)
+      session.exercises[i].exercise_index = i
     }
   }
 
@@ -27,6 +28,11 @@ export function applyEdits(
     if (edit.exercise_id) {
       exerciseIdx = session.exercises.findIndex(
         (e) => e.exercise_id === edit.exercise_id
+      )
+    }
+    if (exerciseIdx === -1 && edit.exercise_index != null) {
+      exerciseIdx = session.exercises.findIndex(
+        (e) => e.exercise_index === edit.exercise_index
       )
     }
     if (exerciseIdx === -1) {

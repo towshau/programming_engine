@@ -26,6 +26,7 @@ export interface PendingEdit {
   session_day: number
   series_label: string
   exercise_id: string | null
+  exercise_index?: number
   edit_type: EditType
   old_value: Record<string, unknown>
   new_value: Record<string, unknown>
