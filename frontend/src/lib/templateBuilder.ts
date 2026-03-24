@@ -1,6 +1,6 @@
 import type { ExerciseLibraryItem, ProgramPayload, ProgramSession } from '../types'
 
-type DayType = 'upper' | 'lower' | 'full'
+export type DayType = 'upper' | 'lower' | 'full'
 
 const SPLIT_MAP: Record<number, DayType[]> = {
   1: ['full'],
@@ -126,22 +126,21 @@ function pickFromPool(
   return fallback
 }
 
-// ── Main builder ──────────────────────────────────────────────────────────────
+// ── Single-session builder ────────────────────────────────────────────────────
 
-export function buildTemplateProgram(
-  sessionsPerWeek: number,
+export function buildSingleSession(
+  dayNumber: number,
+  dayType: DayType,
   repRange: string,
   exerciseLibrary: ExerciseLibraryItem[],
-): ProgramPayload {
+  usedExerciseIds?: Set<string>,
+): ProgramSession | null {
   const [repLow, repHigh] = parseRepRange(repRange)
   const compoundRange = repRange
   const accessoryRange = formatRange(
     Math.min(repLow + 2, 12),
     Math.min(repHigh + 2, 14),
   )
-
-  const clamped = Math.max(1, Math.min(6, sessionsPerWeek))
-  const dayTypes = SPLIT_MAP[clamped]
 
   const warmUpPool = dedupeAndShuffle(
     buildPool(exerciseLibrary, ['Warm Up'], []),
@@ -159,56 +158,72 @@ export function buildTemplateProgram(
   }
 
   const cursors: Record<string, number> = {}
-  const sessions: ProgramSession[] = []
+  const usedIds = new Set<string>(usedExerciseIds)
+  const slots = DAY_TYPE_SLOTS[dayType]
+  const session: ProgramSession = { day: dayNumber, exercises: [] }
 
-  for (let dayIdx = 0; dayIdx < dayTypes.length; dayIdx++) {
-    const dayType = dayTypes[dayIdx]
-    const slots = DAY_TYPE_SLOTS[dayType]
-    const usedIds = new Set<string>()
-    const session: ProgramSession = { day: dayIdx + 1, exercises: [] }
+  const warmUp = pickFromPool(
+    warmUpPool.length > 0 ? warmUpPool : fallbackPool,
+    cursors,
+    'warmup',
+    usedIds,
+  )
+  if (warmUp) {
+    session.exercises.push({
+      exercise_name: warmUp.exercise_name,
+      exercise_id: warmUp.exercise_id,
+      series_label: 'WU1',
+      tags: warmUp.tags ?? undefined,
+      sets: [{ set_number: 1, reps: repRange }],
+    })
+  }
 
-    const warmUp = pickFromPool(
-      warmUpPool.length > 0 ? warmUpPool : fallbackPool,
+  for (const slot of slots) {
+    const pool = getPool(slot)
+    const picked = pickFromPool(
+      pool.length > 0 ? pool : fallbackPool,
       cursors,
-      'warmup',
+      slot.cursor,
       usedIds,
     )
-    if (warmUp) {
-      session.exercises.push({
-        exercise_name: warmUp.exercise_name,
-        exercise_id: warmUp.exercise_id,
-        series_label: 'WU1',
-        tags: warmUp.tags ?? undefined,
-        sets: [{ set_number: 1, reps: repRange }],
-      })
-    }
+    if (!picked) continue
 
-    for (const slot of slots) {
-      const pool = getPool(slot)
-      const picked = pickFromPool(
-        pool.length > 0 ? pool : fallbackPool,
-        cursors,
-        slot.cursor,
-        usedIds,
-      )
-      if (!picked) continue
+    const reps = slot.accessory ? accessoryRange : compoundRange
+    session.exercises.push({
+      exercise_name: picked.exercise_name,
+      exercise_id: picked.exercise_id,
+      series_label: slot.label,
+      tags: picked.tags ?? undefined,
+      sets: Array.from({ length: slot.sets }, (_, i) => ({
+        set_number: i + 1,
+        reps,
+      })),
+    })
+  }
 
-      const reps = slot.accessory ? accessoryRange : compoundRange
-      session.exercises.push({
-        exercise_name: picked.exercise_name,
-        exercise_id: picked.exercise_id,
-        series_label: slot.label,
-        tags: picked.tags ?? undefined,
-        sets: Array.from({ length: slot.sets }, (_, i) => ({
-          set_number: i + 1,
-          reps,
-        })),
-      })
-    }
+  if (session.exercises.length < 3) return null
+  return session
+}
 
-    if (session.exercises.length >= 3) {
-      sessions.push(session)
-    }
+// ── Main builder ──────────────────────────────────────────────────────────────
+
+export function buildTemplateProgram(
+  sessionsPerWeek: number,
+  repRange: string,
+  exerciseLibrary: ExerciseLibraryItem[],
+): ProgramPayload {
+  const clamped = Math.max(1, Math.min(6, sessionsPerWeek))
+  const dayTypes = SPLIT_MAP[clamped]
+
+  const sessions: ProgramSession[] = []
+  for (let dayIdx = 0; dayIdx < dayTypes.length; dayIdx++) {
+    const session = buildSingleSession(
+      dayIdx + 1,
+      dayTypes[dayIdx],
+      repRange,
+      exerciseLibrary,
+    )
+    if (session) sessions.push(session)
   }
 
   return {

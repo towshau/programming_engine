@@ -14,7 +14,8 @@ import type {
 import { supabase } from '../lib/supabase'
 import { applyEdits } from '../lib/applyEdits'
 import { validateSessionsReps, type RepsValidationError } from '../lib/reps'
-import { buildTemplateProgram } from '../lib/templateBuilder'
+import { buildTemplateProgram, buildSingleSession } from '../lib/templateBuilder'
+import type { DayType } from '../lib/templateBuilder'
 
 /** `staff_database.role` values shown in the Program Editor coach filter (exact strings). */
 export const PROGRAMMING_COACH_ROLES = [
@@ -199,6 +200,7 @@ interface EditorState {
   toggleLastProgram: () => void
   fetchComplianceDates: (memberId: string, startDate: string, endDate: string) => Promise<void>
   copyPreviousToNext: () => Promise<boolean>
+  addDay: (dayType: DayType) => Promise<boolean>
   hasConfigChanges: () => boolean
   clearRegenError: () => void
   clearSaveValidationError: () => void
@@ -1030,6 +1032,88 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set((s) => ({ loading: { ...s.loading, saving: false } }))
     await get().fetchProgram(program.member_id)
+    return true
+  },
+
+  addDay: async (dayType) => {
+    const { program, savedEdits, pendingEdits, configDraft } = get()
+    if (!program) return false
+
+    const currentSessions = program.payload.sessions
+    const newSpw = currentSessions.length + 1
+    if (newSpw > 6) return false
+
+    let exerciseLibrary = get().exerciseLibrary
+    if (exerciseLibrary.length === 0) {
+      await get().fetchExerciseLibrary()
+      exerciseLibrary = get().exerciseLibrary
+    }
+    if (exerciseLibrary.length === 0) {
+      set({ saveError: 'No exercise library loaded.' })
+      return false
+    }
+
+    set((s) => ({ loading: { ...s.loading, saving: true }, saveError: null }))
+
+    const allEdits = [...savedEdits, ...pendingEdits] as CoachEdit[]
+    const editedSessions = applyEdits(currentSessions, allEdits)
+    const usedIds = new Set<string>()
+    for (const sess of editedSessions) {
+      for (const ex of sess.exercises) {
+        if (ex.exercise_id) usedIds.add(ex.exercise_id)
+      }
+    }
+
+    const repRange = configDraft?.rep_range ?? program.rep_range ?? '8-10'
+    const nextDayNumber = Math.max(0, ...currentSessions.map((s) => s.day)) + 1
+
+    const newSession = buildSingleSession(
+      nextDayNumber,
+      dayType,
+      repRange,
+      exerciseLibrary,
+      usedIds,
+    )
+
+    if (!newSession) {
+      set((s) => ({
+        loading: { ...s.loading, saving: false },
+        saveError: 'Could not build a valid session for this day type.',
+      }))
+      return false
+    }
+
+    const updatedPayload = {
+      ...program.payload,
+      sessions: [...currentSessions, newSession],
+      metadata: {
+        ...program.payload.metadata,
+        sessions_per_week: newSpw,
+      },
+    }
+
+    const { error } = await supabase
+      .from('programming_generated')
+      .update({
+        payload: updatedPayload,
+        sessions_per_week: newSpw,
+        coach_edited: true,
+        changes_summary: `Added Day ${nextDayNumber} (${dayType}) via Add Day`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', program.id)
+
+    if (error) {
+      set((s) => ({
+        loading: { ...s.loading, saving: false },
+        saveError: error.message ?? 'Failed to add day.',
+      }))
+      return false
+    }
+
+    set((s) => ({ loading: { ...s.loading, saving: false } }))
+    await get().fetchProgram(program.member_id)
+    set({ selectedDay: nextDayNumber })
     return true
   },
 

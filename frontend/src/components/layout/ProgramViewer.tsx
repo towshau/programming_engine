@@ -6,6 +6,7 @@ import { ProgramHeader } from '../../features/program/ProgramHeader'
 import { ComplianceHeatmap } from '../../features/program/ComplianceHeatmap'
 import { ExerciseCategoryGroup } from '../../features/program/ExerciseCategoryGroup'
 import { AddExerciseButton } from '../../features/program/AddExerciseButton'
+import { AddDayModal } from '../../features/program/AddDayModal'
 import { ProgramConfigEditor } from '../../features/program/ProgramConfigEditor'
 import type { ProgramExercise, CoachEdit } from '../../types'
 import { cn, seriesGroup, seriesSortKey } from '../../lib/utils'
@@ -62,7 +63,9 @@ export function ProgramViewer() {
     saveError,
     clearSaveValidationError,
     copyPreviousToNext,
+    addDay,
   } = useEditorStore()
+  const [showAddDayModal, setShowAddDayModal] = useState(false)
   const [firstProgramConfig, setFirstProgramConfig] = useState({
     sessions_per_week: 3,
     scheme_name: '',
@@ -451,7 +454,7 @@ export function ProgramViewer() {
 
       {/* Day picker + workflow buttons row */}
       <div className="flex items-center justify-between gap-4">
-        <DayPicker days={nextDays} selectedDay={selectedDay} onSelect={setSelectedDay} />
+        <DayPicker days={nextDays} selectedDay={selectedDay} onSelect={setSelectedDay} onAddDay={() => setShowAddDayModal(true)} />
 
         <div className="flex items-center gap-2">
           {nextPending && (
@@ -611,6 +614,16 @@ export function ProgramViewer() {
         </div>
       ) : (
         <p className="text-sm text-zinc-500">Select a day to view exercises</p>
+      )}
+
+      {showAddDayModal && (
+        <AddDayModal
+          onSelect={async (dayType) => {
+            setShowAddDayModal(false)
+            await addDay(dayType)
+          }}
+          onClose={() => setShowAddDayModal(false)}
+        />
       )}
     </main>
   )
