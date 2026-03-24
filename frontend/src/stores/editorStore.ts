@@ -198,6 +198,7 @@ interface EditorState {
   }) => Promise<void>
   toggleLastProgram: () => void
   fetchComplianceDates: (memberId: string, startDate: string, endDate: string) => Promise<void>
+  copyPreviousToNext: () => Promise<boolean>
   hasConfigChanges: () => boolean
   clearRegenError: () => void
   clearSaveValidationError: () => void
@@ -981,6 +982,47 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     } finally {
       set((s) => ({ loading: { ...s.loading, regenerating: false } }))
     }
+  },
+
+  copyPreviousToNext: async () => {
+    const { previousProgram, previousSavedEdits, program } = get()
+    if (!previousProgram || !program) return false
+
+    set((s) => ({ loading: { ...s.loading, saving: true } }))
+
+    const finalSessions = applyEdits(
+      previousProgram.payload.sessions,
+      previousSavedEdits as CoachEdit[],
+    )
+    const newPayload = {
+      sessions: finalSessions,
+      metadata: previousProgram.payload.metadata,
+    }
+
+    const { error } = await supabase
+      .from('programming_generated')
+      .update({
+        payload: newPayload,
+        scheme_name: previousProgram.scheme_name,
+        rep_range: previousProgram.rep_range,
+        sessions_per_week: previousProgram.sessions_per_week,
+        coach_edited: true,
+        changes_summary: 'Copied from previous program cycle',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', program.id)
+
+    if (error) {
+      set((s) => ({
+        loading: { ...s.loading, saving: false },
+        saveError: error.message ?? 'Failed to copy program.',
+      }))
+      return false
+    }
+
+    set((s) => ({ loading: { ...s.loading, saving: false } }))
+    await get().fetchProgram(program.member_id)
+    return true
   },
 
   hasConfigChanges: () => {
