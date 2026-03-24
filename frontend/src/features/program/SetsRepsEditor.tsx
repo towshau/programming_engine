@@ -25,7 +25,7 @@ export function SetsRepsEditor({
 }: SetsRepsEditorProps) {
   const [editingSets, setEditingSets] = useState(false)
   const [editingReps, setEditingReps] = useState(false)
-  const [setsValue, setSetsValue] = useState(sets)
+  const [setsValue, setSetsValue] = useState(String(sets))
   const [repsValue, setRepsValue] = useState('')
   const [inputError, setInputError] = useState(false)
 
@@ -38,6 +38,8 @@ export function SetsRepsEditor({
       setEditingReps(false)
       setInputError(false)
     }
+
+    if (e.metaKey || e.ctrlKey) return
 
     if (isSeconds) {
       if (!/[\d]/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Escape'].includes(e.key)) {
@@ -108,23 +110,27 @@ export function SetsRepsEditor({
       {/* Sets */}
       {editingSets ? (
         <input
-          type="number"
-          min={1}
-          max={8}
+          type="text"
+          inputMode="numeric"
           value={setsValue}
-          onChange={(e) => setSetsValue(Number(e.target.value))}
+          onChange={(e) => {
+            const v = e.target.value.replace(/[^0-9]/g, '')
+            setSetsValue(v)
+          }}
+          onFocus={(e) => e.target.select()}
           onBlur={() => {
             setEditingSets(false)
-            if (setsValue !== sets && setsValue >= 1 && setsValue <= 8) {
-              onSetsChange(setsValue)
+            const n = Number(setsValue)
+            if (!isNaN(n) && n >= 1 && n <= 8 && n !== sets) {
+              onSetsChange(n)
             } else {
-              setSetsValue(sets)
+              setSetsValue(String(sets))
             }
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
             if (e.key === 'Escape') {
-              setSetsValue(sets)
+              setSetsValue(String(sets))
               setEditingSets(false)
             }
           }}
@@ -133,7 +139,7 @@ export function SetsRepsEditor({
         />
       ) : (
         <button
-          onClick={() => setEditingSets(true)}
+          onClick={() => { setSetsValue(String(sets)); setEditingSets(true) }}
           className={cn(
             'rounded px-1.5 py-0.5 font-medium text-zinc-300',
             'hover:bg-zinc-700 hover:text-emerald-400 transition-colors cursor-pointer'
@@ -153,6 +159,7 @@ export function SetsRepsEditor({
           inputMode={isSeconds ? 'numeric' : 'text'}
           value={repsValue}
           onChange={(e) => setRepsValue(e.target.value)}
+          onFocus={(e) => e.target.select()}
           onBlur={handleRepsBlur}
           onKeyDown={handleRepsKeyDown}
           autoFocus

@@ -94,9 +94,19 @@ export function ProgramHeader({
     ? computeExpiresDate(previousProgram, program)
     : null
 
-  const nextExpiresDate = program.next_due_date
-    ? (() => { const d = new Date(program.next_due_date); d.setDate(d.getDate() - 1); return d })()
-    : null
+  const nextExpiresDate = (() => {
+    if (program.next_due_date) {
+      const d = new Date(program.next_due_date)
+      d.setDate(d.getDate() - 1)
+      return d
+    }
+    if (program.created_at && program.duration_weeks) {
+      const d = new Date(program.created_at)
+      d.setDate(d.getDate() + program.duration_weeks * 7)
+      return d
+    }
+    return null
+  })()
 
   const isLastActive = activeView === 'last'
   const isNextActive = activeView === 'next'
@@ -191,7 +201,7 @@ export function ProgramHeader({
             {nextExpiresDate && (
               <span className={cn(
                 'text-[10px]',
-                nextExpiresDate < new Date() ? 'text-red-400/70' : 'text-zinc-500',
+                nextExpiresDate < new Date() ? 'text-red-400/70' : 'text-blue-400/70',
               )}>
                 Expires {nextExpiresDate.toLocaleDateString('en-AU')}
               </span>
