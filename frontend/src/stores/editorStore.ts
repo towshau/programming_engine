@@ -568,15 +568,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   fetchComplianceDates: async (memberId, startDate, endDate) => {
     const { data } = await supabase
       .from('member_tbresults')
-      .select('assigned_date')
+      .select('completed_date')
       .eq('member_id', memberId)
-      .gte('assigned_date', startDate)
-      .lte('assigned_date', endDate)
-      .not('assigned_date', 'is', null)
+      .gte('completed_date', startDate)
+      .lte('completed_date', endDate)
+      .not('completed_date', 'is', null)
 
     if (data) {
       const dates = [
-        ...new Set(data.map((r: { assigned_date: string }) => r.assigned_date)),
+        ...new Set(data.map((r: { completed_date: string }) => r.completed_date)),
       ].sort()
       set({ complianceDates: dates })
     }
