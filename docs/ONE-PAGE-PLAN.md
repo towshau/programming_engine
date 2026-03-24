@@ -87,7 +87,7 @@
 
 React app for coaches to review and edit generated programs. Stack: React 19 + TypeScript + Vite + Tailwind CSS 4 + Zustand + Supabase JS. Run: `cd frontend && npm run dev`.
 
-- **Coach selector** — top bar dropdown (`All Coaches` = no filter). Options: active `staff_database` rows whose `role` is one of Coach, Advanced Coach, Gym Manager, Senior Coach, Casual Coach, Head of Exercise. Selected coach ID persisted in `localStorage` (`lr-selected-coach-id`) across refresh. Filters member list by `programming_coach_id` on `member_memberships`.
+- **Coach selector** — top bar dropdown (`All Coaches` = no filter). Options: active `staff_database` rows whose `role` is one of Coach, Advanced Coach, Gym Manager, Senior Coach, Casual Coach, Head of Exercise. Selected coach ID persisted in `localStorage` (`lr-selected-coach-id`) across refresh. Filters member list by **`member_programs.programming_coach_id`** (source of truth; aligns with `run_weekly_batch.py`). Gym / membership stage still come from active `member_memberships` rows.
 - **Member sidebar** — debounced search, shows member name + gym badge; click to load program.
 - **Program viewer** — reads latest `programming_generated` for member; day picker, exercises grouped by series with color-coded labels. Series order: WU (Warm Up, purple) → A (Primary, blue) → B (Accessory, teal) → C/D (Additional, amber/zinc) → CD (Cool Down, rose).
 - **Inline editing** — click series label to change (dropdown WU1–CD4, grouped by series), click exercise name to swap (searches `exercise_library`), click sets/reps to edit, add notes. Each edit writes to `programming_coach_edits` with old/new values for differential learning.

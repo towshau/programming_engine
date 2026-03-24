@@ -305,7 +305,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const cutoffStr = cutoff.toISOString().slice(0, 10)
     const today = new Date().toISOString().slice(0, 10)
 
-    const [allMembersRes, activeMembershipRes, pgRes] = await Promise.all([
+    const [allMembersRes, activeMembershipRes, pgRes, mpRes] = await Promise.all([
       supabase
         .from('member_database')
         .select('id, first_name, last_name, member_name')
@@ -313,7 +313,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .limit(2000),
       supabase
         .from('member_memberships')
-        .select('member_id, gym, programming_coach_id, start_date, end_date, journey_stage, status, membership_stage, pipeline_lost')
+        .select('member_id, gym, start_date, end_date, journey_stage, status, membership_stage, pipeline_lost')
         .gt('end_date', today)
         .not('journey_stage', 'eq', 'no_sale')
         .not('status', 'eq', 'f&f')
@@ -322,13 +322,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .from('programming_generated')
         .select('member_id')
         .limit(5000),
+      supabase.from('member_programs').select('member_id, programming_coach_id').limit(5000),
     ])
 
     const pgSet = new Set((pgRes.data ?? []).map((r: { member_id: string }) => r.member_id))
 
+    /** Source of truth for coach assignment in Program Editor (aligns with run_weekly_batch, Retool). */
+    const mpCoachMap = new Map<string, string>()
+    for (const row of (mpRes.data ?? []) as Record<string, unknown>[]) {
+      const mid = row.member_id as string
+      const cid = (row.programming_coach_id as string) || ''
+      if (mid) mpCoachMap.set(mid, cid)
+    }
+
     interface ActiveInfo {
       gym: string
-      programming_coach_id: string
       start_date: string
       membership_stage: string
       not_renewing: boolean
@@ -342,7 +350,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!existing || startDate > existing.start_date) {
         activeMap.set(mid, {
           gym: (row.gym as string) || '',
-          programming_coach_id: (row.programming_coach_id as string) || '',
           start_date: startDate,
           membership_stage: (row.membership_stage as string) || '',
           not_renewing: notRenewing,
@@ -355,8 +362,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const mid = row.id as string
       const active = activeMap.get(mid)
       const isActive = !!active && !active.not_renewing
+      const mpCoach = mpCoachMap.get(mid) || ''
 
-      if (coachId && active?.programming_coach_id !== coachId) continue
+      if (coachId && mpCoach !== coachId) continue
 
       const fullName = (row.member_name as string) || ''
       const firstName = (row.first_name as string) || fullName.split(' ')[0] || ''
@@ -372,7 +380,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         first_name: firstName,
         last_name: lastName,
         gym: active?.gym || '',
-        programming_coach_id: active?.programming_coach_id || '',
+        programming_coach_id: mpCoach,
         membership_status: isActive ? 'active' : 'inactive',
         program_status: hasProgram ? 'has_program' : isNew ? 'new_member' : 'needs_program',
         is_new: isNew,

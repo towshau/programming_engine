@@ -312,7 +312,7 @@ Built by trigger from `member_tbhealthmax` + `member_tbresults`. Synced weekly t
 | member_name | text | Display |
 | due_date | date | Program expiry; batch runner triggers 8 days before |
 | programming_stage | text | Enum: awaiting_program, update_stage, complete, uploaded, inactive |
-| programming_coach_id | uuid | Coach assignment |
+| programming_coach_id | uuid | Coach assignment; **Program Editor** coach dropdown filters members by this column (not `member_memberships.programming_coach_id`). |
 | scheme_name | text (default 'GPP') | Progression scheme: GPP, Strength, Hypertrophy |
 | duration_weeks | integer | Program length in weeks |
 
