@@ -150,6 +150,8 @@ interface EditorState {
   progressionSchemes: ProgressionScheme[]
   pendingRegen: RegenerationRequest | null
   regenError: string | null
+  lastProgramExpanded: boolean
+  complianceDates: string[]
   saveValidationErrors: RepsValidationError[] | null
   saveError: string | null
   selectedDay: number | null
@@ -194,6 +196,8 @@ interface EditorState {
     rep_range: string
     duration_weeks: number
   }) => Promise<void>
+  toggleLastProgram: () => void
+  fetchComplianceDates: (memberId: string, startDate: string, endDate: string) => Promise<void>
   hasConfigChanges: () => boolean
   clearRegenError: () => void
   clearSaveValidationError: () => void
@@ -217,6 +221,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   exerciseLibrary: [],
   progressionSchemes: [],
   pendingRegen: null,
+  lastProgramExpanded: false,
+  complianceDates: [],
   regenError: null,
   saveValidationErrors: null,
   saveError: null,
@@ -283,6 +289,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       members: [],
       configDraft: null,
       pendingRegen: null,
+      lastProgramExpanded: false,
+      complianceDates: [],
     })
     get().fetchMembers(coach?.id ?? null)
   },
@@ -402,6 +410,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedDay: null,
       configDraft: null,
       pendingRegen: null,
+      lastProgramExpanded: false,
+      complianceDates: [],
     })
     if (member) get().fetchProgram(member.member_id)
   },
@@ -474,8 +484,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       get().fetchEdits(current.id)
       if (previous) {
         get().fetchPreviousEdits(previous.id)
+        get().fetchComplianceDates(
+          memberId,
+          previous.created_at.slice(0, 10),
+          current.created_at.slice(0, 10),
+        )
       } else {
-        set({ previousSavedEdits: [] })
+        set({ previousSavedEdits: [], complianceDates: [] })
       }
 
       const { data: regenData } = await supabase
@@ -491,7 +506,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         set({ pendingRegen: null })
       }
     } else {
-      set({ program: null, previousProgram: null, pastProgramInfo: null, configDraft: null, previousSavedEdits: [], previousPendingEdits: [], previousSelectedDay: null })
+      set({ program: null, previousProgram: null, pastProgramInfo: null, configDraft: null, previousSavedEdits: [], previousPendingEdits: [], previousSelectedDay: null, lastProgramExpanded: false, complianceDates: [] })
     }
     set((s) => ({ loading: { ...s.loading, program: false } }))
   },
@@ -539,6 +554,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedDay: (day) => set({ selectedDay: day }),
   setActiveView: (view) => set({ activeView: view, saveValidationErrors: null, saveError: null }),
   setPreviousSelectedDay: (day) => set({ previousSelectedDay: day }),
+
+  toggleLastProgram: () => {
+    set((s) => ({
+      lastProgramExpanded: !s.lastProgramExpanded,
+      previousSelectedDay:
+        !s.lastProgramExpanded && s.previousSelectedDay === null
+          ? 1
+          : s.previousSelectedDay,
+    }))
+  },
+
+  fetchComplianceDates: async (memberId, startDate, endDate) => {
+    const { data } = await supabase
+      .from('member_tbresults')
+      .select('assigned_date')
+      .eq('member_id', memberId)
+      .gte('assigned_date', startDate)
+      .lte('assigned_date', endDate)
+      .not('assigned_date', 'is', null)
+
+    if (data) {
+      const dates = [
+        ...new Set(data.map((r: { assigned_date: string }) => r.assigned_date)),
+      ].sort()
+      set({ complianceDates: dates })
+    }
+  },
 
   addPendingEdit: (edit: PendingEdit) => {
     set((s) => {

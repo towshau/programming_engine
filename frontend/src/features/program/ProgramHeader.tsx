@@ -88,7 +88,7 @@ export function ProgramHeader({
   memberName,
   editCount,
 }: ProgramHeaderProps) {
-  const { activeView, setActiveView, configDraft } = useEditorStore()
+  const { lastProgramExpanded, toggleLastProgram, configDraft } = useEditorStore()
 
   const expiresDate = pastProgramInfo && previousProgram
     ? computeExpiresDate(previousProgram, program)
@@ -109,9 +109,6 @@ export function ProgramHeader({
     }
     return null
   })()
-
-  const isLastActive = activeView === 'last'
-  const isNextActive = activeView === 'next'
 
   return (
     <div className="space-y-4">
@@ -140,25 +137,39 @@ export function ProgramHeader({
         </div>
       </div>
 
-      {/* Last program — clickable tab */}
+      {/* Last program — collapsible card */}
       {pastProgramInfo && (
         <button
           type="button"
-          onClick={() => setActiveView('last')}
+          onClick={toggleLastProgram}
           className={cn(
             'w-full text-left rounded-lg p-3 space-y-2 transition-all cursor-pointer',
-            isLastActive
+            lastProgramExpanded
               ? 'border border-blue-500/50 bg-blue-500/5 ring-1 ring-blue-500/20'
               : 'border border-zinc-700/60 bg-zinc-800/40 hover:border-zinc-600/80',
           )}
         >
           <div className="flex items-center justify-between">
-            <span className={cn(
-              'text-[10px] font-semibold uppercase tracking-wider',
-              isLastActive ? 'text-blue-400' : 'text-zinc-500',
-            )}>
-              Last Program
-            </span>
+            <div className="flex items-center gap-2">
+              <svg
+                className={cn(
+                  'h-3 w-3 transition-transform',
+                  lastProgramExpanded ? 'rotate-90 text-blue-400' : 'text-zinc-500',
+                )}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+              <span className={cn(
+                'text-[10px] font-semibold uppercase tracking-wider',
+                lastProgramExpanded ? 'text-blue-400' : 'text-zinc-500',
+              )}>
+                Last Program
+              </span>
+            </div>
             <div className="flex items-center gap-3">
               <span className="text-[10px] text-zinc-600">
                 {pastProgramInfo.source === 'generated' ? 'Generated ' : ''}
@@ -178,22 +189,12 @@ export function ProgramHeader({
         </button>
       )}
 
-      {/* Next / current program — clickable tab */}
-      <button
-        type="button"
-        onClick={() => setActiveView('next')}
-        className={cn(
-          'w-full text-left rounded-lg p-3 space-y-2 transition-all cursor-pointer',
-          isNextActive
-            ? 'border border-emerald-500/50 bg-emerald-500/5 ring-1 ring-emerald-500/20'
-            : 'border border-zinc-700/60 bg-zinc-800/40 hover:border-zinc-600/80',
-        )}
+      {/* Next / current program card — always active */}
+      <div
+        className="w-full text-left rounded-lg p-3 space-y-2 border border-emerald-500/50 bg-emerald-500/5 ring-1 ring-emerald-500/20"
       >
         <div className="flex items-center justify-between">
-          <span className={cn(
-            'text-[10px] font-semibold uppercase tracking-wider',
-            isNextActive ? 'text-emerald-400' : 'text-zinc-500',
-          )}>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
             {pastProgramInfo ? 'Next Program' : 'Current Program'}
           </span>
           <div className="flex items-center gap-3">
@@ -210,8 +211,8 @@ export function ProgramHeader({
             )}
           </div>
         </div>
-        {isNextActive && <ProgramConfigEditor />}
-      </button>
+        <ProgramConfigEditor />
+      </div>
 
       {program.changes_summary && (
         <div className="rounded-lg bg-zinc-800/50 border border-zinc-700 px-3 py-2 text-sm text-zinc-300">

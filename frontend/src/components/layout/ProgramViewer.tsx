@@ -3,6 +3,7 @@ import { useEditorStore } from '../../stores/editorStore'
 import { applyEdits } from '../../lib/applyEdits'
 import { DayPicker } from '../ui/DayPicker'
 import { ProgramHeader } from '../../features/program/ProgramHeader'
+import { ComplianceHeatmap } from '../../features/program/ComplianceHeatmap'
 import { ExerciseCategoryGroup } from '../../features/program/ExerciseCategoryGroup'
 import { AddExerciseButton } from '../../features/program/AddExerciseButton'
 import type { ProgramExercise, CoachEdit } from '../../types'
@@ -20,17 +21,6 @@ function groupBySeries(exercises: ProgramExercise[]) {
   )
 }
 
-function computeExpiresDate(
-  previousNextDueDate: string | null | undefined,
-  currentCreatedAt: string,
-): Date | null {
-  const ref = previousNextDueDate ?? currentCreatedAt
-  if (!ref) return null
-  const d = new Date(ref)
-  d.setDate(d.getDate() - 1)
-  return d
-}
-
 const SESSION_OPTIONS = [1, 2, 3, 4, 5, 6]
 const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8]
 
@@ -43,13 +33,14 @@ export function ProgramViewer() {
     pastProgramInfo,
     savedEdits,
     pendingEdits,
-    activeView,
     previousSavedEdits,
     previousPendingEdits,
     previousSelectedDay,
     setPreviousSelectedDay,
     selectedDay,
     setSelectedDay,
+    lastProgramExpanded,
+    complianceDates,
     loading,
     fetchProgressionSchemes,
     fetchExerciseLibrary,
@@ -61,7 +52,6 @@ export function ProgramViewer() {
     saveProgram,
     finalizeProgram,
     markUploaded,
-    hasPendingChanges,
     saveValidationErrors,
     saveError,
     clearSaveValidationError,
@@ -130,8 +120,6 @@ export function ProgramViewer() {
     })
   }, [progressionSchemes, schemeNames])
 
-  const isLastView = activeView === 'last'
-
   // --- Next program data ---
   const nextCombinedEdits = useMemo(
     () => [...savedEdits, ...pendingEdits] as CoachEdit[],
@@ -153,7 +141,7 @@ export function ProgramViewer() {
     [nextEditedSessions, selectedDay]
   )
 
-  // --- Last program data ---
+  // --- Last program data (for expanded section) ---
   const lastCombinedEdits = useMemo(
     () => [...previousSavedEdits, ...previousPendingEdits] as CoachEdit[],
     [previousSavedEdits, previousPendingEdits]
@@ -174,26 +162,12 @@ export function ProgramViewer() {
     [lastEditedSessions, previousSelectedDay]
   )
 
-  // Active view derived values
-  const combinedEdits = isLastView ? lastCombinedEdits : nextCombinedEdits
-  const days = isLastView ? lastDays : nextDays
-  const currentDaySelection = isLastView ? previousSelectedDay : selectedDay
-  const setDaySelection = isLastView ? setPreviousSelectedDay : setSelectedDay
-  const currentSession = isLastView ? lastCurrentSession : nextCurrentSession
-  const activeProgram = isLastView ? previousProgram : program
+  const nextPending = pendingEdits.length > 0
+  const nextEditCount = nextCombinedEdits.length
 
-  const pending = hasPendingChanges()
-  const activePendingEdits = isLastView ? previousPendingEdits : pendingEdits
-  const totalEditCount = combinedEdits.length
-
-  // Expiry check for last program
-  const expiresDate = useMemo(() => {
-    if (!previousProgram || !program) return null
-    return computeExpiresDate(previousProgram.next_due_date, program.created_at)
-  }, [previousProgram, program])
-
-  const isLastExpired = expiresDate ? new Date() > expiresDate : false
-  const readOnly = isLastView && isLastExpired
+  // Compliance heatmap date range (last program period)
+  const lastProgramStart = previousProgram?.created_at?.slice(0, 10) ?? null
+  const lastProgramEnd = program?.created_at?.slice(0, 10) ?? null
 
   if (!selectedMember) {
     return (
@@ -349,25 +323,61 @@ export function ProgramViewer() {
         previousProgram={previousProgram}
         pastProgramInfo={pastProgramInfo}
         memberName={memberName}
-        editCount={totalEditCount}
+        editCount={nextEditCount}
       />
 
-      {/* Read-only banner for expired last program */}
-      {readOnly && (
-        <div className="rounded-lg border border-zinc-600/40 bg-zinc-800/40 px-3 py-2 text-xs text-zinc-400 flex items-center gap-2">
-          <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-          </svg>
-          This program has expired — view only
-        </div>
+      {/* ── Last Program expanded section ── */}
+      {lastProgramExpanded && previousProgram && (
+        <section className="space-y-4 rounded-xl border border-blue-500/20 bg-blue-500/[0.02] p-4">
+          {/* Compliance heatmap */}
+          {pastProgramInfo?.source === 'generated' && lastProgramStart && lastProgramEnd && (
+            <ComplianceHeatmap
+              startDate={lastProgramStart}
+              endDate={lastProgramEnd}
+              complianceDates={complianceDates}
+              sessionsPerWeek={pastProgramInfo.sessions_per_week ?? null}
+              durationWeeks={pastProgramInfo.duration_weeks ?? null}
+            />
+          )}
+
+          <DayPicker
+            days={lastDays}
+            selectedDay={previousSelectedDay}
+            onSelect={setPreviousSelectedDay}
+          />
+
+          {lastCurrentSession ? (
+            <div className="space-y-6">
+              {groupBySeries(lastCurrentSession.exercises).map(
+                ([seriesLetter, exercises]) => (
+                  <ExerciseCategoryGroup
+                    key={seriesLetter}
+                    seriesLetter={seriesLetter}
+                    exercises={exercises}
+                    sessionDay={lastCurrentSession.day}
+                    edits={lastCombinedEdits}
+                    programId={previousProgram.id}
+                    memberId={previousProgram.member_id}
+                    coachId={selectedCoach?.id ?? null}
+                    readOnly
+                  />
+                )
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-zinc-500">Select a day to view last program exercises</p>
+          )}
+        </section>
       )}
+
+      {/* ── Next / Current Program section (always visible) ── */}
 
       {/* Day picker + workflow buttons row */}
       <div className="flex items-center justify-between gap-4">
-        <DayPicker days={days} selectedDay={currentDaySelection} onSelect={setDaySelection} />
+        <DayPicker days={nextDays} selectedDay={selectedDay} onSelect={setSelectedDay} />
 
         <div className="flex items-center gap-2">
-          {pending && !readOnly && (
+          {nextPending && (
             <button
               onClick={saveProgram}
               disabled={loading.saving}
@@ -389,7 +399,7 @@ export function ProgramViewer() {
             </button>
           )}
 
-          {!isLastView && !program.coach_approved && !pending && (
+          {!program.coach_approved && !nextPending && (
             <button
               onClick={async () => {
                 if (window.confirm('Finalize this program? This marks it as coach-approved and calculates the next due date.')) {
@@ -403,7 +413,7 @@ export function ProgramViewer() {
             </button>
           )}
 
-          {!isLastView && program.coach_approved && !program.uploaded_to_teambuildr && (
+          {program.coach_approved && !program.uploaded_to_teambuildr && (
             <button
               onClick={async () => {
                 if (window.confirm('This is an admin-only action.\n\nConfirm you are admin and this program has been uploaded to TeamBuildr.')) {
@@ -422,8 +432,8 @@ export function ProgramViewer() {
         </div>
       </div>
 
-      {/* Re-upload required banner (next program only) */}
-      {!isLastView && program.coach_approved && program.coach_edited && !program.uploaded_to_teambuildr && totalEditCount > 0 && (
+      {/* Re-upload required banner */}
+      {program.coach_approved && program.coach_edited && !program.uploaded_to_teambuildr && nextEditCount > 0 && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-400 flex items-center gap-2">
           <svg className="h-3.5 w-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
@@ -435,7 +445,7 @@ export function ProgramViewer() {
         </div>
       )}
 
-      {/* Save validation errors — block save until fixed */}
+      {/* Save validation errors */}
       {saveValidationErrors && saveValidationErrors.length > 0 && (
         <div className="rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-3 text-sm text-red-200 flex flex-col gap-2">
           <div className="flex items-start justify-between gap-2">
@@ -486,42 +496,41 @@ export function ProgramViewer() {
       )}
 
       {/* Unsaved changes indicator */}
-      {pending && !readOnly && (
+      {nextPending && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-400 flex items-center gap-2">
           <svg className="h-3.5 w-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
           </svg>
-          {activePendingEdits.length} unsaved change{activePendingEdits.length !== 1 ? 's' : ''} — click Save Program to persist
+          {pendingEdits.length} unsaved change{pendingEdits.length !== 1 ? 's' : ''} — click Save Program to persist
         </div>
       )}
 
-      {currentSession && activeProgram ? (
+      {/* Next program exercises */}
+      {nextCurrentSession && program ? (
         <div className="space-y-6">
-          {groupBySeries(currentSession.exercises).map(
+          {groupBySeries(nextCurrentSession.exercises).map(
             ([seriesLetter, exercises]) => (
               <ExerciseCategoryGroup
                 key={seriesLetter}
                 seriesLetter={seriesLetter}
                 exercises={exercises}
-                sessionDay={currentSession.day}
-                edits={combinedEdits}
-                programId={activeProgram.id}
-                memberId={activeProgram.member_id}
+                sessionDay={nextCurrentSession.day}
+                edits={nextCombinedEdits}
+                programId={program.id}
+                memberId={program.member_id}
                 coachId={selectedCoach?.id ?? null}
-                readOnly={readOnly}
+                readOnly={false}
               />
             )
           )}
 
-          {!readOnly && (
-            <AddExerciseButton
-              sessionDay={currentSession.day}
-              programId={activeProgram.id}
-              memberId={activeProgram.member_id}
-              coachId={selectedCoach?.id ?? null}
-              existingExercises={currentSession.exercises}
-            />
-          )}
+          <AddExerciseButton
+            sessionDay={nextCurrentSession.day}
+            programId={program.id}
+            memberId={program.member_id}
+            coachId={selectedCoach?.id ?? null}
+            existingExercises={nextCurrentSession.exercises}
+          />
         </div>
       ) : (
         <p className="text-sm text-zinc-500">Select a day to view exercises</p>
