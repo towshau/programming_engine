@@ -614,7 +614,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   saveProgram: async () => {
-    const { activeView, program, previousProgram, selectedCoach } = get()
+    const { activeView, program, previousProgram } = get()
     const isLast = activeView === 'last'
     const targetProgram = isLast ? previousProgram : program
     const currentPending = isLast ? get().previousPendingEdits : get().pendingEdits
@@ -633,87 +633,77 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ saveValidationErrors: null, saveError: null })
     set((s) => ({ loading: { ...s.loading, saving: true } }))
 
-    const rows = currentPending.map((edit) => ({
-      program_id: targetProgram.id,
-      member_id: targetProgram.member_id,
-      coach_id: selectedCoach?.id ?? null,
-      session_day: edit.session_day,
-      series_label: edit.series_label,
-      exercise_id: edit.exercise_id,
-      edit_type: edit.edit_type,
-      old_value: edit.old_value,
-      new_value: edit.new_value,
-      row_id: edit.row_id ?? null,
-    }))
-
-    const { data, error } = await supabase
-      .from('programming_coach_edits')
-      .insert(rows)
-      .select()
-
-    if (!error && data) {
-      const wasUploaded = targetProgram.uploaded_to_teambuildr
-      const bakedPayload = {
-        ...targetProgram.payload,
-        sessions: editedSessions,
-      }
-      const patch: Record<string, unknown> = {
-        payload: bakedPayload,
-        coach_edited: true,
-        updated_at: new Date().toISOString(),
-      }
-      if (wasUploaded) {
-        patch.uploaded_to_teambuildr = false
-      }
-
-      const { error: updateError } = await supabase
-        .from('programming_generated')
-        .update(patch)
-        .eq('id', targetProgram.id)
-
-      if (!updateError) {
-        await supabase
-          .from('programming_coach_edits')
-          .delete()
-          .eq('program_id', targetProgram.id)
-      }
-
-      if (isLast) {
-        set((s) => ({
-          previousSavedEdits: [],
-          previousPendingEdits: [],
-          previousProgram: s.previousProgram
-            ? {
-                ...s.previousProgram,
-                payload: bakedPayload,
-                coach_edited: true,
-                uploaded_to_teambuildr: wasUploaded ? false : s.previousProgram.uploaded_to_teambuildr,
-              }
-            : null,
-        }))
-      } else {
-        set((s) => ({
-          savedEdits: [],
-          pendingEdits: [],
-          program: s.program
-            ? {
-                ...s.program,
-                payload: bakedPayload,
-                coach_edited: true,
-                uploaded_to_teambuildr: wasUploaded ? false : s.program.uploaded_to_teambuildr,
-              }
-            : null,
-        }))
-      }
-      set((s) => ({ loading: { ...s.loading, saving: false } }))
-      return true
+    const wasUploaded = targetProgram.uploaded_to_teambuildr
+    const bakedPayload = {
+      ...targetProgram.payload,
+      sessions: editedSessions,
+    }
+    const patch: Record<string, unknown> = {
+      payload: bakedPayload,
+      coach_edited: true,
+      updated_at: new Date().toISOString(),
+    }
+    if (wasUploaded) {
+      patch.uploaded_to_teambuildr = false
     }
 
-    set((s) => ({
-      loading: { ...s.loading, saving: false },
-      saveError: error?.message ?? 'Save failed. Please try again.',
-    }))
-    return false
+    const { error: updateError } = await supabase
+      .from('programming_generated')
+      .update(patch)
+      .eq('id', targetProgram.id)
+
+    if (updateError) {
+      set((s) => ({
+        loading: { ...s.loading, saving: false },
+        saveError: updateError.message ?? 'Save failed. Please try again.',
+      }))
+      return false
+    }
+
+    // Payload baked successfully — purge any lingering coach_edits with retry
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const { error: delError } = await supabase
+        .from('programming_coach_edits')
+        .delete()
+        .eq('program_id', targetProgram.id)
+      if (!delError) break
+      if (attempt === 1) {
+        console.warn(
+          '[saveProgram] Failed to delete coach_edits after 2 attempts:',
+          delError.message,
+        )
+      }
+    }
+
+    if (isLast) {
+      set((s) => ({
+        previousSavedEdits: [],
+        previousPendingEdits: [],
+        previousProgram: s.previousProgram
+          ? {
+              ...s.previousProgram,
+              payload: bakedPayload,
+              coach_edited: true,
+              uploaded_to_teambuildr: wasUploaded ? false : s.previousProgram.uploaded_to_teambuildr,
+            }
+          : null,
+      }))
+    } else {
+      set((s) => ({
+        savedEdits: [],
+        pendingEdits: [],
+        program: s.program
+          ? {
+              ...s.program,
+              payload: bakedPayload,
+              coach_edited: true,
+              uploaded_to_teambuildr: wasUploaded ? false : s.program.uploaded_to_teambuildr,
+            }
+          : null,
+      }))
+    }
+    set((s) => ({ loading: { ...s.loading, saving: false } }))
+    return true
   },
 
   finalizeProgram: async () => {
