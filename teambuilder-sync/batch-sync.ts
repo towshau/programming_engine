@@ -571,6 +571,7 @@ function buildSessionFromScrape(
           tags: match.tags || "",
           series_label: match.series_label || "",
           sets: match.sets || [],
+          row_id: match.row_id || crypto.randomUUID(),
         };
       }
     }
@@ -581,6 +582,7 @@ function buildSessionFromScrape(
       tags: "",
       series_label: "",
       sets: [{ reps: "0", set_number: 1 }],
+      row_id: crypto.randomUUID(),
     };
   });
 

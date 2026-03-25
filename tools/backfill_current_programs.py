@@ -135,6 +135,7 @@ def build_canonical_payload(extracted_sessions, phase_result, spw):
                 "series_label": label,
                 "tags": ex.get("tags"),
                 "sets": new_sets,
+                "row_id": str(uuid.uuid4()),
             })
 
         new_sessions.append({

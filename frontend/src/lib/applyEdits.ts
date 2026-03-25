@@ -2,36 +2,33 @@ import type { CoachEdit, ProgramExercise, ProgramSession, RepUnit } from '../typ
 import { buildSetsFromInput, enrichSet, getUnit } from './reps'
 
 /**
- * Find the target exercise index for an edit.
- * Priority: exercise_idx (_idx match) > exercise_id > exercise_index > series_label.
+ * Find the target exercise index by row_id (preferred) with fallback to
+ * series_label for legacy edits that pre-date row_id adoption.
  */
 function findExercise(
   exercises: ProgramExercise[],
   edit: CoachEdit
 ): number {
-  if (edit.exercise_idx != null) {
-    return exercises.findIndex((e) => e._idx === edit.exercise_idx)
+  if (edit.row_id) {
+    const idx = exercises.findIndex((e) => e.row_id === edit.row_id)
+    if (idx !== -1) return idx
   }
-  let idx = -1
   if (edit.exercise_id) {
-    idx = exercises.findIndex((e) => e.exercise_id === edit.exercise_id)
+    const idx = exercises.findIndex(
+      (e) => e.exercise_id === edit.exercise_id && e.series_label === edit.series_label
+    )
+    if (idx !== -1) return idx
   }
-  if (idx === -1 && edit.exercise_index != null) {
-    idx = exercises.findIndex((e) => e.exercise_index === edit.exercise_index)
-  }
-  if (idx === -1) {
-    idx = exercises.findIndex((e) => e.series_label === edit.series_label)
-  }
-  return idx
+  return exercises.findIndex((e) => e.series_label === edit.series_label)
 }
 
 /**
  * Applies saved coach edits on top of the generated program sessions,
  * returning a new array with modifications applied. The original is not mutated.
  *
- * Each exercise is stamped with a stable `_idx` (its original array position)
- * so that edits can target the correct row even when duplicates exist or
- * series labels have been changed.
+ * Each exercise is guaranteed to have a `row_id`. If one is missing from the
+ * stored payload (legacy data), a deterministic fallback is generated from
+ * session day + position so it remains stable across renders.
  */
 export function applyEdits(
   sessions: ProgramSession[],
@@ -39,13 +36,13 @@ export function applyEdits(
 ): ProgramSession[] {
   const result: ProgramSession[] = JSON.parse(JSON.stringify(sessions))
 
-  let nextSyntheticIdx = 1000
-
   for (const session of result) {
     for (let i = 0; i < session.exercises.length; i++) {
-      session.exercises[i]._idx = i
-      session.exercises[i].sets = session.exercises[i].sets.map(enrichSet)
-      session.exercises[i].exercise_index = i
+      const ex = session.exercises[i]
+      if (!ex.row_id) {
+        ex.row_id = `legacy-${session.day}-${i}`
+      }
+      ex.sets = ex.sets.map(enrichSet)
     }
   }
 
@@ -114,6 +111,7 @@ export function applyEdits(
         break
       }
       case 'exercise_add': {
+        const rowId = (edit.new_value.row_id as string) || (edit.row_id ?? crypto.randomUUID())
         const newExercise: ProgramExercise = {
           exercise_id: edit.new_value.exercise_id as string,
           exercise_name: edit.new_value.exercise_name as string,
@@ -121,7 +119,7 @@ export function applyEdits(
           tags: (edit.new_value.tags as string) || undefined,
           sets: (edit.new_value.sets as ProgramExercise['sets']) ??
             buildSetsFromInput('8-10', 'reps', 3),
-          _idx: nextSyntheticIdx++,
+          row_id: rowId,
         }
         session.exercises.push(newExercise)
         break
@@ -134,19 +132,19 @@ export function applyEdits(
 
 /**
  * Checks whether a specific exercise in a session has been edited.
- * When exerciseIdx is provided, matches on exercise_idx for precision;
+ * When row_id is provided, matches on row_id for precision;
  * otherwise falls back to series_label matching.
  */
 export function isExerciseEdited(
   edits: CoachEdit[],
   sessionDay: number,
   seriesLabel: string,
-  exerciseIdx?: number
+  rowId?: string
 ): boolean {
   return edits.some((e) => {
     if (e.session_day !== sessionDay) return false
-    if (exerciseIdx != null && e.exercise_idx != null) {
-      return e.exercise_idx === exerciseIdx
+    if (rowId && e.row_id) {
+      return e.row_id === rowId
     }
     return e.series_label === seriesLabel
   })

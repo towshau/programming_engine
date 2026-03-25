@@ -20,18 +20,17 @@ export interface CoachEdit {
   old_value: Record<string, unknown>
   new_value: Record<string, unknown>
   created_at: string
-  /** Stable exercise index for targeting; absent on legacy saved edits. */
-  exercise_idx?: number
+  /** Persistent exercise row identity for targeting. */
+  row_id?: string
 }
 
 export interface PendingEdit {
   session_day: number
   series_label: string
   exercise_id: string | null
-  exercise_index?: number
   edit_type: EditType
   old_value: Record<string, unknown>
   new_value: Record<string, unknown>
-  /** Stable exercise index for targeting the correct exercise. */
-  exercise_idx?: number
+  /** Persistent exercise row identity for targeting. */
+  row_id?: string
 }

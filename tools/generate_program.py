@@ -25,6 +25,7 @@ Requires: pip install supabase python-dotenv
 import json
 import os
 import sys
+import uuid
 from pathlib import Path
 
 _tools_dir = str(Path(__file__).resolve().parent)
@@ -704,6 +705,7 @@ def generate_next_program(
                     {"set_number": i + 1, "reps": reps_str}
                     for i in range(num_sets)
                 ],
+                "row_id": str(uuid.uuid4()),
             })
 
         new_sessions.append({

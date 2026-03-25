@@ -175,6 +175,7 @@ export function buildSingleSession(
       series_label: 'WU1',
       tags: warmUp.tags ?? undefined,
       sets: [{ set_number: 1, reps: repRange }],
+      row_id: crypto.randomUUID(),
     })
   }
 
@@ -198,6 +199,7 @@ export function buildSingleSession(
         set_number: i + 1,
         reps,
       })),
+      row_id: crypto.randomUUID(),
     })
   }
 

@@ -31,8 +31,8 @@ export function ExerciseRow({
   void _programId; void _memberId; void _coachId;
   const { addPendingEdit, hasRepsError } = useEditorStore()
   const [showSwapModal, setShowSwapModal] = useState(false)
-  const exerciseIdx = exercise._idx
-  const edited = isExerciseEdited(edits, sessionDay, exercise.series_label, exerciseIdx)
+  const rowId = exercise.row_id
+  const edited = isExerciseEdited(edits, sessionDay, exercise.series_label, rowId)
   const repsInvalid = !readOnly && hasRepsError(sessionDay, exercise.series_label)
 
   const handleSeriesChange = (newLabel: string) => {
@@ -41,11 +41,10 @@ export function ExerciseRow({
       session_day: sessionDay,
       series_label: exercise.series_label,
       exercise_id: exercise.exercise_id,
-      exercise_index: exercise.exercise_index,
       edit_type: 'series_change',
       old_value: { series_label: exercise.series_label },
       new_value: { series_label: newLabel },
-      exercise_idx: exerciseIdx,
+      row_id: rowId,
     })
   }
 
@@ -55,7 +54,6 @@ export function ExerciseRow({
       session_day: sessionDay,
       series_label: exercise.series_label,
       exercise_id: exercise.exercise_id,
-      exercise_index: exercise.exercise_index,
       edit_type: 'exercise_swap',
       old_value: {
         exercise_id: exercise.exercise_id,
@@ -66,7 +64,7 @@ export function ExerciseRow({
         exercise_name: newExercise.exercise_name,
         tags: newExercise.tags,
       },
-      exercise_idx: exerciseIdx,
+      row_id: rowId,
     })
     setShowSwapModal(false)
   }
@@ -77,11 +75,10 @@ export function ExerciseRow({
       session_day: sessionDay,
       series_label: exercise.series_label,
       exercise_id: exercise.exercise_id,
-      exercise_index: exercise.exercise_index,
       edit_type: 'sets_change',
       old_value: { sets: exercise.sets.length },
       new_value: { sets: newSets },
-      exercise_idx: exerciseIdx,
+      row_id: rowId,
     })
   }
 
@@ -93,11 +90,10 @@ export function ExerciseRow({
       session_day: sessionDay,
       series_label: exercise.series_label,
       exercise_id: exercise.exercise_id,
-      exercise_index: exercise.exercise_index,
       edit_type: 'reps_change',
       old_value: { reps: exercise.sets[0]?.reps ?? '', unit: currentUnit },
       new_value: { reps: newReps, unit: currentUnit },
-      exercise_idx: exerciseIdx,
+      row_id: rowId,
     })
   }
 
@@ -107,11 +103,10 @@ export function ExerciseRow({
       session_day: sessionDay,
       series_label: exercise.series_label,
       exercise_id: exercise.exercise_id,
-      exercise_index: exercise.exercise_index,
       edit_type: 'unit_change',
       old_value: { unit: currentUnit },
       new_value: { unit: newUnit },
-      exercise_idx: exerciseIdx,
+      row_id: rowId,
     })
   }
 
@@ -121,11 +116,10 @@ export function ExerciseRow({
       session_day: sessionDay,
       series_label: exercise.series_label,
       exercise_id: exercise.exercise_id,
-      exercise_index: exercise.exercise_index,
       edit_type: 'notes_change',
       old_value: { notes: exercise.notes ?? '' },
       new_value: { notes: newNotes },
-      exercise_idx: exerciseIdx,
+      row_id: rowId,
     })
   }
 
@@ -135,7 +129,6 @@ export function ExerciseRow({
       session_day: sessionDay,
       series_label: exercise.series_label,
       exercise_id: exercise.exercise_id,
-      exercise_index: exercise.exercise_index,
       edit_type: 'exercise_delete',
       old_value: {
         exercise_id: exercise.exercise_id,
@@ -143,7 +136,7 @@ export function ExerciseRow({
         series_label: exercise.series_label,
       },
       new_value: {},
-      exercise_idx: exerciseIdx,
+      row_id: rowId,
     })
   }
 

@@ -35,8 +35,8 @@ export const SELECTED_COACH_STORAGE_KEY = 'lr-selected-coach-id'
  * or null if no cancellation applies.
  */
 function editsMatchExercise(a: PendingEdit, b: PendingEdit): boolean {
-  if (a.exercise_idx != null && b.exercise_idx != null) {
-    return a.exercise_idx === b.exercise_idx
+  if (a.row_id && b.row_id) {
+    return a.row_id === b.row_id
   }
   return a.series_label === b.series_label
 }
@@ -60,30 +60,7 @@ function findCancellableChain(
   if (edit_type === 'exercise_add') return null
 
   if (edit_type === 'series_change') {
-    if (incoming.exercise_idx != null) {
-      const chainIndices = collectChain(pending, edit_type, session_day, incoming)
-      if (chainIndices.length > 0) {
-        const first = pending[chainIndices[0]]
-        if (
-          String(incoming.new_value.series_label) ===
-          String(first.old_value.series_label)
-        ) {
-          return chainIndices
-        }
-      }
-      return null
-    }
-    const chainIndices: number[] = []
-    let traceLabel = incoming.series_label
-    for (let i = pending.length - 1; i >= 0; i--) {
-      const e = pending[i]
-      if (e.edit_type !== 'series_change' || e.session_day !== session_day) continue
-      if (String(e.new_value.series_label) !== traceLabel) continue
-      if (incoming.exercise_id && e.exercise_id && e.exercise_id !== incoming.exercise_id) continue
-      if (incoming.exercise_index != null && e.exercise_index != null && e.exercise_index !== incoming.exercise_index) continue
-      chainIndices.unshift(i)
-      traceLabel = e.series_label
-    }
+    const chainIndices = collectChain(pending, edit_type, session_day, incoming)
     if (chainIndices.length > 0) {
       const first = pending[chainIndices[0]]
       if (
@@ -666,6 +643,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       edit_type: edit.edit_type,
       old_value: edit.old_value,
       new_value: edit.new_value,
+      row_id: edit.row_id ?? null,
     }))
 
     const { data, error } = await supabase

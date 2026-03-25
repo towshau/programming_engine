@@ -56,6 +56,7 @@ export function AddExerciseButton({
   const handleSelect = (exercise: ExerciseLibraryItem) => {
     const seriesLabel = nextSeriesLabel(existingExercises)
     const defaultSets = buildSetsFromInput('8-10', 'reps', 3)
+    const rowId = crypto.randomUUID()
 
     addPendingEdit({
       session_day: sessionDay,
@@ -69,7 +70,9 @@ export function AddExerciseButton({
         series_label: seriesLabel,
         tags: exercise.tags ?? '',
         sets: defaultSets,
+        row_id: rowId,
       },
+      row_id: rowId,
     })
     setShowModal(false)
   }

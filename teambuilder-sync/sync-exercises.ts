@@ -66,6 +66,7 @@ interface SupabaseExercise {
   series_label: string;
   sets: Array<{ reps: string; set_number: number }>;
   order: number;
+  row_id?: string;
 }
 
 interface SyncDiff {
@@ -533,6 +534,7 @@ class SupabaseSync {
         series_label: ex.series_label || "",
         sets: ex.sets || [],
         order: index,
+        row_id: ex.row_id || crypto.randomUUID(),
       })
     );
 
@@ -560,6 +562,7 @@ class SupabaseSync {
       tags: string;
       series_label: string;
       sets: any[];
+      row_id?: string;
     }>
   ): Promise<boolean> {
     console.log(chalk.blue("→ Updating programming_generated..."));
@@ -805,6 +808,7 @@ function buildUpdatedExerciseList(
   tags: string;
   series_label: string;
   sets: any[];
+  row_id?: string;
 }> {
   const usedSeriesLabels = new Set<string>();
 
@@ -821,6 +825,7 @@ function buildUpdatedExerciseList(
         tags: match.tags,
         series_label: match.series_label,
         sets: match.sets,
+        row_id: match.row_id || crypto.randomUUID(),
       };
     }
 
@@ -832,6 +837,7 @@ function buildUpdatedExerciseList(
       tags: "",
       series_label: seriesLabel,
       sets: [{ reps: "0", set_number: 1 }],
+      row_id: crypto.randomUUID(),
     };
   });
 }
@@ -987,6 +993,7 @@ async function syncWeek(opts: any, targetDate: string): Promise<void> {
           series_label: ex.series_label || "",
           sets: ex.sets || [],
           order: idx,
+          row_id: ex.row_id || crypto.randomUUID(),
         }));
 
         const diff = compareExercises(tbDay.exercises, sbExercises);
@@ -1040,6 +1047,7 @@ async function syncWeek(opts: any, targetDate: string): Promise<void> {
           tags: "",
           series_label: "",
           sets: [{ reps: "0", set_number: 1 }],
+          row_id: crypto.randomUUID(),
         }));
 
         newSessions.push({

@@ -43,7 +43,7 @@ export function ExerciseCategoryGroup({
       <div className="space-y-1">
         {exercises.map((exercise) => (
           <ExerciseRow
-            key={exercise._idx ?? `${exercise.series_label}-${exercise.exercise_id}`}
+            key={exercise.row_id ?? `${exercise.series_label}-${exercise.exercise_id}`}
             exercise={exercise}
             sessionDay={sessionDay}
             edits={edits}
