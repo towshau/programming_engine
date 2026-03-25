@@ -17,6 +17,8 @@ export interface ProgramExercise {
   sets: SetPrescription[]
   notes?: string
   exercise_index?: number
+  /** Runtime-only stable index assigned by applyEdits; not persisted. */
+  _idx?: number
 }
 
 export interface ProgramSession {

@@ -9,7 +9,7 @@
 - **Supabase (source):** member_tbresults, member_tbhealthmax, exercise_library (trigger-built), member table with current_status = 'active' for cohort.
 - **Supabase (engine config):** All tables use `programming_` prefix; gym column uses enum `gym` (BLIGH, BRIDGE, COLLIN) where applicable.
 - **Retool:** **Planned:** one **admin check-in / upload queue** — pending programs after coach finalization, support manual TeamBuildr load, mark `uploaded_to_teambuildr`. **Not planned:** separate Retool program viewer, coach feedback form, flagged counter, PDF export, or deleted-exercise form (coaches stay in Program Editor).
-- **Program Editor (Vercel):** LR Program Editor at `programming-engine.vercel.app` (source: `teambuildr-replacement/`). Coaches search members, view generated programs, edit exercises inline, Save and Finalize. Admin marks as uploaded (or uses Retool check-in when built). Primary surface for coach view/edit.
+- **Program Editor (Vercel):** LR Program Editor at `programming-engine.vercel.app` (source: `teambuildr-replacement/`). Coaches search members, view generated programs, edit exercises inline, Save and Finalize. Admin marks as uploaded (or uses Retool check-in when built). Primary surface for coach view/edit. Notable editor bugs and fixes: [BUG-FIXES.md](./BUG-FIXES.md).
 - **Output:** Normalised past programs -> programming_normalized_programs. Generated programs -> programming_generated. Coach edits saved back to programming_generated.payload. Single source of truth; view/edit in Program Editor.
 
 ---

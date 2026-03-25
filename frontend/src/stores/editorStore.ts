@@ -34,27 +34,47 @@ export const SELECTED_COACH_STORAGE_KEY = 'lr-selected-coach-id'
  * exercise/field back to its original value.  Returns the indices to remove,
  * or null if no cancellation applies.
  */
+function editsMatchExercise(a: PendingEdit, b: PendingEdit): boolean {
+  if (a.exercise_idx != null && b.exercise_idx != null) {
+    return a.exercise_idx === b.exercise_idx
+  }
+  return a.series_label === b.series_label
+}
+
 function findCancellableChain(
   pending: PendingEdit[],
   incoming: PendingEdit,
 ): number[] | null {
-  const { edit_type, session_day, series_label } = incoming
+  const { edit_type, session_day } = incoming
 
   if (edit_type === 'exercise_delete') {
-    const idx = pending.findIndex((e) => {
-      if (e.edit_type !== 'exercise_add' || e.session_day !== session_day) return false
-      if (incoming.exercise_id && e.exercise_id) return e.exercise_id === incoming.exercise_id
-      if (incoming.exercise_index != null && e.exercise_index != null) return e.exercise_index === incoming.exercise_index
-      return e.series_label === series_label
-    })
+    const idx = pending.findIndex(
+      (e) =>
+        e.edit_type === 'exercise_add' &&
+        e.session_day === session_day &&
+        editsMatchExercise(e, incoming),
+    )
     return idx !== -1 ? [idx] : null
   }
 
   if (edit_type === 'exercise_add') return null
 
   if (edit_type === 'series_change') {
+    if (incoming.exercise_idx != null) {
+      const chainIndices = collectChain(pending, edit_type, session_day, incoming)
+      if (chainIndices.length > 0) {
+        const first = pending[chainIndices[0]]
+        if (
+          String(incoming.new_value.series_label) ===
+          String(first.old_value.series_label)
+        ) {
+          return chainIndices
+        }
+      }
+      return null
+    }
     const chainIndices: number[] = []
-    let traceLabel = series_label
+    let traceLabel = incoming.series_label
     for (let i = pending.length - 1; i >= 0; i--) {
       const e = pending[i]
       if (e.edit_type !== 'series_change' || e.session_day !== session_day) continue
@@ -77,7 +97,7 @@ function findCancellableChain(
   }
 
   if (edit_type === 'exercise_swap') {
-    const chainIndices = collectChain(pending, edit_type, session_day, series_label, incoming.exercise_id, incoming.exercise_index)
+    const chainIndices = collectChain(pending, edit_type, session_day, incoming)
     if (chainIndices.length > 0) {
       const first = pending[chainIndices[0]]
       if (
@@ -99,7 +119,7 @@ function findCancellableChain(
   const key = keyMap[edit_type]
   if (!key) return null
 
-  const chainIndices = collectChain(pending, edit_type, session_day, series_label, incoming.exercise_id, incoming.exercise_index)
+  const chainIndices = collectChain(pending, edit_type, session_day, incoming)
   if (chainIndices.length > 0) {
     const first = pending[chainIndices[0]]
     if (String(incoming.new_value[key]) === String(first.old_value[key])) {
@@ -113,19 +133,16 @@ function collectChain(
   pending: PendingEdit[],
   editType: EditType,
   sessionDay: number,
-  seriesLabel: string,
-  exerciseId?: string | null,
-  exerciseIndex?: number,
+  ref: PendingEdit,
 ): number[] {
   const indices: number[] = []
   for (let i = 0; i < pending.length; i++) {
     const e = pending[i]
-    if (e.edit_type !== editType || e.session_day !== sessionDay) continue
-    if (exerciseId && e.exercise_id) {
-      if (e.exercise_id === exerciseId) indices.push(i)
-    } else if (exerciseIndex != null && e.exercise_index != null) {
-      if (e.exercise_index === exerciseIndex) indices.push(i)
-    } else if (e.series_label === seriesLabel) {
+    if (
+      e.edit_type === editType &&
+      e.session_day === sessionDay &&
+      editsMatchExercise(e, ref)
+    ) {
       indices.push(i)
     }
   }
@@ -319,6 +336,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .select('member_id, gym, start_date, end_date, journey_stage, status, membership_stage, pipeline_lost')
         .gt('end_date', today)
         .not('journey_stage', 'eq', 'no_sale')
+        .not('journey_stage', 'eq', 'not_renewing')
+        .not('journey_stage', 'eq', 'expired')
         .not('status', 'eq', 'f&f')
         .limit(2000),
       supabase

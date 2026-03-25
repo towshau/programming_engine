@@ -20,6 +20,8 @@ export interface CoachEdit {
   old_value: Record<string, unknown>
   new_value: Record<string, unknown>
   created_at: string
+  /** Stable exercise index for targeting; absent on legacy saved edits. */
+  exercise_idx?: number
 }
 
 export interface PendingEdit {
@@ -30,4 +32,6 @@ export interface PendingEdit {
   edit_type: EditType
   old_value: Record<string, unknown>
   new_value: Record<string, unknown>
+  /** Stable exercise index for targeting the correct exercise. */
+  exercise_idx?: number
 }

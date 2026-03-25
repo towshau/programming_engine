@@ -2,8 +2,36 @@ import type { CoachEdit, ProgramExercise, ProgramSession, RepUnit } from '../typ
 import { buildSetsFromInput, enrichSet, getUnit } from './reps'
 
 /**
+ * Find the target exercise index for an edit.
+ * Priority: exercise_idx (_idx match) > exercise_id > exercise_index > series_label.
+ */
+function findExercise(
+  exercises: ProgramExercise[],
+  edit: CoachEdit
+): number {
+  if (edit.exercise_idx != null) {
+    return exercises.findIndex((e) => e._idx === edit.exercise_idx)
+  }
+  let idx = -1
+  if (edit.exercise_id) {
+    idx = exercises.findIndex((e) => e.exercise_id === edit.exercise_id)
+  }
+  if (idx === -1 && edit.exercise_index != null) {
+    idx = exercises.findIndex((e) => e.exercise_index === edit.exercise_index)
+  }
+  if (idx === -1) {
+    idx = exercises.findIndex((e) => e.series_label === edit.series_label)
+  }
+  return idx
+}
+
+/**
  * Applies saved coach edits on top of the generated program sessions,
  * returning a new array with modifications applied. The original is not mutated.
+ *
+ * Each exercise is stamped with a stable `_idx` (its original array position)
+ * so that edits can target the correct row even when duplicates exist or
+ * series labels have been changed.
  */
 export function applyEdits(
   sessions: ProgramSession[],
@@ -11,8 +39,11 @@ export function applyEdits(
 ): ProgramSession[] {
   const result: ProgramSession[] = JSON.parse(JSON.stringify(sessions))
 
+  let nextSyntheticIdx = 1000
+
   for (const session of result) {
     for (let i = 0; i < session.exercises.length; i++) {
+      session.exercises[i]._idx = i
       session.exercises[i].sets = session.exercises[i].sets.map(enrichSet)
       session.exercises[i].exercise_index = i
     }
@@ -24,22 +55,7 @@ export function applyEdits(
     const session = result.find((s) => s.day === edit.session_day)
     if (!session) continue
 
-    let exerciseIdx = -1
-    if (edit.exercise_id) {
-      exerciseIdx = session.exercises.findIndex(
-        (e) => e.exercise_id === edit.exercise_id
-      )
-    }
-    if (exerciseIdx === -1 && edit.exercise_index != null) {
-      exerciseIdx = session.exercises.findIndex(
-        (e) => e.exercise_index === edit.exercise_index
-      )
-    }
-    if (exerciseIdx === -1) {
-      exerciseIdx = session.exercises.findIndex(
-        (e) => e.series_label === edit.series_label
-      )
-    }
+    const exerciseIdx = findExercise(session.exercises, edit)
     if (exerciseIdx === -1 && edit.edit_type !== 'series_change' && edit.edit_type !== 'exercise_add' && edit.edit_type !== 'exercise_delete') continue
 
     const exercise: ProgramExercise | undefined = session.exercises[exerciseIdx]
@@ -105,6 +121,7 @@ export function applyEdits(
           tags: (edit.new_value.tags as string) || undefined,
           sets: (edit.new_value.sets as ProgramExercise['sets']) ??
             buildSetsFromInput('8-10', 'reps', 3),
+          _idx: nextSyntheticIdx++,
         }
         session.exercises.push(newExercise)
         break
@@ -117,13 +134,20 @@ export function applyEdits(
 
 /**
  * Checks whether a specific exercise in a session has been edited.
+ * When exerciseIdx is provided, matches on exercise_idx for precision;
+ * otherwise falls back to series_label matching.
  */
 export function isExerciseEdited(
   edits: CoachEdit[],
   sessionDay: number,
-  seriesLabel: string
+  seriesLabel: string,
+  exerciseIdx?: number
 ): boolean {
-  return edits.some(
-    (e) => e.session_day === sessionDay && e.series_label === seriesLabel
-  )
+  return edits.some((e) => {
+    if (e.session_day !== sessionDay) return false
+    if (exerciseIdx != null && e.exercise_idx != null) {
+      return e.exercise_idx === exerciseIdx
+    }
+    return e.series_label === seriesLabel
+  })
 }
