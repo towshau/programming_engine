@@ -64,6 +64,8 @@ export function ProgramViewer() {
     clearSaveValidationError,
     copyPreviousToNext,
     addDay,
+    deleteDay,
+    swapDays,
   } = useEditorStore()
   const [showAddDayModal, setShowAddDayModal] = useState(false)
   const [firstProgramConfig, setFirstProgramConfig] = useState({
@@ -588,6 +590,38 @@ export function ProgramViewer() {
       {/* Next program exercises */}
       {nextCurrentSession && program ? (
         <div className="space-y-6">
+          <div className="flex items-center justify-end gap-2 border-b border-zinc-800 pb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-500">Swap with:</span>
+              <select
+                className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                value=""
+                onChange={async (e) => {
+                  const targetDay = Number(e.target.value)
+                  if (!targetDay) return
+                  await swapDays(nextCurrentSession.day, targetDay)
+                }}
+              >
+                <option value="" disabled>Select day...</option>
+                {nextDays.filter(d => d !== nextCurrentSession.day).map(d => (
+                  <option key={d} value={d}>Day {d}</option>
+                ))}
+              </select>
+            </div>
+            <div className="h-4 w-px bg-zinc-800"></div>
+            <button
+              onClick={async () => {
+                await deleteDay(nextCurrentSession.day)
+              }}
+              className="flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete Day {nextCurrentSession.day}
+            </button>
+          </div>
+
           {groupBySeries(nextCurrentSession.exercises).map(
             ([seriesLetter, exercises]) => (
               <ExerciseCategoryGroup

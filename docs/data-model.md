@@ -136,7 +136,7 @@ Unique `(run_id, member_id)`. Migration: `20250225100004`.
 | run_id | uuid | Groups all members in one generation run |
 | member_id | uuid | FK to member_database.id |
 | assigned_to | uuid (nullable) | Coach assignment for filter/export |
-| sessions_per_week | integer | 2, 3, or 4 (same as last time) |
+| sessions_per_week | integer | 1 through 6 (same as last time) |
 | duration_weeks | integer (default 6) | First program = 4 weeks, standard = 6 |
 | phase_number | integer (nullable) | Phase within scheme cycle (1–4) |
 | scheme_name | text (nullable) | GPP, Hypertrophy, Strength, etc. |
@@ -295,8 +295,12 @@ Seeded: GPP (order 1–4: 10-12→8-10→6-8→4-6→10-12), Hypertrophy, Streng
 | exercise_id | text |
 | exercise_name | text |
 | tags | text |
+| series_assignment | text[] |
+| equipment_tags | text[] |
 
 Built by trigger from `member_tbhealthmax` + `member_tbresults`. Synced weekly to Google Sheet.
+
+**equipment_tags:** Canonical keys used for **holiday / equipment filtering** (n8n and future Program Editor forms). Overlap query: `WHERE equipment_tags && ARRAY['dumbbell','cable',...]`. Populated by `python tools/backfill_exercise_equipment_tags.py` (re-run after bulk library changes). Tag vocabulary includes: `dumbbell`, `barbell`, `ez_bar`, `swiss_bar`, `cable`, `pulldown_machine`, `leg_press`, `leg_extension`, `leg_curl`, `hack_squat`, `pendulum`, `machine_other`, `landmine`, `landmine_viking`, `bench`, `pull_up_bar`, `bodyweight`, cardio keys, etc. See script for full rules. Six non-exercise rows (manual entry / tracking) intentionally have `{}`.
 
 ---
 

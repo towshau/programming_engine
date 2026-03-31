@@ -55,7 +55,7 @@ def main():
     ap = argparse.ArgumentParser(description="Run full programming pipeline for one member")
     ap.add_argument("member_id", help="Member UUID")
     ap.add_argument("--scheme", default="GPP", help="GPP | Strength | Hypertrophy")
-    ap.add_argument("--sessions-per-week", type=int, default=None, choices=[2, 3, 4],
+    ap.add_argument("--sessions-per-week", type=int, default=None, choices=[1, 2, 3, 4, 5, 6],
                     help="Override; auto-detected from history if omitted")
     ap.add_argument("--duration-weeks", type=int, default=6)
     ap.add_argument("--skip-staging", action="store_true", help="Skip writing to staging")
@@ -101,9 +101,9 @@ def main():
         cli_override=args.sessions_per_week,
         stored_from_row=stored_spw,
     )
-    if args.sessions_per_week in (2, 3, 4):
+    if args.sessions_per_week in range(1, 7):
         spw_note = "override"
-    elif stored_spw in (2, 3, 4) and spw == stored_spw:
+    elif stored_spw in range(1, 7) and spw == stored_spw:
         spw_note = "from latest programming_generated row"
     else:
         spw_note = "auto-detected"

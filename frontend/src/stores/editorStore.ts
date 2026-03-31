@@ -196,6 +196,8 @@ interface EditorState {
   fetchComplianceDates: (memberId: string, startDate: string, endDate: string) => Promise<void>
   copyPreviousToNext: () => Promise<boolean>
   addDay: (dayType: DayType) => Promise<boolean>
+  deleteDay: (dayNumber: number) => Promise<boolean>
+  swapDays: (dayA: number, dayB: number) => Promise<boolean>
   hasConfigChanges: () => boolean
   clearRegenError: () => void
   clearSaveValidationError: () => void
@@ -1116,6 +1118,143 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => ({ loading: { ...s.loading, saving: false } }))
     await get().fetchProgram(program.member_id)
     set({ selectedDay: nextDayNumber })
+    return true
+  },
+
+  deleteDay: async (dayNumber) => {
+    const { program, pendingEdits } = get()
+    if (!program) return false
+    
+    if (pendingEdits.length > 0) {
+      alert('Please save or discard your pending edits before deleting a day.')
+      return false
+    }
+
+    if (!window.confirm(`Are you sure you want to delete Day ${dayNumber}? This action cannot be undone.`)) {
+      return false
+    }
+
+    const currentSessions = program.payload.sessions
+    const newSpw = currentSessions.length - 1
+    if (newSpw < 1) {
+      alert('Cannot delete the last remaining day.')
+      return false
+    }
+
+    set((s) => ({ loading: { ...s.loading, saving: true }, saveError: null }))
+
+    // Filter out the deleted day and shift higher days down
+    const newSessions = currentSessions
+      .filter((s) => s.day !== dayNumber)
+      .map((s) => ({
+        ...s,
+        day: s.day > dayNumber ? s.day - 1 : s.day,
+      }))
+
+    const updatedPayload = {
+      ...program.payload,
+      sessions: newSessions,
+      metadata: {
+        ...program.payload.metadata,
+        sessions_per_week: newSpw,
+      },
+    }
+
+    const { error } = await supabase
+      .from('programming_generated')
+      .update({
+        payload: updatedPayload,
+        sessions_per_week: newSpw,
+        coach_edited: true,
+        changes_summary: `Deleted Day ${dayNumber}`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', program.id)
+
+    if (error) {
+      set((s) => ({
+        loading: { ...s.loading, saving: false },
+        saveError: error.message ?? 'Failed to delete day.',
+      }))
+      return false
+    }
+
+    set((s) => ({ loading: { ...s.loading, saving: false } }))
+    await get().fetchProgram(program.member_id)
+    
+    // Reset selected day to 1 or the nearest available
+    const { selectedDay } = get()
+    if (selectedDay === dayNumber) {
+      set({ selectedDay: 1 })
+    } else if (selectedDay && selectedDay > dayNumber) {
+      set({ selectedDay: selectedDay - 1 })
+    }
+    
+    return true
+  },
+
+  swapDays: async (dayA, dayB) => {
+    const { program, pendingEdits } = get()
+    if (!program) return false
+    
+    if (pendingEdits.length > 0) {
+      alert('Please save or discard your pending edits before swapping days.')
+      return false
+    }
+
+    const currentSessions = [...program.payload.sessions]
+    const idxA = currentSessions.findIndex((s) => s.day === dayA)
+    const idxB = currentSessions.findIndex((s) => s.day === dayB)
+    
+    if (idxA === -1 || idxB === -1) {
+      alert('Cannot swap days: one or both days not found.')
+      return false
+    }
+
+    set((s) => ({ loading: { ...s.loading, saving: true }, saveError: null }))
+
+    // Swap the day numbers
+    const tempA = currentSessions[idxA].day
+    currentSessions[idxA] = { ...currentSessions[idxA], day: currentSessions[idxB].day }
+    currentSessions[idxB] = { ...currentSessions[idxB], day: tempA }
+    
+    // Sort so array order matches day number
+    currentSessions.sort((a, b) => a.day - b.day)
+
+    const updatedPayload = {
+      ...program.payload,
+      sessions: currentSessions,
+    }
+
+    const { error } = await supabase
+      .from('programming_generated')
+      .update({
+        payload: updatedPayload,
+        coach_edited: true,
+        changes_summary: `Swapped Day ${dayA} and Day ${dayB}`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', program.id)
+
+    if (error) {
+      set((s) => ({
+        loading: { ...s.loading, saving: false },
+        saveError: error.message ?? 'Failed to swap days.',
+      }))
+      return false
+    }
+
+    set((s) => ({ loading: { ...s.loading, saving: false } }))
+    await get().fetchProgram(program.member_id)
+    
+    // Swap the selected day so the user stays on the content they were viewing
+    const { selectedDay } = get()
+    if (selectedDay === dayA) {
+      set({ selectedDay: dayB })
+    } else if (selectedDay === dayB) {
+      set({ selectedDay: dayA })
+    }
+    
     return true
   },
 

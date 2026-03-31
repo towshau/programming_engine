@@ -58,7 +58,7 @@ def main():
     ap.add_argument("payload_file", nargs="?", help="JSON file with payload; if omitted, read from stdin")
     ap.add_argument("--run-id", required=True, help="Generation run UUID (e.g. from uuidgen)")
     ap.add_argument("--member-id", required=True, help="Member UUID")
-    ap.add_argument("--sessions-per-week", type=int, required=True, choices=[2, 3, 4], help="2, 3, or 4")
+    ap.add_argument("--sessions-per-week", type=int, required=True, choices=[1, 2, 3, 4, 5, 6], help="1 through 6")
     ap.add_argument("--assigned-to", default=None, help="Optional coach UUID")
     ap.add_argument("--duration-weeks", type=int, default=6, help="Program duration (default 6)")
     ap.add_argument("--phase-number", type=int, default=None, help="Scheme phase (e.g. 1-4)")

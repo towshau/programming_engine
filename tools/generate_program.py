@@ -437,7 +437,7 @@ def detect_sessions_per_week(sessions):
     """Infer sessions-per-week from the member's recent training history.
 
     Counts distinct day signatures (unique A-series exercise combos) in the
-    most recent ~4 weeks of full sessions. Returns 2, 3, or 4.
+    most recent ~4 weeks of full sessions. Returns 1 through 6.
     """
     sorted_sessions = sorted(
         sessions,
@@ -760,9 +760,9 @@ def main():
         cli_override=args.sessions_per_week,
         stored_from_row=stored_spw,
     )
-    if args.sessions_per_week in (2, 3, 4):
+    if args.sessions_per_week in range(1, 7):
         spw_note = "override"
-    elif stored_spw in (2, 3, 4) and spw == stored_spw:
+    elif stored_spw in range(1, 7) and spw == stored_spw:
         spw_note = "from latest programming_generated row"
     else:
         spw_note = "auto-detected"

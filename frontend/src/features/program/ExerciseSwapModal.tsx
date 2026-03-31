@@ -31,14 +31,21 @@ export function ExerciseSwapModal({
   }, [])
 
   const filtered = useMemo(() => {
-    if (!debouncedQuery) return exerciseLibrary.slice(0, 50)
-    const q = debouncedQuery.toLowerCase()
+    if (!debouncedQuery.trim()) return exerciseLibrary.slice(0, 50)
+    
+    // Split the query by spaces to support multiple keywords (e.g. "split squat db")
+    const keywords = debouncedQuery.toLowerCase().split(/\s+/).filter(Boolean)
+    
     return exerciseLibrary
-      .filter(
-        (ex) =>
-          ex.exercise_name.toLowerCase().includes(q) ||
-          (ex.tags && ex.tags.toLowerCase().includes(q))
-      )
+      .filter((ex) => {
+        const nameMatchStr = ex.exercise_name.toLowerCase()
+        const tagMatchStr = ex.tags ? ex.tags.toLowerCase() : ''
+        
+        // Every keyword must be found in either the name or the tags
+        return keywords.every((kw) => 
+          nameMatchStr.includes(kw) || tagMatchStr.includes(kw)
+        )
+      })
       .slice(0, 50)
   }, [exerciseLibrary, debouncedQuery])
 
