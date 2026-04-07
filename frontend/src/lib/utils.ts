@@ -38,19 +38,19 @@ export function seriesSortKey(group: string): number {
 export function seriesColor(seriesLetter: string): string {
   switch (seriesLetter) {
     case 'WU':
-      return 'text-purple-400 bg-purple-400/10 border-purple-400/20'
+      return 'series-wu'
     case 'A':
-      return 'text-blue-400 bg-blue-400/10 border-blue-400/20'
+      return 'series-a'
     case 'B':
-      return 'text-teal-400 bg-teal-400/10 border-teal-400/20'
+      return 'series-b'
     case 'C':
-      return 'text-amber-400 bg-amber-400/10 border-amber-400/20'
+      return 'series-c'
     case 'D':
-      return 'text-zinc-400 bg-zinc-400/10 border-zinc-400/20'
+      return 'series-d'
     case 'CD':
-      return 'text-rose-400 bg-rose-400/10 border-rose-400/20'
+      return 'series-cd'
     default:
-      return 'text-zinc-400 bg-zinc-400/10 border-zinc-400/20'
+      return 'series-d'
   }
 }
 

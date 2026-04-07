@@ -37,7 +37,7 @@ export function ExerciseCategoryGroup({
         >
           {seriesLetter}
         </span>
-        <span className="text-sm font-medium text-zinc-400">{label}</span>
+        <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{label}</span>
       </div>
 
       <div className="space-y-1">

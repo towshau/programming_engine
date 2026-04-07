@@ -1,15 +1,23 @@
-import { TopBar } from './components/layout/TopBar'
-import { MemberSidebar } from './components/layout/MemberSidebar'
-import { ProgramViewer } from './components/layout/ProgramViewer'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { AppShell } from './components/layout/AppShell'
+import { ClientQueue } from './pages/ClientQueue'
+import { Intake } from './pages/Intake'
+import { ProgrammingEngine } from './pages/ProgrammingEngine'
+import { HolidayPrograms } from './pages/HolidayPrograms'
 
 export default function App() {
   return (
-    <div className="h-screen flex flex-col bg-zinc-950 text-zinc-100">
-      <TopBar />
-      <div className="flex flex-1 overflow-hidden">
-        <MemberSidebar />
-        <ProgramViewer />
-      </div>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route path="/" element={<ClientQueue />} />
+          <Route path="/intake" element={<Intake />} />
+          <Route path="/intake/:memberId" element={<Intake />} />
+          <Route path="/program" element={<ProgrammingEngine />} />
+          <Route path="/program/:memberId" element={<ProgrammingEngine />} />
+          <Route path="/holiday" element={<HolidayPrograms />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   )
 }

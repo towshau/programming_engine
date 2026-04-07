@@ -96,7 +96,7 @@ export function ProgramHeader({
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between">
-        <h2 className="text-xl font-semibold text-zinc-100">{memberName}</h2>
+        <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>{memberName}</h2>
         <div className="flex items-center gap-2">
           {program.coach_edited && (
             <Badge variant="blue">Edited</Badge>
@@ -125,20 +125,17 @@ export function ProgramHeader({
         <button
           type="button"
           onClick={toggleLastProgram}
-          className={cn(
-            'w-full text-left rounded-lg p-3 space-y-2 transition-all cursor-pointer',
-            lastProgramExpanded
-              ? 'border border-blue-500/50 bg-blue-500/5 ring-1 ring-blue-500/20'
-              : 'border border-zinc-700/60 bg-zinc-800/40 hover:border-zinc-600/80',
-          )}
+          className="w-full text-left rounded-lg p-3 space-y-2 transition-all cursor-pointer border"
+          style={lastProgramExpanded
+            ? { borderColor: 'var(--blue-border)', background: 'rgba(219,234,254,0.3)' }
+            : { borderColor: 'var(--border)', background: 'var(--bg3)' }
+          }
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <svg
-                className={cn(
-                  'h-3 w-3 transition-transform',
-                  lastProgramExpanded ? 'rotate-90 text-blue-400' : 'text-zinc-500',
-                )}
+                className={cn('h-3 w-3 transition-transform', lastProgramExpanded && 'rotate-90')}
+                style={{ color: lastProgramExpanded ? 'var(--blue)' : 'var(--text-muted)' }}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -146,23 +143,23 @@ export function ProgramHeader({
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
               </svg>
-              <span className={cn(
-                'text-[10px] font-semibold uppercase tracking-wider',
-                lastProgramExpanded ? 'text-blue-400' : 'text-zinc-500',
-              )}>
+              <span
+                className="text-[10px] font-semibold uppercase tracking-wider"
+                style={{ color: lastProgramExpanded ? 'var(--blue)' : 'var(--text-muted)' }}
+              >
                 Last Program
               </span>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-[10px] text-zinc-600">
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                 {pastProgramInfo.source === 'generated' ? 'Generated ' : ''}
                 {formatDateAU(pastProgramInfo.created_at)}
               </span>
               {expiresDate && (
-                <span className={cn(
-                  'text-[10px]',
-                  expiresDate < new Date() ? 'text-red-400/70' : 'text-zinc-500',
-                )}>
+                <span
+                  className="text-[10px]"
+                  style={{ color: expiresDate < new Date() ? 'var(--red)' : 'var(--text-muted)' }}
+                >
                   Expires {expiresDate.toLocaleDateString('en-AU')}
                 </span>
               )}

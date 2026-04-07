@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react'
+import React, { useMemo, useCallback } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { Badge } from '../../components/ui/Badge'
 
@@ -83,6 +83,9 @@ export function ProgramConfigEditor() {
 
   if (!configDraft) return null
 
+  const selectCls = "rounded-md border px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 bg-white"
+  const selectStyle: React.CSSProperties = { borderColor: 'var(--border)', color: 'var(--text)' }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -90,7 +93,8 @@ export function ProgramConfigEditor() {
         <select
           value={configDraft.scheme_name}
           onChange={(e) => handleSchemeChange(e.target.value)}
-          className="rounded-md border border-zinc-600/50 bg-zinc-800 px-2 py-1 text-xs font-medium text-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+          className={selectCls}
+          style={{ ...selectStyle, color: 'var(--blue)' }}
         >
           {schemeNames.map((name) => (
             <option key={name} value={name}>
@@ -103,7 +107,8 @@ export function ProgramConfigEditor() {
         <select
           value={configDraft.rep_range}
           onChange={(e) => handleRepRangeChange(e.target.value)}
-          className="rounded-md border border-zinc-600/50 bg-zinc-800 px-2 py-1 text-xs font-medium text-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-500/50"
+          className={selectCls}
+          style={{ ...selectStyle, color: '#0d9488' }}
         >
           {repRangesForScheme.map((range) => (
             <option key={range} value={range}>
@@ -121,7 +126,8 @@ export function ProgramConfigEditor() {
         <select
           value={configDraft.sessions_per_week}
           onChange={(e) => handleSessionsChange(Number(e.target.value))}
-          className="rounded-md border border-zinc-600/50 bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-500/50"
+          className={selectCls}
+          style={selectStyle}
         >
           {SESSION_OPTIONS.map((n) => (
             <option key={n} value={n}>
@@ -134,7 +140,8 @@ export function ProgramConfigEditor() {
         <select
           value={configDraft.duration_weeks}
           onChange={(e) => handleDurationChange(Number(e.target.value))}
-          className="rounded-md border border-zinc-600/50 bg-zinc-800 px-2 py-1 text-xs font-medium text-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-500/50"
+          className={selectCls}
+          style={selectStyle}
         >
           {DURATION_OPTIONS.map((n) => (
             <option key={n} value={n}>
@@ -165,7 +172,8 @@ export function ProgramConfigEditor() {
           <button
             onClick={requestRegeneration}
             disabled={loading.regenerating}
-            className="ml-auto rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 transition-colors"
+            className="ml-auto rounded-md px-3 py-1 text-xs font-semibold text-white disabled:opacity-50 transition-colors"
+            style={{ background: 'var(--color-gold)' }}
           >
             {loading.regenerating ? 'Requesting…' : 'Regenerate Workout'}
           </button>
@@ -174,11 +182,11 @@ export function ProgramConfigEditor() {
 
       {/* Regeneration error banner */}
       {regenError && (
-        <div className="flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+        <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--red-border)', background: 'var(--red-bg)', color: 'var(--red)' }}>
           <span>{regenError}</span>
           <button
             onClick={clearRegenError}
-            className="ml-2 text-red-300 hover:text-white"
+            className="ml-2 opacity-70 hover:opacity-100"
           >
             ✕
           </button>
@@ -187,7 +195,7 @@ export function ProgramConfigEditor() {
 
       {/* Pending regeneration banner */}
       {pendingRegen && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-400">
+        <div className="rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--orange-border)', background: 'var(--orange-bg)', color: 'var(--orange)' }}>
           Regeneration requested — the pipeline will pick this up and generate a
           new program with the updated settings.
         </div>

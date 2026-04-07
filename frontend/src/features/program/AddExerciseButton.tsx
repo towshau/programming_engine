@@ -81,7 +81,10 @@ export function AddExerciseButton({
     <>
       <button
         onClick={() => setShowModal(true)}
-        className="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed border-zinc-700 bg-zinc-800/20 px-4 py-3 text-sm text-zinc-500 hover:border-emerald-500/40 hover:text-emerald-400 hover:bg-emerald-500/5 transition-colors"
+        className="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-3 text-sm transition-colors"
+        style={{ borderColor: 'var(--border)', color: 'var(--text-muted)', background: 'transparent' }}
+        onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--color-gold)'; e.currentTarget.style.color = 'var(--color-gold)'; e.currentTarget.style.background = 'rgba(184,134,11,0.05)' }}
+        onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent' }}
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

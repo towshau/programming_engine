@@ -1,5 +1,215 @@
 @import "tailwindcss";
+@plugin "tailwindcss-animate";
+@plugin "tailwindcss-react-aria-components";
+
+/* ── LR Programming OS — Light Theme ── */
+:root {
+  /* Brand */
+  --color-gold: #b8860b;
+  --color-gold-light: #d4a017;
+  --color-gold-50: #fef9c3;
+  --color-gold-100: #fde68a;
+
+  /* Backgrounds */
+  --bg: #f0f2f5;
+  --bg2: #ffffff;
+  --bg3: #f6f8fa;
+
+  /* Text */
+  --text: #1a1f2e;
+  --text-muted: #6b7280;
+
+  /* Borders */
+  --border: #e2e8f0;
+
+  /* Status colors */
+  --green: #16a34a;
+  --green-bg: #dcfce7;
+  --green-border: #bbf7d0;
+  --red: #dc2626;
+  --red-bg: #fee2e2;
+  --red-border: #fecaca;
+  --blue: #2563eb;
+  --blue-bg: #dbeafe;
+  --blue-border: #bfdbfe;
+  --orange: #d97706;
+  --orange-bg: #fef3c7;
+  --orange-border: #fde68a;
+  --purple: #7c3aed;
+  --pink: #db2777;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+
+  /* Untitled UI React semantic tokens */
+  --color-brand-primary_alt: #fef9c3;
+  --color-brand-secondary: #b8860b;
+  --color-fg-brand-primary_alt: #b8860b;
+  --color-fg-brand-secondary_alt: #d4a017;
+  --color-fg-brand-secondary_hover: #92680a;
+  --color-bg-primary: #ffffff;
+  --color-bg-primary_hover: #f9fafb;
+  --color-bg-primary_alt: #f6f8fa;
+  --color-bg-secondary: #f6f8fa;
+  --color-bg-secondary_alt: #f0f2f5;
+  --color-bg-secondary_hover: #e5e7eb;
+  --color-text-primary: #1a1f2e;
+  --color-text-secondary: #374151;
+  --color-text-secondary_hover: #1f2937;
+  --color-text-tertiary: #6b7280;
+  --color-text-tertiary_hover: #4b5563;
+  --color-text-quaternary: #9ca3af;
+  --color-text-quaternary_hover: #6b7280;
+  --color-border-primary: #e2e8f0;
+  --color-border-secondary: #e5e7eb;
+  --color-fg-quaternary: #9ca3af;
+  --color-fg-quaternary_hover: #6b7280;
+  --color-fg-secondary: #374151;
+  --color-fg-secondary_hover: #1f2937;
+  --color-outline-brand: #b8860b;
+  --color-outline-focus-ring: #b8860b;
+  --color-outline-error: #dc2626;
+
+  /* Utility colors for badges */
+  --color-utility-brand-50: #fef9c3;
+  --color-utility-brand-100: #fde68a;
+  --color-utility-brand-200: #d4a017;
+  --color-utility-brand-500: #b8860b;
+  --color-utility-brand-700: #92680a;
+  --color-utility-neutral-50: #f9fafb;
+  --color-utility-neutral-100: #f3f4f6;
+  --color-utility-neutral-200: #e5e7eb;
+  --color-utility-neutral-400: #9ca3af;
+  --color-utility-neutral-500: #6b7280;
+  --color-utility-neutral-700: #374151;
+  --color-utility-green-50: #dcfce7;
+  --color-utility-green-100: #bbf7d0;
+  --color-utility-green-200: #86efac;
+  --color-utility-green-500: #22c55e;
+  --color-utility-green-700: #15803d;
+  --color-utility-red-50: #fee2e2;
+  --color-utility-red-100: #fecaca;
+  --color-utility-red-200: #fca5a5;
+  --color-utility-red-500: #ef4444;
+  --color-utility-red-700: #b91c1c;
+  --color-utility-blue-50: #dbeafe;
+  --color-utility-blue-100: #bfdbfe;
+  --color-utility-blue-200: #93c5fd;
+  --color-utility-blue-500: #3b82f6;
+  --color-utility-blue-700: #1d4ed8;
+  --color-utility-yellow-50: #fef9c3;
+  --color-utility-yellow-100: #fef08a;
+  --color-utility-yellow-200: #fde047;
+  --color-utility-yellow-500: #eab308;
+  --color-utility-yellow-700: #a16207;
+  --color-utility-orange-50: #fff7ed;
+  --color-utility-orange-100: #ffedd5;
+  --color-utility-orange-200: #fed7aa;
+  --color-utility-orange-500: #f97316;
+  --color-utility-orange-700: #c2410c;
+  --color-utility-purple-50: #ede9fe;
+  --color-utility-purple-100: #ddd6fe;
+  --color-utility-purple-200: #c4b5fd;
+  --color-utility-purple-500: #8b5cf6;
+  --color-utility-purple-700: #6d28d9;
+  --color-utility-pink-50: #fce7f3;
+  --color-utility-pink-100: #fbcfe8;
+  --color-utility-pink-200: #f9a8d4;
+  --color-utility-pink-500: #ec4899;
+  --color-utility-pink-700: #be185d;
+  --color-utility-sky-50: #f0f9ff;
+  --color-utility-sky-100: #e0f2fe;
+  --color-utility-sky-200: #bae6fd;
+  --color-utility-sky-500: #0ea5e9;
+  --color-utility-sky-700: #0369a1;
+  --color-utility-indigo-50: #eef2ff;
+  --color-utility-indigo-100: #e0e7ff;
+  --color-utility-indigo-200: #c7d2fe;
+  --color-utility-indigo-500: #6366f1;
+  --color-utility-indigo-700: #4338ca;
+  --color-utility-slate-50: #f8fafc;
+  --color-utility-slate-100: #f1f5f9;
+  --color-utility-slate-200: #e2e8f0;
+  --color-utility-slate-500: #64748b;
+  --color-utility-slate-700: #334155;
+}
 
 @theme {
-  --color-zinc-850: #1f2127;
+  /* Extend Tailwind with our custom tokens */
+  --color-gold: var(--color-gold);
+  --color-gold-light: var(--color-gold-light);
+
+  /* Semantic aliases for Untitled UI component tokens */
+  --color-brand-solid: var(--color-gold);
+  --color-brand-solid_hover: var(--color-gold-light);
+
+  /* Background semantic colors */
+  --color-primary: var(--color-bg-primary);
+  --color-primary_hover: var(--color-bg-primary_hover);
+  --color-primary_alt: var(--color-bg-primary_alt);
+  --color-secondary_alt: var(--color-bg-secondary_alt);
+
+  /* Text semantic colors */
+  --color-secondary: var(--color-text-secondary);
+  --color-secondary_hover: var(--color-text-secondary_hover);
+  --color-tertiary: var(--color-text-tertiary);
+  --color-tertiary_hover: var(--color-text-tertiary_hover);
+  --color-quaternary: var(--color-text-quaternary);
+  --color-quaternary_hover: var(--color-text-quaternary_hover);
+
+  /* Shadow tokens for Untitled UI */
+  --shadow-xs-skeuomorphic: 0 1px 2px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.08);
+
+  /* Focus ring */
+  --color-focus-ring: var(--color-gold);
+  --color-error: var(--red);
+
+  /* Border */
+  --color-ring-primary: var(--border);
+  --color-ring-secondary: #e5e7eb;
+  --color-error_subtle: #fecaca;
+  --color-error-primary: #fee2e2;
+  --color-error-primary_hover: #fecaca;
+  --color-error-solid: #dc2626;
+  --color-error-solid_hover: #b91c1c;
+  --color-fg-error-secondary: #ef4444;
+  --color-fg-error-primary: #dc2626;
 }
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* Untitled UI focus ring utility */
+.outline-focus-ring {
+  outline-color: var(--color-gold);
+}
+.outline-brand {
+  outline-color: var(--color-gold);
+}
+.outline-error {
+  outline-color: var(--red);
+}
+
+/* Series color utilities (for exercise program views — keep dark-style for readability on white) */
+.series-wu { color: #7c3aed; background: #ede9fe; border-color: #ddd6fe; }
+.series-a  { color: #2563eb; background: #dbeafe; border-color: #bfdbfe; }
+.series-b  { color: #0d9488; background: #ccfbf1; border-color: #99f6e4; }
+.series-c  { color: #d97706; background: #fef3c7; border-color: #fde68a; }
+.series-d  { color: #6b7280; background: #f3f4f6; border-color: #e5e7eb; }
+.series-cd { color: #db2777; background: #fce7f3; border-color: #fbcfe8; }

@@ -52,7 +52,10 @@ export function SeriesLabelDropdown({ value, onChange, disabled = false }: Serie
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl p-2 space-y-1 w-44">
+        <div
+          className="absolute top-full left-0 mt-1 z-50 rounded-lg p-2 space-y-1 w-44"
+          style={{ background: 'white', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)' }}
+        >
           {['WU', 'A', 'B', 'C', 'D', 'CD'].map((grp) => {
             const opts = SERIES_OPTIONS.filter((o) => seriesGroup(o) === grp)
             return (
@@ -66,10 +69,13 @@ export function SeriesLabelDropdown({ value, onChange, disabled = false }: Serie
                     }}
                     className={cn(
                       'flex-1 rounded px-1.5 py-1 text-xs font-medium transition-colors',
-                      opt === value
-                        ? 'bg-emerald-600 text-white'
-                        : 'text-zinc-300 hover:bg-zinc-700'
                     )}
+                    style={opt === value
+                      ? { background: 'var(--color-gold)', color: 'white' }
+                      : { color: 'var(--text)' }
+                    }
+                    onMouseOver={e => { if (opt !== value) e.currentTarget.style.background = 'var(--bg3)' }}
+                    onMouseOut={e => { if (opt !== value) e.currentTarget.style.background = '' }}
                   >
                     {opt}
                   </button>

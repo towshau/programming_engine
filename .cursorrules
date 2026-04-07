@@ -1,0 +1,46 @@
+# Cursor Rules — Locker Room Gym
+
+## Database Schema Auto-Update
+
+After applying any database migration, creating new tables, adding foreign keys,
+or modifying the schema in any way, automatically run:
+
+  npm run update-schema
+
+This regenerates `index.html` in the `schema_reference` clone (github.com/Lockeroom-Gym/lockeroom_schema) with the latest table structure,
+relationships, and domain classifications from Supabase.
+
+The diagram reads from the `/* SCHEMA_DATA_START */` block in the HTML file.
+Never edit that block manually — always use `update-schema.js` to regenerate it.
+
+## Key Tables to Know
+
+- member_database       → core member records (always filter test_account = FALSE)
+- staff_database        → all coaches and staff
+- member_memberships    → one row per membership contract (a member can have many)
+- stripe_invoices       → revenue (amounts are in AUD CENTS — divide by 100)
+- schedule_sessions     → all scheduled gym sessions (BLIGH / BRIDGE / COLLINS)
+- member_health_metrics → InBody scan data
+- member_physicals_raw  → quarterly fitness assessments
+
+## Critical Query Rules
+
+1. Always add: WHERE test_account = FALSE (for member queries)
+2. Stripe amounts: divide by 100 for AUD dollar values
+3. Members on hold still have current_status = 'active' — check member_holds separately
+4. Multiple memberships per member — filter mm.status = 'active' for current one
+5. Timestamps are UTC — use AT TIME ZONE 'Australia/Sydney' for display
+6. Never join on name strings (coach_name, member_name) — always join on id (uuid)
+
+## SQL Dialect: PostgreSQL 15 (Supabase)
+
+- Schema: public (default, no prefix needed)
+- Primary keys: uuid (gen_random_uuid())
+- Enums: custom PostgreSQL enum types (see lockerroom-data-analyst/SKILL.md)
+- Array columns: use = ANY(column) not = column
+- JSON/JSONB: use ->> for text, -> for JSON
+
+## Project: Locker Room Gym
+
+Gyms: BLIGH (Sydney CBD), BRIDGE (Sydney CBD), COLLINS (Melbourne)
+Database: Supabase PostgreSQL 15 | Project: dvrhazdtbsttzduaedzu

@@ -144,11 +144,12 @@ export function ExerciseRow({
     <>
       <div
         className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2 transition-colors group',
-          'bg-zinc-800/30 hover:bg-zinc-800/60',
-          edited && !repsInvalid && 'ring-1 ring-emerald-500/40 bg-emerald-500/5',
-          repsInvalid && 'ring-1 ring-red-500/60 bg-red-500/5'
+          'flex items-center gap-3 rounded-lg px-3 py-2 transition-colors group border',
         )}
+        style={{
+          background: repsInvalid ? 'var(--red-bg)' : edited ? 'rgba(184,134,11,0.05)' : 'white',
+          borderColor: repsInvalid ? 'var(--red-border)' : edited ? 'rgba(184,134,11,0.25)' : 'var(--border)',
+        }}
       >
         <SeriesLabelDropdown
           value={exercise.series_label}
@@ -158,11 +159,11 @@ export function ExerciseRow({
 
         {readOnly ? (
           <div className="flex-1 min-w-0">
-            <span className="text-sm text-zinc-200 truncate block">
+            <span className="text-sm truncate block" style={{ color: 'var(--text)' }}>
               {exercise.exercise_name}
             </span>
             {exercise.tags && (
-              <span className="text-xs text-zinc-500 truncate block">
+              <span className="text-xs truncate block" style={{ color: 'var(--text-muted)' }}>
                 {exercise.tags}
               </span>
             )}
@@ -173,11 +174,11 @@ export function ExerciseRow({
             className="flex-1 text-left min-w-0 group/name"
             title="Click to swap exercise"
           >
-            <span className="text-sm text-zinc-200 group-hover/name:text-emerald-400 transition-colors truncate block">
+            <span className="text-sm truncate block transition-colors group-hover/name:text-[var(--color-gold)]" style={{ color: 'var(--text)' }}>
               {exercise.exercise_name}
             </span>
             {exercise.tags && (
-              <span className="text-xs text-zinc-500 truncate block">
+              <span className="text-xs truncate block" style={{ color: 'var(--text-muted)' }}>
                 {exercise.tags}
               </span>
             )}
@@ -204,7 +205,7 @@ export function ExerciseRow({
 
         {edited && (
           <div className="flex-shrink-0" title="Modified by coach">
-            <svg className="h-4 w-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="h-4 w-4" style={{ color: 'var(--color-gold)' }} fill="currentColor" viewBox="0 0 20 20">
               <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
             </svg>
           </div>
@@ -213,8 +214,11 @@ export function ExerciseRow({
         {!readOnly && (
           <button
             onClick={handleDelete}
-            className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-red-400"
+            className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ color: 'var(--text-muted)' }}
             title="Remove exercise"
+            onMouseOver={e => e.currentTarget.style.color = 'var(--red)'}
+            onMouseOut={e => e.currentTarget.style.color = 'var(--text-muted)'}
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

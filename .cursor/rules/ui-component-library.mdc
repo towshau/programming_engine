@@ -1,0 +1,52 @@
+---
+description: UI component library standards for the LR Programming OS frontend
+globs: frontend/src/**/*.tsx, frontend/src/**/*.ts
+alwaysApply: true
+---
+
+# UI Component Library — Untitled UI React
+
+All frontend UI in `frontend/src/` must follow the **Untitled UI React** design system.
+
+## Stack
+- React 19 + Tailwind CSS 4 + TypeScript 5.9 + React Aria
+- Components live in `frontend/src/components/ui/`
+
+## Rules
+- **Do NOT** create one-off custom UI primitives (buttons, badges, inputs, modals, tabs, selects) when an Untitled UI equivalent exists
+- **Always check** `frontend/src/components/ui/` before adding a new component
+- **Add new components** via: `npx untitledui@latest add <component_name>`
+- Reference docs: https://www.untitledui.com/react
+
+## Color Tokens (CSS variables in `frontend/src/index.css`)
+- `--color-gold: #b8860b` — primary accent (buttons, active states, badges)
+- `--color-gold-light: #d4a017` — hover state for gold
+- `--bg: #f0f2f5` — page background
+- `--bg2: #ffffff` — card/panel background
+- `--bg3: #f6f8fa` — subtle background
+- `--text: #1a1f2e` — primary text
+- `--text-muted: #6b7280` — secondary text
+- `--border: #e2e8f0` — border color
+- `--green: #16a34a` — success / active
+- `--red: #dc2626` — error / awaiting
+- `--blue: #2563eb` — info / phase due
+- `--orange: #d97706` — warning
+
+## Badge Variants
+- `gold` — awaiting draft / pending
+- `red` — awaiting first program
+- `blue` — new training phase due
+- `green` — active / approved / actioned
+- `grey` — inactive / neutral
+
+## Naming Conventions
+- Page components → `frontend/src/pages/`
+- Layout shell → `frontend/src/components/layout/`
+- Shared UI primitives → `frontend/src/components/ui/`
+- Domain features → `frontend/src/features/`
+
+## Theme
+- **Light theme only** on this branch (dark theme is removed)
+- Background: `bg-[var(--bg)]`, cards: `bg-[var(--bg2)]`
+- Primary accent: `text-[var(--color-gold)]`, `bg-[var(--color-gold)]`
+- Borders: `border-[var(--border)]`
