@@ -242,6 +242,62 @@ def detect_phase(scheme_rows, sessions):
     }
 
 
+def get_next_phase_from_prescribed(scheme_rows, previous_rep_range):
+    """Deterministically find the next phase based on the previously prescribed rep range.
+
+    Returns the same dict shape as detect_phase, but with 'high' confidence and
+    'deterministic' direction, skipping the fuzzy median logic.
+    """
+    if not scheme_rows:
+        return {
+            "current_rep_range": previous_rep_range,
+            "next_rep_range": "8-10",
+            "next_order": 1,
+            "exercise_behavior": "same_exercises",
+            "confidence": "none",
+            "median_reps": None,
+            "direction": "deterministic",
+            "n_reps_sampled": 0,
+            "blocks_analysed": 0,
+            "reason": "No scheme rows provided.",
+        }
+
+    current_order = None
+    next_row = None
+
+    for row in scheme_rows:
+        if row["from_rep_range"] == previous_rep_range:
+            current_order = row["order"]
+            next_row = row
+            break
+
+    # If the previous range matches the *to* of the last step (e.g. "8-10" after a
+    # reset in Strength), that means we're at the START of order 1.
+    if current_order is None:
+        last_to = scheme_rows[-1]["to_rep_range"]
+        if previous_rep_range == last_to:
+            current_order = scheme_rows[0]["order"]
+            next_row = scheme_rows[0]
+
+    # Still can't match — fall back to order 1
+    if next_row is None:
+        next_row = scheme_rows[0]
+        current_order = 0
+
+    return {
+        "current_rep_range": previous_rep_range,
+        "current_order": current_order,
+        "next_rep_range": next_row["to_rep_range"],
+        "next_order": (current_order % len(scheme_rows)) + 1 if current_order else 1,
+        "exercise_behavior": next_row["exercise_behavior"],
+        "confidence": "high",
+        "median_reps": None,
+        "direction": "deterministic",
+        "n_reps_sampled": 0,
+        "blocks_analysed": 0,
+    }
+
+
 def detect_phase_for_member(supabase, member_id, scheme_name, sessions):
     """High-level convenience: fetch scheme from DB and detect phase."""
     schemes = fetch_schemes(supabase)

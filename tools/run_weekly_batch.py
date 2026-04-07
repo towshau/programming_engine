@@ -44,7 +44,7 @@ from normalize_one_member import (
     fetch_results_for_member,
     normalize,
 )
-from detect_phase import detect_phase_for_member
+    from detect_phase import detect_phase_for_member, get_next_phase_from_prescribed
 from load_rules import load_config
 from generate_program import (
     generate_next_program,
@@ -136,18 +136,22 @@ def run_pipeline_for_member(sb, member_id, scheme_name, exercise_lib, duration_w
         if not sessions:
             raise ValueError("Normalization produced 0 sessions")
 
-    rows_tb = fetch_results_for_member(sb, member_id)
-    sessions_tb = normalize(rows_tb, exercise_lib)["sessions"] if rows_tb else []
-
     spw = resolve_sessions_per_week(
         sessions,
         cli_override=None,
         stored_from_row=stored_spw,
     )
-    phase = detect_phase_for_member(
-        sb, member_id, scheme_name, sessions_tb if sessions_tb else sessions
-    )
+    
     config = load_config(sb, member_id=member_id, scheme_name=scheme_name)
+
+    if gen and gen.get("rep_range"):
+        phase = get_next_phase_from_prescribed(config["scheme"], gen["rep_range"])
+    else:
+        rows_tb = fetch_results_for_member(sb, member_id)
+        sessions_tb = normalize(rows_tb, exercise_lib)["sessions"] if rows_tb else []
+        phase = detect_phase_for_member(
+            sb, member_id, scheme_name, sessions_tb if sessions_tb else sessions
+        )
 
     program = generate_next_program(
         sessions, exercise_lib, phase, config, sessions_per_week=spw,

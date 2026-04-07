@@ -1,4 +1,6 @@
 .env
+# Local clone of github.com/Lockeroom-Gym/lockeroom_schema (deploy separately)
+schema_reference/
 node_modules/
 .gemini/
 __pycache__/

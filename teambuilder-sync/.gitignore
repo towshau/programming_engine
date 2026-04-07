@@ -1,5 +1,0 @@
-node_modules/
-.env
-batch-progress.json
-upload-progress.json
-dist/

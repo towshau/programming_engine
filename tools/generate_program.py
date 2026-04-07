@@ -45,7 +45,7 @@ from normalize_one_member import (
     normalize,
     SERIES_ORDER,
 )
-from detect_phase import detect_phase_for_member
+from detect_phase import detect_phase_for_member, get_next_phase_from_prescribed
 from load_rules import load_config
 
 
@@ -486,13 +486,13 @@ def resolve_sessions_per_week(sessions, cli_override=None, stored_from_row=None)
 def fetch_latest_generated_program(supabase, member_id):
     """Fetch the most recent programming_generated row for this member.
 
-    Returns ``{"sessions": [...], "sessions_per_week": int|None}`` or None if no row.
+    Returns ``{"sessions": [...], "sessions_per_week": int|None, "rep_range": str|None}`` or None if no row.
     ``sessions_per_week`` is taken from the row column when 2–4, else from
     ``payload.metadata.sessions_per_week``. Used so coach/batch-sync truth carries forward.
     """
     r = (
         supabase.table("programming_generated")
-        .select("payload, sessions_per_week")
+        .select("payload, sessions_per_week, rep_range")
         .eq("member_id", member_id)
         .order("created_at", desc=True)
         .limit(1)
@@ -520,7 +520,7 @@ def fetch_latest_generated_program(supabase, member_id):
         except (TypeError, ValueError):
             m = None
         spw = m if (m is not None and 1 <= m <= 6) else None
-    return {"sessions": sessions, "sessions_per_week": spw}
+    return {"sessions": sessions, "sessions_per_week": spw, "rep_range": row.get("rep_range")}
 
 
 # ── Core generator ───────────────────────────────────────────────────────────
@@ -751,10 +751,6 @@ def main():
         sessions = payload["sessions"]
         print(f"Normalised {len(sessions)} sessions from tbresults.", file=sys.stderr)
 
-    # Phase detection always uses tbresults (actual logged reps)
-    rows_tb = fetch_results_for_member(sb, args.member_id)
-    sessions_tb = normalize(rows_tb, exercise_lib)["sessions"] if rows_tb else []
-
     spw = resolve_sessions_per_week(
         sessions,
         cli_override=args.sessions_per_week,
@@ -768,13 +764,21 @@ def main():
         spw_note = "auto-detected"
     print(f"Sessions per week: {spw} ({spw_note})", file=sys.stderr)
 
-    # 2. Phase detection (uses tbresults so next rep range reflects what member actually did)
-    phase = detect_phase_for_member(sb, args.member_id, args.scheme, sessions_tb) if sessions_tb else detect_phase_for_member(sb, args.member_id, args.scheme, sessions)
-    print(f"Phase: current={phase.get('current_rep_range')}, next={phase.get('next_rep_range')}, confidence={phase.get('confidence')}", file=sys.stderr)
-
-    # 3. Load config
+    # 3. Load config early for scheme rows
     config = load_config(sb, member_id=args.member_id, scheme_name=args.scheme)
     print(f"Config: {len(config['rules'])} rules, {len(config['scheme'])} scheme steps, {len(config['exclusions'])} exclusions.", file=sys.stderr)
+
+    # 2. Phase detection (deterministic if previous gen exists, else fuzzy)
+    if gen and gen.get("rep_range"):
+        print("Using deterministic phase detection from previous generated program's rep_range.", file=sys.stderr)
+        phase = get_next_phase_from_prescribed(config["scheme"], gen["rep_range"])
+    else:
+        print("Using fuzzy phase detection from tbresults.", file=sys.stderr)
+        rows_tb = fetch_results_for_member(sb, args.member_id)
+        sessions_tb = normalize(rows_tb, exercise_lib)["sessions"] if rows_tb else []
+        phase = detect_phase_for_member(sb, args.member_id, args.scheme, sessions_tb) if sessions_tb else detect_phase_for_member(sb, args.member_id, args.scheme, sessions)
+        
+    print(f"Phase: current={phase.get('current_rep_range')}, next={phase.get('next_rep_range')}, confidence={phase.get('confidence')}", file=sys.stderr)
 
     # 4. Generate
     result = generate_next_program(

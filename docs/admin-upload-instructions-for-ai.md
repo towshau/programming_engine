@@ -122,22 +122,7 @@ The above steps are intended to be automated by an AI agent (e.g. Manus) using b
 
 ### 6.2 High-level flow for the AI
 
-1. **Query** Supabase for programs with `coach_approved = true` and `uploaded_to_teambuildr = false` (see §2).
-2. For each program:
-   - **Navigate** to TeamBuildr (e.g. login page), log in with credentials provided via environment or secrets.
-   - **Resolve member:** Search or navigate to the member (by name/email from `member_database` or the query result).
-   - **Create/update program:** For each day in `payload.sessions`, create or update the workout with the exercises and set/rep prescriptions — **subject to §6.1** (skip calendar dates before today). Map our `exercise_id` / `exercise_name` to TeamBuildr’s exercise picker or IDs as needed.
-   - **Verify:** Confirm the program is visible and matches the payload (e.g. same number of days, same exercises per day). If verification fails, do not mark as uploaded.
-   - **Record success:** Call Supabase to set `uploaded_to_teambuildr = true` for this `programming_generated.id` (and optionally update `member_programs.due_date` as in §4).
-3. If any step fails, log and optionally retry; if still failing, leave `uploaded_to_teambuildr = false` and report for human admin.
-
-**Repo implementation:** `teambuilder-sync/upload-programs.ts` queries pending rows, maps session days to weekday dates, and applies §6.1. **Primary mode:** dry run / plan — prints exercises, sets, and reps per date for **manual** TeamBuildr entry; `--mark-uploaded` (or `npm run upload:done`) flags the row after admin confirms. **`--live`** Playwright automation exists but is **experimental** (fragile against TeamBuildr UI). GitHub Actions workflow `.github/workflows/upload-to-teambuildr.yml` is **disabled** by default. See `teambuilder-sync/README.md`.
-
-**Security:**
-
-- Do not hardcode TeamBuildr credentials. Use environment variables or a secrets manager.
-- Prefer a dedicated “upload bot” account in TeamBuildr with minimal required permissions.
-- Supabase access should use a key with permission only to update `programming_generated` (and optionally `member_programs`), not full DB access.
+*(Note: Playwright push has been removed. Admins now manually upload programs from the Program Editor UI. The text below is retained for historical context.)*
 
 ---
 
@@ -145,7 +130,7 @@ The above steps are intended to be automated by an AI agent (e.g. Manus) using b
 
 - [ ] Query `programming_generated` for rows with `coach_approved = true` and `uploaded_to_teambuildr = false`.
 - [ ] For each row, get `payload`, `member_id`, and member identity (name, email) from `member_database`.
-- [ ] In TeamBuildr, find the member and create/update their program to match `payload.sessions` (**§6.1:** only calendar days ≥ today for the **upload** automation; not required for manual admin process unless you adopt the same rule).
+- [ ] In TeamBuildr, find the member and create/update their program to match `payload.sessions` (Only calendar days ≥ today for the upload).
 - [ ] Verify the program in TeamBuildr matches the payload.
 - [ ] Update `programming_generated` set `uploaded_to_teambuildr = true` (and `updated_at`) for that program’s `id`.
 - [ ] Optionally update `member_programs.due_date` from `programming_generated.next_due_date`.

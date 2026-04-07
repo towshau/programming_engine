@@ -321,12 +321,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .limit(2000),
       supabase
         .from('programming_generated')
-        .select('member_id')
+        .select('member_id, next_due_date, created_at, duration_weeks')
+        .order('created_at', { ascending: false })
         .limit(5000),
       supabase.from('member_programs').select('member_id, programming_coach_id').limit(5000),
     ])
 
-    const pgSet = new Set((pgRes.data ?? []).map((r: { member_id: string }) => r.member_id))
+    // Keep track of the most recent program for each member to check expiration
+    interface ProgInfo {
+      next_due_date: string | null
+      created_at: string
+      duration_weeks: number | null
+    }
+    const pgMap = new Map<string, ProgInfo>()
+    for (const row of (pgRes.data ?? []) as { member_id: string, next_due_date: string | null, created_at: string, duration_weeks: number | null }[]) {
+      if (!pgMap.has(row.member_id)) {
+        pgMap.set(row.member_id, {
+          next_due_date: row.next_due_date,
+          created_at: row.created_at,
+          duration_weeks: row.duration_weeks,
+        })
+      }
+    }
 
     /** Source of truth for coach assignment in Program Editor (aligns with run_weekly_batch, Retool). */
     const mpCoachMap = new Map<string, string>()
@@ -371,7 +387,31 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const firstName = (row.first_name as string) || fullName.split(' ')[0] || ''
       const lastName = (row.last_name as string) || fullName.split(' ').slice(1).join(' ') || ''
       const startDate = active?.start_date || ''
-      const hasProgram = pgSet.has(mid)
+      
+      const progInfo = pgMap.get(mid)
+      const hasProgram = !!progInfo
+      
+      // Check if program is expiring within 8 days
+      let isExpiring = false
+      if (progInfo) {
+        let expiryDate: Date | null = null
+        if (progInfo.next_due_date) {
+          expiryDate = new Date(progInfo.next_due_date)
+          expiryDate.setDate(expiryDate.getDate() - 1)
+        } else if (progInfo.created_at && progInfo.duration_weeks) {
+          expiryDate = new Date(progInfo.created_at)
+          expiryDate.setDate(expiryDate.getDate() + progInfo.duration_weeks * 7)
+        }
+        
+        if (expiryDate) {
+          const in8Days = new Date()
+          in8Days.setDate(in8Days.getDate() + 8)
+          if (expiryDate <= in8Days) {
+            isExpiring = true
+          }
+        }
+      }
+
       const withinNewWindow = (startDate > today) || (!!startDate && startDate >= cutoffStr)
       const isNew = withinNewWindow && active?.membership_stage === 'newsale'
 
@@ -383,7 +423,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         gym: active?.gym || '',
         programming_coach_id: mpCoach,
         membership_status: isActive ? 'active' : 'inactive',
-        program_status: hasProgram ? 'has_program' : isNew ? 'new_member' : 'needs_program',
+        program_status: (!hasProgram || isExpiring) ? 'needs_program' : isNew ? 'new_member' : 'has_program',
         is_new: isNew,
       })
     }
@@ -799,14 +839,31 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!program) return
 
     set((s) => ({ loading: { ...s.loading, saving: true } }))
+    
+    const wasUploaded = program.uploaded_to_teambuildr
+    const patch: Record<string, unknown> = {
+      duration_weeks: weeks,
+      coach_edited: true,
+      updated_at: new Date().toISOString()
+    }
+    
+    if (wasUploaded) {
+      patch.uploaded_to_teambuildr = false
+    }
+    
     const { error } = await supabase
       .from('programming_generated')
-      .update({ duration_weeks: weeks })
+      .update(patch)
       .eq('id', program.id)
 
     if (!error) {
       set((s) => ({
-        program: s.program ? { ...s.program, duration_weeks: weeks } : null,
+        program: s.program ? { 
+          ...s.program, 
+          duration_weeks: weeks,
+          coach_edited: true,
+          uploaded_to_teambuildr: wasUploaded ? false : s.program.uploaded_to_teambuildr
+        } : null,
       }))
     }
     set((s) => ({ loading: { ...s.loading, saving: false } }))

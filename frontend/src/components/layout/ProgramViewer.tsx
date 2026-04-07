@@ -22,6 +22,14 @@ function groupBySeries(exercises: ProgramExercise[]) {
     if (!groups[group]) groups[group] = []
     groups[group].push(ex)
   }
+  
+  // Sort exercises chronologically within each group (e.g. A1, A2, A3)
+  for (const group of Object.keys(groups)) {
+    groups[group].sort((a, b) => 
+      a.series_label.localeCompare(b.series_label, undefined, { numeric: true })
+    )
+  }
+  
   return Object.entries(groups).sort(
     ([a], [b]) => seriesSortKey(a) - seriesSortKey(b)
   )

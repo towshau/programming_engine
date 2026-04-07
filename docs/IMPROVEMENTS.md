@@ -2,6 +2,26 @@
 
 Track improvements identified and their implementation status. Cross off when done.
 
+**Priority (this doc):** **A** = ship first when touching the area. **C** = later / nice-to-have bucket (ordering polish, richer inputs, drag UX). **D** = exploratory / bigger UX; implement when there is time and a clear spec.
+
+---
+
+## Program Editor (coach UI)
+
+### Priority A
+
+- [ ] **14. Fuzzy exercise search (swap / add)** — In the exercise picker (`ExerciseSwapModal`, used for swap and add exercise), matching is effectively a single contiguous substring on name/tags. Change to **fuzzy / multi-token** behavior so coaches can type words in any order (e.g. `bench barbell` surfaces `Barbell Bench Press`). Consider simple token-and intersection scoring or a small fuzzy library; rank best matches to the top.
+
+### Priority C
+
+- [ ] **15. Series labels chronological within letter** — Revisit ordering/refactor for A1/A2 and B1/B2 (etc.) so series within each letter group is always **chronological** (e.g. B1 then B2 in display and logical order), even when edits or imports produce odd ordering.
+- [ ] **16. Drag to reorder exercises** — Allow moving rows up/down within a session (same bucket as series ordering polish).
+- [ ] **17. Seconds rest: allow dash ranges** — Today seconds mode accepts a single value (e.g. `30`); support a **range** like reps (e.g. `45-60` or `45-60s`) in `parseReps` / `validateRepsInput` / coach messaging in `frontend/src/lib/reps.ts`.
+
+### Priority D
+
+- [ ] **18. Weekly “matrix” view (toggle)** — Optional view mode (e.g. tab or toggle at the top of the program screen): Lay out **sessions as columns** — all Day 1 / Monday together, all Day 2 / Tuesday, etc. — so coaches scan the week **side by side**. Repeat the same layout for **last (current) program** and **next program** stacked (last block above, next below) for quick comparison. Implementation TBD (separate route vs. same page toggle; how day labels map when the program is day-numbered vs. calendar weekdays).
+
 ---
 
 ## From technical review (25 Feb 2026)

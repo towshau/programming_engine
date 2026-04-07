@@ -80,7 +80,6 @@
 ### Standalone apps
 
 - **exercise-library-sheet-sync/** — Node app that syncs `exercise_library` to Google Sheet. See `exercise-library-sheet-sync/.env.example`.
-- **teambuilder-sync/** — Playwright-based scraper that syncs exercises from TeamBuilder into `programming_generated`. Single-member: `npm run sync -- --member="Last, First" --date=YYYY-MM-DD --day=N`. Full-week: add `--sync-week`. **Batch sync** (`npm run batch`): iterates all members with `uploaded_to_teambuildr = true`, scrapes Mon–Fri, overwrites `programming_generated`. Logs results to `programming_sync_log`. Supports `--dry-run`, `--limit N`, `--reset`, and resume via `batch-progress.json`. **Planned (not built):** reverse direction — Playwright upload from Supabase → TeamBuildr; **only** writes calendar days ≥ today (see `docs/admin-upload-instructions-for-ai.md` §6.1); does **not** apply to pull sync. See `teambuilder-sync/README.md`.
 
 ---
 
@@ -116,9 +115,8 @@ FastAPI app deployed on Railway. Wraps the existing Python pipeline (`tools/`) a
 ## Admin and operations (Retool + upload)
 
 - **Admin upload (for AI):** Instructions for the admin task of uploading finalized programs to TeamBuildr and marking them uploaded. See **docs/admin-upload-instructions-for-ai.md** (human or agent-assisted; browser automation for **push** is de-scoped).
-- **teambuilder-sync:** Node + Playwright. **Pull:** `sync-exercises.ts` / `batch-sync.ts` (TeamBuildr → Supabase). **Push:** Primary path is **admin manual load** — `upload-programs.ts` **plan mode** prints pending programs (`coach_approved && !uploaded_to_teambuildr`), dates, exercises, sets/reps; admin enters in TeamBuildr; then `npm run upload:done` / `--mark-uploaded`. `--live` Playwright push and `.github/workflows/upload-to-teambuildr.yml` are **experimental / not the plan** (fragile TB UI).
 
-**Retool — build:** **Admin check-in / upload queue** (queue + mark-uploaded workflow; align queries with `upload-programs.ts`). Specs under **retool/**: `01`–`05` are **legacy prompts** for canceled pages (viewer, feedback, counter, removal form, PDF); see `retool/README.md`.
+**Retool — build:** **Admin check-in / upload queue** (queue + mark-uploaded workflow; align queries with manual sync process). Specs under **retool/**: `01`–`05` are **legacy prompts** for canceled pages (viewer, feedback, counter, removal form, PDF); see `retool/README.md`.
 
 ---
 

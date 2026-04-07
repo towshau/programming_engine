@@ -42,7 +42,7 @@ from normalize_one_member import (
     fetch_results_for_member,
     normalize,
 )
-from detect_phase import detect_phase_for_member
+    from detect_phase import detect_phase_for_member, get_next_phase_from_prescribed
 from load_rules import load_config
 from generate_program import (
     generate_next_program,
@@ -109,21 +109,28 @@ def main():
         spw_note = "auto-detected"
     print(f"  Sessions per week: {spw} ({spw_note})")
 
-    # Phase detection uses tbresults (actual logged reps)
-    rows_tb = fetch_results_for_member(sb, member_id)
-    sessions_tb = normalize(rows_tb, exercise_lib)["sessions"] if rows_tb else []
-
     # ── Step 2: Phase Detection ──
     print(f"\n[2/4] Phase detection (scheme={args.scheme})...")
-    phase = detect_phase_for_member(sb, member_id, args.scheme, sessions_tb if sessions_tb else sessions)
+    # Load config early so we can pass scheme rows to get_next_phase_from_prescribed
+    config = load_config(sb, member_id=member_id, scheme_name=args.scheme)
+    scheme_rows = config["scheme"]
+
+    if gen and gen.get("rep_range"):
+        print("  Using deterministic phase detection from previous generated program's rep_range.")
+        phase = get_next_phase_from_prescribed(scheme_rows, gen["rep_range"])
+    else:
+        print("  Using fuzzy phase detection from tbresults.")
+        # Phase detection uses tbresults (actual logged reps)
+        rows_tb = fetch_results_for_member(sb, member_id)
+        sessions_tb = normalize(rows_tb, exercise_lib)["sessions"] if rows_tb else []
+        phase = detect_phase_for_member(sb, member_id, args.scheme, sessions_tb if sessions_tb else sessions)
+
     print(f"  Current: {phase.get('current_rep_range')}  Next: {phase.get('next_rep_range')}  Confidence: {phase.get('confidence')}")
     if phase.get("confidence") == "low":
         print("  WARNING: Low confidence -- consider coach review before using this program.", file=sys.stderr)
 
-    # ── Step 3: Load Config ──
-    print(f"\n[3/4] Loading rules + config...")
-    config = load_config(sb, member_id=member_id, scheme_name=args.scheme)
-    print(f"  {len(config['rules'])} rules, {len(config['scheme'])} scheme steps, {len(config['exclusions'])} exclusions.")
+    # ── Step 3: Load Config (Already loaded above) ──
+    print(f"\n[3/4] Rules + config loaded: {len(config['rules'])} rules, {len(config['scheme'])} scheme steps, {len(config['exclusions'])} exclusions.")
 
     # ── Step 4: Generate ──
     print(f"\n[4/4] Generating next program...")
