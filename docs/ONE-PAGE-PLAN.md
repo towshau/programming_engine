@@ -85,7 +85,21 @@
 
 ## Program Editor frontend (`frontend/`)
 
-React app for coaches to review and edit generated programs. Stack: React 19 + TypeScript + Vite + Tailwind CSS 4 + Zustand + Supabase JS. Run: `cd frontend && npm run dev`.
+> **Branch note:** A major UI overhaul is in progress on `feature/ui-overhaul` (pushed to GitHub, not yet merged to `main`). All description below reflects the `feature/ui-overhaul` state. The old dark-theme single-page layout exists only in `main` git history.
+
+React multi-page app for coaches. Stack: React 19 + TypeScript + Vite + Tailwind CSS 4 + Zustand + Supabase JS + react-router-dom. Run: `cd frontend && npm run dev` (requires `frontend/.env` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` — copy values from root `.env`).
+
+**Architecture (feature/ui-overhaul):**
+- Light theme throughout (CSS variables in `index.css`; `--bg`, `--text`, `--color-gold`, `--border`, status colors `--red/--green/--blue`)
+- `AppShell` — horizontal top nav bar (LR logo, nav links, coach selector, date, "Andrew Ponce" page-owner credit); wraps all pages via react-router `<Outlet>`
+- Routes: `/` → ClientQueue, `/intake[/:memberId]` → Intake, `/program[/:memberId]` → ProgrammingEngine, `/holiday` → HolidayPrograms
+- `MemberSidebar` — collapsible (chevron toggle; collapsed = 40px icon rail, expanded = 288px). Used on Intake and ProgrammingEngine pages. Not used on ClientQueue (has its own inline list)
+
+**Pages:**
+- **ClientQueue** (`/`) — landing page. 4 full-width tabs: Awaiting First Program (red), New Training Phase Due (gold), Active Programs (green), Holiday Programs (blue). Each tab queries Supabase live. Active Programs uses a two-step query (no FK from `programming_generated` → `member_database` yet; FK migration file exists at `supabase/migrations/20260408000001_fk_programming_generated_member.sql` — apply when Supabase CLI is linked)
+- **Intake & Assessment** (`/intake`) — member profile, movement screen (RAG indicators mapped from raw text values in `member_physicals_raw`), benchmarks (grip/chin/jump/VO2 with RAG color coding). Left panel = collapsible MemberSidebar
+- **ProgrammingEngine** (`/program`) — wraps existing `ProgramViewer`; URL-synced member selection. All coach workflow buttons (Save Program, Finalize, Mark Uploaded) intact and functional
+- **HolidayPrograms** (`/holiday`) — placeholder tab; query TBD once holiday program data structure is defined
 
 - **Coach selector** — top bar dropdown (`All Coaches` = no filter). Options: active `staff_database` rows whose `role` is one of Coach, Advanced Coach, Gym Manager, Senior Coach, Casual Coach, Head of Exercise. Selected coach ID persisted in `localStorage` (`lr-selected-coach-id`) across refresh. Filters member list by **`member_programs.programming_coach_id`** (source of truth; aligns with `run_weekly_batch.py`). Gym / membership stage still come from active `member_memberships` rows.
 - **Member sidebar** — debounced search, shows member name + gym badge; click to load program.
