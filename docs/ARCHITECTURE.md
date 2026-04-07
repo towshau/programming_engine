@@ -92,7 +92,42 @@ Because the automated TeamBuildr scraper was removed, an Admin must manually pus
 
 ---
 
-## 6. How to Run & Develop
+## 6. Frontend Architecture (Program Editor)
+
+The frontend is a React 19 app built with Vite, TypeScript, and Tailwind CSS v4, deployed to Vercel. It acts as the primary interface for coaches to review and edit AI-generated programs.
+
+### Tech Stack & Libraries
+- **Framework:** React 19 + TypeScript + Vite.
+- **Styling:** Tailwind CSS 4.
+- **State Management:** Zustand (`frontend/src/stores/editorStore.ts`).
+- **Database Connection:** Supabase JS client (`frontend/src/lib/supabase.ts`).
+
+### Folder Structure
+- **`src/components/layout/`**: Major structural blocks. `ProgramViewer.tsx` is the primary view for rendering the current member's program, day picker, and action buttons. `Sidebar.tsx` handles coach selection and the member list queue.
+- **`src/components/ui/`**: Reusable low-level UI components (e.g., `DayPicker.tsx`, `Modal.tsx`).
+- **`src/features/program/`**: Domain-specific components for the editor. 
+  - `ExerciseRow.tsx` / `SetsRepsEditor.tsx` / `SeriesLabelDropdown.tsx`: Handling specific exercise properties.
+  - `ProgramConfigEditor.tsx`: Allows changing the scheme, duration, and frequency.
+  - `ComplianceHeatmap.tsx`: A calendar visualization showing which days a member historically trained.
+- **`src/lib/`**: Core business logic that executes in the browser.
+  - `applyEdits.ts`: The crucial diffing engine. Merges `programming_generated` (base payload) with `programming_coach_edits` (differential edits) to produce the final state rendered in the UI.
+  - `templateBuilder.ts`: Logic to cold-start a "first program" template for brand new members before passing it to the AI.
+  - `reps.ts`: Validation logic for set/rep string formatting.
+- **`src/stores/`**: `editorStore.ts` holds all global state via Zustand.
+
+### State & The "Diff" Pattern
+Instead of mutating the base program payload directly when a coach makes a change, the frontend uses an event-sourcing pattern.
+1. When a coach makes an edit (e.g., swapping an exercise or changing reps), an edit object is added to the `pendingEdits` array in Zustand.
+2. The UI is immediately re-rendered by running the base `programming_generated` payload through `applyEdits.ts` along with any saved `programming_coach_edits` from the DB and the local `pendingEdits`.
+3. When the coach clicks "Save", the `pendingEdits` are flushed to the `programming_coach_edits` table in Supabase. The `programming_generated` payload itself remains mathematically pure to what the AI generated, preserving analytical integrity.
+
+### Data Flow
+- The frontend connects directly to Supabase via RLS policies to read members, programs, libraries, and write coach edits.
+- It does **not** generate programs directly. If a coach changes core variables (like days per week or rep range), the frontend calls the FastAPI endpoint (`POST /regenerate` on Railway) to invoke the Python pipeline, waiting for the new program to be written to Supabase before fetching it back.
+
+---
+
+## 7. How to Run & Develop
 
 ### Python Pipeline (Local Dev)
 Requires `.env` at the repo root with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
