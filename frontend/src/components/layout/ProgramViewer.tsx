@@ -12,7 +12,7 @@ import { AddDayModal } from '../../features/program/AddDayModal'
 import { ProgramConfigEditor } from '../../features/program/ProgramConfigEditor'
 import { WeeklyView } from '../../features/program/WeeklyView'
 import type { ProgramExercise, CoachEdit } from '../../types'
-import { cn, seriesGroup, seriesSortKey } from '../../lib/utils'
+import { seriesGroup, seriesSortKey } from '../../lib/utils'
 
 function formatDateAU(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-AU')

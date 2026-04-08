@@ -304,11 +304,11 @@ export function Intake() {
           ?.submission_date ?? null,
       )
       setHealth(healthResult.data as HealthMetrics | null)
-      setPhysicalsHistory((physHistResult.data ?? []) as MemberPhysicals[])
-      setHealthHistory((healthHistResult.data ?? []) as HealthMetrics[])
+      setPhysicalsHistory((physHistResult.data ?? []) as unknown as MemberPhysicals[])
+      setHealthHistory((healthHistResult.data ?? []) as unknown as HealthMetrics[])
 
       // Derive primary/secondary memberships
-      const memberships = (membershipResult.data ?? []) as MembershipRow[]
+      const memberships = (membershipResult.data ?? []) as unknown as MembershipRow[]
       const latestPrimary =
         memberships.find((m) => !m.primary_membership_id) ?? null
       const currentSecondaries = latestPrimary

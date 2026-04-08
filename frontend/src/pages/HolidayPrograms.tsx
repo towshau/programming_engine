@@ -7,7 +7,7 @@ import { AddExerciseButton } from '../features/program/AddExerciseButton'
 import { DayPicker } from '../components/ui/DayPicker'
 import { applyEdits } from '../lib/applyEdits'
 import { seriesGroup, seriesSortKey } from '../lib/utils'
-import type { GeneratedProgram, ProgramExercise, MemberWithCoach } from '../types'
+import type { GeneratedProgram, ProgramExercise, MemberWithCoach, CoachEdit } from '../types'
 import { cn } from '../lib/utils'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

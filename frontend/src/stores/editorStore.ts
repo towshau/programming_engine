@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 
-export type ProgramViewMode = 'day' | 'weekly'
 import type {
   Coach,
   MemberWithCoach,

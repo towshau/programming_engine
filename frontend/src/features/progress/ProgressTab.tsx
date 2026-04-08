@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react'
+import { useId, useState } from 'react'
 import type { MemberPhysicals, HealthMetrics } from '../../lib/scoring'
 import { RadarOverview } from './RadarOverview'
 import { MasterTrendChart } from './MasterTrendChart'

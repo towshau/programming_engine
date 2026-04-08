@@ -74,7 +74,7 @@ export function ExerciseRow({
     }
     return (
       <span className={`${textClass} block truncate`} style={{ color: 'var(--text-muted)' }}>
-        All-time PB: {allTimeBest.result}kg
+        All-time PB: {allTimeBest?.result}kg
       </span>
     )
   }
