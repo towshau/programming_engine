@@ -85,20 +85,21 @@ export function SetsRepsEditor({
   if (readOnly) {
     return (
       <div className="flex items-center gap-1 text-sm">
-        <span className="px-1.5 py-0.5 font-medium text-zinc-400">{sets}</span>
-        <span className="text-zinc-600">x</span>
-        <span className={cn(
-          'px-1.5 py-0.5 font-medium',
-          isCustom ? 'text-teal-400/70' : 'text-zinc-400',
-        )}>
+        <span className="px-1.5 py-0.5 font-medium" style={{ color: 'var(--text-muted)' }}>{sets}</span>
+        <span style={{ color: 'var(--text-muted)' }}>x</span>
+        <span
+          className="px-1.5 py-0.5 font-medium"
+          style={{ color: isCustom ? '#0d9488' : 'var(--text-muted)' }}
+        >
           {repsDisplay}
         </span>
-        <span className={cn(
-          'rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide border',
-          isSeconds
-            ? 'border-blue-500/30 text-blue-400/60 bg-blue-500/5'
-            : 'border-zinc-700/40 text-zinc-500/60 bg-zinc-800/50',
-        )}>
+        <span
+          className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide border"
+          style={isSeconds
+            ? { borderColor: 'var(--blue-border)', color: 'var(--blue)', background: 'var(--blue-bg)' }
+            : { borderColor: 'var(--border)', color: 'var(--text-muted)', background: 'var(--bg3)' }
+          }
+        >
           {isSeconds ? 'sec' : 'reps'}
         </span>
       </div>
@@ -135,22 +136,21 @@ export function SetsRepsEditor({
             }
           }}
           autoFocus
-          className="w-10 rounded bg-zinc-700 border border-emerald-500 px-1.5 py-0.5 text-center text-zinc-200 text-sm focus:outline-none"
+          className="w-10 rounded border px-1.5 py-0.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]/40 bg-white"
+          style={{ borderColor: 'var(--color-gold)', color: 'var(--text)' }}
         />
       ) : (
         <button
           onClick={() => { setSetsValue(String(sets)); setEditingSets(true) }}
-          className={cn(
-            'rounded px-1.5 py-0.5 font-medium text-zinc-300',
-            'hover:bg-zinc-700 hover:text-emerald-400 transition-colors cursor-pointer'
-          )}
+          className="rounded px-1.5 py-0.5 font-medium transition-colors cursor-pointer hover:bg-[var(--bg3)]"
+          style={{ color: 'var(--text)' }}
           title="Edit sets"
         >
           {sets}
         </button>
       )}
 
-      <span className="text-zinc-600">x</span>
+      <span style={{ color: 'var(--text-muted)' }}>x</span>
 
       {/* Reps / seconds value */}
       {editingReps ? (
@@ -164,22 +164,22 @@ export function SetsRepsEditor({
           onKeyDown={handleRepsKeyDown}
           autoFocus
           placeholder={isSeconds ? 'e.g. 30' : isCustom ? 'e.g. 10, 8, 6' : 'e.g. 8-10'}
-          className={cn(
-            'w-24 rounded bg-zinc-700 border px-1.5 py-0.5 text-center text-zinc-200 text-sm focus:outline-none',
-            inputError ? 'border-red-500' : 'border-emerald-500'
-          )}
+          className="w-24 rounded border px-1.5 py-0.5 text-center text-sm focus:outline-none bg-white"
+          style={{
+            borderColor: inputError ? 'var(--red)' : 'var(--color-gold)',
+            color: 'var(--text)',
+          }}
         />
       ) : (
         <button
           onClick={startEditingReps}
-          className={cn(
-            'rounded px-1.5 py-0.5 font-medium transition-colors cursor-pointer',
-            hasError
-              ? 'ring-1 ring-red-500 bg-red-500/10 text-red-300 hover:bg-red-500/20'
-              : isCustom
-                ? 'text-teal-400 hover:bg-zinc-700 hover:text-emerald-400'
-                : 'text-zinc-300 hover:bg-zinc-700 hover:text-emerald-400'
-          )}
+          className="rounded px-1.5 py-0.5 font-medium transition-colors cursor-pointer"
+          style={hasError
+            ? { border: '1px solid var(--red-border)', background: 'var(--red-bg)', color: 'var(--red)' }
+            : { color: isCustom ? '#0d9488' : 'var(--text)' }
+          }
+          onMouseOver={e => { if (!hasError) e.currentTarget.style.background = 'var(--bg3)' }}
+          onMouseOut={e => { if (!hasError) e.currentTarget.style.background = '' }}
           title={hasError ? 'Invalid — fix before saving' : isCustom ? 'Custom reps per set — click to edit' : 'Edit reps'}
         >
           {repsDisplay}
@@ -191,11 +191,12 @@ export function SetsRepsEditor({
         onClick={handleToggleUnit}
         className={cn(
           'rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide border transition-colors',
-          hasError && 'ring-1 ring-red-500 border-red-500/50',
-          isSeconds
-            ? 'border-blue-500/40 text-blue-400 bg-blue-500/10 hover:bg-blue-500/20'
-            : 'border-zinc-600/40 text-zinc-500 bg-zinc-800 hover:bg-zinc-700 hover:text-zinc-300'
+          hasError && 'ring-1'
         )}
+        style={isSeconds
+          ? { borderColor: 'var(--blue-border)', color: 'var(--blue)', background: 'var(--blue-bg)' }
+          : { borderColor: 'var(--border)', color: 'var(--text-muted)', background: 'var(--bg3)' }
+        }
         title={isSeconds ? 'Switch to reps' : 'Switch to seconds'}
       >
         {isSeconds ? 'sec' : 'reps'}

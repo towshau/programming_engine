@@ -15,6 +15,8 @@ export interface Member {
 export type ProgramStatus = 'has_program' | 'needs_program' | 'new_member'
 export type MembershipStatus = 'active' | 'pending' | 'indefinite_hold' | 'inactive'
 
+export type ProgramDraftStatus = 'awaiting_draft' | 'draft_ready' | 'approved' | 'uploaded'
+
 export interface MemberWithCoach {
   member_id: string
   member_name: string
@@ -25,6 +27,11 @@ export interface MemberWithCoach {
   program_status: ProgramStatus
   membership_status: MembershipStatus
   is_new: boolean
+  sessions_per_week: number | null
+  scheme_name: string | null
+  draft_status: ProgramDraftStatus
+  holds?: import('./program').MemberHold[]
+  holiday_programs?: import('./program').GeneratedProgram[]
 }
 
 export interface ExerciseLibraryItem {

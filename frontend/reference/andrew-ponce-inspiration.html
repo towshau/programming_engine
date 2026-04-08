@@ -1,0 +1,2423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LR Programming System — Prototype</title>
+<style>
+  :root {
+    --bg: #f0f2f5;
+    --bg2: #ffffff;
+    --bg3: #f6f8fa;
+    --gold: #b8860b;
+    --gold-light: #d4a017;
+    --text: #1a1f2e;
+    --text-muted: #6b7280;
+    --border: #e2e8f0;
+    --green: #16a34a;
+    --red: #dc2626;
+    --blue: #2563eb;
+    --orange: #d97706;
+    --purple: #7c3aed;
+    --pink: #db2777;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 240px; min-width: 240px;
+    background: #ffffff; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 0;
+    box-shadow: 1px 0 4px rgba(0,0,0,0.04);
+  }
+  .sidebar-logo { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
+  .lr-badge { display: flex; align-items: center; gap: 10px; }
+  .lr-icon {
+    width: 36px; height: 36px; background: var(--gold); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 14px; color: #fff; letter-spacing: -0.5px;
+  }
+  .lr-title { font-size: 13px; font-weight: 700; color: var(--text); line-height: 1.2; }
+  .lr-sub { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .nav-section { padding: 12px 12px 4px; }
+  .nav-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; padding: 0 8px 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    font-size: 13px; color: var(--text-muted);
+    transition: all 0.15s; margin-bottom: 2px; border: 1px solid transparent;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: rgba(184,134,11,0.10); color: var(--gold); border-color: rgba(184,134,11,0.25); }
+  .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+  .nav-badge {
+    margin-left: auto; background: var(--red); color: #fff;
+    font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 600;
+  }
+  .nav-badge.green { background: var(--green); }
+
+  .sidebar-footer { margin-top: auto; padding: 12px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 6px; }
+
+  /* MAIN */
+  .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+  .top-bar {
+    background: #ffffff; border-bottom: 1px solid var(--border);
+    padding: 14px 28px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 10;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .top-bar-title { font-size: 16px; font-weight: 600; }
+  .top-bar-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+  .content { padding: 28px; flex: 1; }
+
+  /* BUTTONS */
+  .btn { padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
+  .btn-ghost { background: transparent; border-color: var(--border); color: var(--text-muted); }
+  .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-gold { background: var(--gold); color: #fff; border-color: var(--gold); }
+  .btn-gold:hover { background: var(--gold-light); }
+  .btn-approve { background: var(--green); color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .btn-request { background: #ffffff; color: var(--text); border: 1px solid var(--border); padding: 8px 18px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+  /* SCREENS */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* CARDS */
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-24 { margin-bottom: 24px; }
+
+  /* SECTION HEADER */
+  .section-header { margin-bottom: 20px; }
+  .section-title { font-size: 22px; font-weight: 800; }
+  .section-sub { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+  /* BEFORE/AFTER STATS */
+  .compare-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 24px; }
+  .cs-col { background: var(--bg2); }
+  .cs-col:first-child { border-right: 1px solid var(--border); }
+  .cs-header { padding: 12px 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; border-bottom: 1px solid var(--border); }
+  .cs-header.before { background: #fee2e2; color: var(--red); }
+  .cs-header.after { background: #dcfce7; color: var(--green); }
+  .cs-rows { padding: 0; }
+  .cs-row { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); gap: 16px; }
+  .cs-row:last-child { border-bottom: none; }
+  .cs-value { font-size: 26px; font-weight: 800; min-width: 90px; }
+  .cs-value.red { color: var(--red); }
+  .cs-value.green { color: var(--green); }
+  .cs-value.gold { color: var(--gold); }
+  .cs-value.blue { color: var(--blue); }
+  .cs-info { flex: 1; }
+  .cs-label { font-size: 13px; font-weight: 600; color: var(--text); }
+  .cs-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* BEFORE/AFTER COMPARISON */
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .compare-header { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 12px; border-radius: 6px 6px 0 0; }
+  .compare-header.before { background: #fee2e2; color: var(--red); }
+  .compare-header.after { background: #dcfce7; color: var(--green); }
+  .compare-body { border: 1px solid var(--border); border-top: none; border-radius: 0 0 6px 6px; overflow: hidden; }
+  .compare-item { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; display: flex; align-items: flex-start; gap: 8px; }
+  .compare-item:last-child { border-bottom: none; }
+
+  /* FLOW */
+  .flow-row { display: flex; align-items: center; gap: 0; margin-bottom: 12px; }
+  .flow-node {
+    flex: 1; background: #f6f8fa; border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; font-size: 12px;
+    text-align: center; cursor: pointer; transition: all 0.15s;
+  }
+  .flow-node:hover { border-color: var(--gold); background: #fef9c3; }
+  .flow-node.highlight { border-color: var(--gold); background: #fef9c3; }
+  .fn-label { font-weight: 600; color: var(--text); font-size: 12px; }
+  .fn-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+  .flow-arrow { color: var(--text-muted); font-size: 14px; padding: 0 6px; flex-shrink: 0; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.25); z-index: 100;
+    align-items: flex-start; justify-content: center;
+    padding-top: 120px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    width: 560px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    overflow: hidden;
+  }
+  .modal-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: #fef9c3;
+  }
+  .modal-title { font-size: 14px; font-weight: 700; color: var(--gold); }
+  .modal-step { font-size: 11px; color: var(--text-muted); }
+  .modal-close { cursor: pointer; color: var(--text-muted); font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px; }
+  .modal-close:hover { background: var(--border); }
+  .modal-body { padding: 20px; }
+  .modal-desc { font-size: 13px; color: var(--text); line-height: 1.6; margin-bottom: 14px; }
+  .modal-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .modal-tag { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; background: #f6f8fa; border: 1px solid var(--border); color: var(--text-muted); }
+  .modal-nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--border); background: #f6f8fa; }
+  .modal-nav-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--text);
+    transition: all 0.15s;
+  }
+  .modal-nav-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .modal-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .modal-nav-btn.primary { background: var(--gold); color: #fff; border-color: var(--gold); }
+  .modal-nav-btn.primary:hover { background: var(--gold-light); }
+  .modal-counter { font-size: 11px; color: var(--text-muted); }
+
+  /* BADGE */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: #dcfce7; color: var(--green); border: 1px solid #bbf7d0; }
+  .badge-red { background: #fee2e2; color: var(--red); border: 1px solid #fecaca; }
+  .badge-gold { background: #fef9c3; color: var(--gold); border: 1px solid #fde68a; }
+  .badge-blue { background: #dbeafe; color: var(--blue); border: 1px solid #bfdbfe; }
+  .badge-orange { background: #fef3c7; color: var(--orange); border: 1px solid #fde68a; }
+  .badge-purple { background: #ede9fe; color: var(--purple); border: 1px solid #ddd6fe; }
+  .badge-grey { background: var(--bg3); color: var(--text-muted); border: 1px solid var(--border); }
+  .badge-pink { background: #fce7f3; color: var(--pink); border: 1px solid #fbcfe8; }
+
+  /* FLAGS */
+  .flags-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .flag { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+  .flag-warn { background: #fef3c7; color: var(--orange); border: 1px solid #fde68a; }
+  .flag-ok { background: #dcfce7; color: var(--green); border: 1px solid #bbf7d0; }
+  .flag-block { background: #fee2e2; color: var(--red); border: 1px solid #fecaca; }
+  .flag-info { background: #dbeafe; color: var(--blue); border: 1px solid #bfdbfe; }
+
+  /* FORM */
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block; }
+  .form-value { font-size: 13px; color: var(--text); background: var(--bg3); padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border); }
+  .form-value.highlight { border-color: var(--gold); color: var(--gold); background: #fef9c3; }
+
+  /* TABS */
+  .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab { padding: 10px 16px; font-size: 13px; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--gold); border-bottom-color: var(--gold); font-weight: 600; }
+
+  /* PROGRAM BLOCKS */
+  .program-series { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .series-header { padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; }
+  .series-r .series-header { background: #f3f4f6; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
+  .series-a .series-header { background: #dcfce7; color: var(--green); border-bottom: 1px solid #bbf7d0; }
+  .series-b .series-header { background: #dbeafe; color: var(--blue); border-bottom: 1px solid #bfdbfe; }
+  .series-c .series-header { background: #fce7f3; color: var(--pink); border-bottom: 1px solid #fbcfe8; }
+  .series-body { padding: 10px 16px; }
+  .ex-cols { display: flex; font-size: 10px; color: var(--text-muted); padding: 4px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .exercise-row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .exercise-row:last-child { border-bottom: none; }
+  .ex-name { flex: 1; font-weight: 500; }
+  .ex-sets { width: 80px; text-align: center; color: var(--text-muted); font-size: 12px; }
+  .ex-reps { width: 90px; text-align: center; color: var(--text-muted); font-size: 12px; }
+  .ex-note { flex: 1; color: var(--text-muted); font-size: 11px; text-align: right; }
+
+  /* STEP INDICATOR */
+  .steps { display: flex; align-items: center; gap: 0; margin-bottom: 24px; }
+  .step { display: flex; align-items: center; gap: 8px; }
+  .step-circle { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .step-circle.done { background: var(--green); color: #fff; }
+  .step-circle.active { background: var(--gold); color: #fff; }
+  .step-circle.pending { background: var(--bg3); color: var(--text-muted); border: 1px solid var(--border); }
+  .step-label { font-size: 11px; font-weight: 600; }
+  .step-label.done { color: var(--green); }
+  .step-label.active { color: var(--gold); }
+  .step-label.pending { color: var(--text-muted); }
+  .step-line { flex: 1; height: 1px; background: var(--border); min-width: 16px; }
+  .step-line.done { background: var(--green); }
+
+  /* TIMELINE */
+  .timeline { position: relative; padding-left: 24px; }
+  .timeline::before { content: ''; position: absolute; left: 8px; top: 0; bottom: 0; width: 1px; background: var(--border); }
+  .tl-item { position: relative; margin-bottom: 14px; }
+  .tl-dot { position: absolute; left: -20px; top: 4px; width: 10px; height: 10px; border-radius: 50%; }
+  .tl-dot.gold { background: var(--gold); }
+  .tl-dot.green { background: var(--green); }
+  .tl-dot.blue { background: var(--blue); }
+  .tl-dot.red { background: var(--red); }
+  .tl-dot.grey { background: var(--border); }
+  .tl-title { font-size: 13px; font-weight: 600; }
+  .tl-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .tl-time { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+
+  /* PROGRESS */
+  .progress-bar { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; background: var(--gold); }
+  .progress-fill.green { background: var(--green); }
+  .progress-fill.blue { background: var(--blue); }
+
+  /* APPROVAL BAR */
+  .approval-bar { background: #fef9c3; border: 1px solid #fde68a; border-radius: 8px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .approval-bar-text { font-size: 13px; }
+  .approval-bar-text strong { color: var(--gold); }
+  .approval-actions { display: flex; gap: 8px; }
+
+  /* SLACK */
+  .slack-msg { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .slack-msg:last-child { border-bottom: none; }
+  .slack-avatar { width: 32px; height: 32px; border-radius: 6px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; color: var(--text); }
+  .slack-name { font-size: 13px; font-weight: 600; }
+  .slack-time { font-size: 11px; color: var(--text-muted); margin-left: 6px; }
+  .slack-text { font-size: 13px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+  .slack-tag { background: #dbeafe; border: 1px solid #bfdbfe; border-radius: 4px; padding: 2px 6px; font-size: 11px; color: var(--blue); }
+
+  /* CLIENT LIST */
+  .client-row { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); gap: 14px; cursor: pointer; transition: all 0.15s; }
+  .client-row:last-child { border-bottom: none; }
+  .client-row:hover { background: rgba(0,0,0,0.02); margin: 0 -16px; padding: 12px 16px; border-radius: 6px; }
+  .client-avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--gold); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; flex-shrink: 0; }
+  .client-name { font-size: 13px; font-weight: 600; }
+  .client-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .client-status { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+  /* HOTEL */
+  .hotel-card { background: #f6f8fa; border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .hotel-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .hotel-location { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+  .equip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .equip-tag { background: #ffffff; border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: var(--text-muted); }
+
+  /* INFO BOX */
+  .info-box { padding: 12px 14px; border-radius: 6px; font-size: 12px; margin-bottom: 12px; line-height: 1.5; }
+  .info-box.gold { background: #fef9c3; border: 1px solid #fde68a; color: var(--gold); }
+  .info-box.green { background: #dcfce7; border: 1px solid #bbf7d0; color: var(--green); }
+  .info-box.red { background: #fee2e2; border: 1px solid #fecaca; color: var(--red); }
+  .info-box.blue { background: #dbeafe; border: 1px solid #bfdbfe; color: var(--blue); }
+  .info-box-title { font-weight: 700; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* FORM SELECT DROPDOWN */
+  .form-select {
+    width: 100%; padding: 9px 32px 9px 12px; border-radius: 6px;
+    border: 1px solid var(--border); font-size: 13px; font-family: inherit;
+    color: var(--text); background-color: var(--bg3); cursor: pointer;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .form-select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(184,134,11,0.15); }
+  .form-select.highlight {
+    border-color: var(--gold); color: var(--gold); background-color: #fef9c3; font-weight: 600;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23b8860b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  .form-select.highlight option { color: var(--text); font-weight: normal; background: #fff; }
+
+  /* DIVIDER */
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #f0f2f5; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+  /* DAY TABS */
+  .day-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .day-tab { padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--text-muted); transition: all 0.15s; }
+  .day-tab:hover { border-color: var(--gold); color: var(--gold); }
+  .day-tab.active { background: #374151; color: #fff; border-color: #374151; }
+  .day-content { display: none; }
+  .day-content.active { display: block; }
+
+  /* INLINE EDITING — sets / reps */
+  .editable {
+    cursor: pointer; border-radius: 3px; padding: 1px 4px; display: inline-block;
+    min-width: 30px; transition: background 0.15s, outline 0.15s;
+  }
+  .editable:hover { background: #fef9c3; outline: 1px dashed var(--gold); }
+  .editable:focus { background: #fef9c3; outline: 2px solid var(--gold); cursor: text; }
+  .editable-hint { font-size: 10px; color: var(--text-muted); margin-left: 6px; opacity: 0; transition: opacity 0.2s; }
+  .exercise-row:hover .editable-hint { opacity: 1; }
+
+  /* EXERCISE SEARCH / AUTOCOMPLETE */
+  .ex-name-editable {
+    cursor: pointer; border-radius: 3px; padding: 2px 6px; display: inline-block;
+    transition: background 0.15s; font-weight: 500;
+  }
+  .ex-name-editable:hover { background: #fef9c3; outline: 1px dashed var(--gold); }
+  .ex-autocomplete-wrapper { flex: 1; display: flex; }
+  .ex-autocomplete-input {
+    flex: 1; padding: 5px 10px; border: 2px solid var(--gold);
+    border-radius: 5px; font-size: 13px; font-family: inherit;
+    background: #fef9c3; outline: none; font-weight: 500; color: var(--text);
+  }
+  /* Dropdowns are appended to body as position:fixed — no CSS positioning needed here */
+  .ex-dropdown {
+    position: fixed; display: none;
+    min-width: 280px; max-width: 380px;
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    z-index: 9999; max-height: 240px; overflow-y: auto;
+  }
+  .ex-dropdown-header {
+    padding: 6px 12px; font-size: 10px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border); background: #f6f8fa;
+    border-radius: 8px 8px 0 0; position: sticky; top: 0;
+  }
+  .ex-dropdown-item {
+    padding: 9px 12px; font-size: 12px; cursor: pointer; color: var(--text);
+    border-bottom: 1px solid #f0f2f5; display: flex; align-items: center; gap: 8px;
+  }
+  .ex-dropdown-item:last-child { border-bottom: none; }
+  .ex-dropdown-item:hover, .ex-dropdown-item.focused { background: #fef9c3; color: var(--gold); }
+  .ex-dropdown-cat { font-size: 10px; color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+  .ex-dropdown-empty { padding: 12px; font-size: 12px; color: var(--text-muted); text-align: center; }
+  /* Sets picker */
+  .sets-picker {
+    position: fixed; display: flex; flex-direction: column;
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    z-index: 9999; overflow: hidden; min-width: 60px;
+  }
+  .sets-picker-header {
+    padding: 5px 10px; font-size: 9px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border); background: #f6f8fa; text-align: center;
+  }
+  .sets-picker-item {
+    padding: 9px 20px; font-size: 14px; font-weight: 700; cursor: pointer;
+    text-align: center; border-bottom: 1px solid #f0f2f5; color: var(--text);
+    transition: background 0.1s;
+  }
+  .sets-picker-item:last-child { border-bottom: none; }
+  .sets-picker-item:hover, .sets-picker-item.selected { background: #fef9c3; color: var(--gold); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="lr-badge">
+      <div class="lr-icon">LR</div>
+      <div>
+        <div class="lr-title">Programming OS</div>
+        <div class="lr-sub">Locker Room</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Overview</div>
+    <div class="nav-item active" onclick="showScreen('overview')"><span class="nav-icon">📊</span> System Overview</div>
+    <div class="nav-item" onclick="showScreen('queue')"><span class="nav-icon">👥</span> Client Queue <span class="nav-badge">3</span></div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">New Client Flow</div>
+    <div class="nav-item" onclick="showScreen('intake')"><span class="nav-icon">📋</span> Intake & Assessment</div>
+    <div class="nav-item" onclick="showScreen('ai-draft')"><span class="nav-icon">⚡</span> AI Program Draft</div>
+    <div class="nav-item" onclick="showScreen('review')"><span class="nav-icon">✅</span> Coach Review <span class="nav-badge green">1</span></div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Ongoing</div>
+    <div class="nav-item" onclick="showScreen('updates')"><span class="nav-icon">🔄</span> Program Updates <span class="nav-badge">2</span></div>
+    <div class="nav-item" onclick="showScreen('holiday')"><span class="nav-icon">✈️</span> Holiday Programs</div>
+    <div class="nav-item" onclick="showScreen('progression')"><span class="nav-icon">📈</span> Progression Tracker</div>
+  </div>
+
+  <div class="sidebar-footer">
+    <span class="status-dot"></span>AI Engine Active
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="flowModal" onclick="closeModalOnOverlay(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Step</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="modal-step" id="modal-step">1 of 5</div>
+        <div class="modal-close" onclick="closeModal()">✕</div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-desc" id="modal-desc"></div>
+      <div class="modal-tags" id="modal-tags"></div>
+    </div>
+    <div class="modal-nav">
+      <button class="modal-nav-btn" id="modal-prev" onclick="stepModal(-1)">← Previous</button>
+      <div class="modal-counter" id="modal-dots"></div>
+      <button class="modal-nav-btn primary" id="modal-next" onclick="stepModal(1)">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="top-bar">
+    <div>
+      <div class="top-bar-title" id="top-title">System Overview</div>
+      <div class="top-bar-sub" id="top-sub">LR Programming Automation — Prototype</div>
+    </div>
+    <div><div class="badge badge-gold">⚡ Prototype Demo</div></div>
+  </div>
+
+  <div class="content">
+
+    <!-- ====== OVERVIEW ====== -->
+    <div class="screen active" id="screen-overview">
+      <div class="section-header">
+        <div class="section-title">The Business Case</div>
+        <div class="section-sub">The programming workflow today is manual, inconsistent, and hard to scale. This system fixes that.</div>
+      </div>
+
+      <!-- BEFORE / AFTER STATS -->
+      <div class="compare-stats">
+        <div class="cs-col">
+          <div class="cs-header before">❌ Today — Manual Process</div>
+          <div class="cs-rows">
+            <div class="cs-row">
+              <div class="cs-value red">20–25<span style="font-size:14px;color:var(--text-muted)"> min</span></div>
+              <div class="cs-info">
+                <div class="cs-label">Time to build a first program</div>
+                <div class="cs-sub">Reading consult, physicals, cross-referencing, building from scratch</div>
+              </div>
+            </div>
+            <div class="cs-row">
+              <div class="cs-value red">5</div>
+              <div class="cs-info">
+                <div class="cs-label">Systems involved in one program</div>
+                <div class="cs-sub">Consult · Physicals · Supabase · Slack · TeamBuildr</div>
+              </div>
+            </div>
+            <div class="cs-row">
+              <div class="cs-value red">Variable</div>
+              <div class="cs-info">
+                <div class="cs-label">Output quality</div>
+                <div class="cs-sub">Depends entirely on who's programming that day</div>
+              </div>
+            </div>
+            <div class="cs-row">
+              <div class="cs-value red">Slow</div>
+              <div class="cs-info">
+                <div class="cs-label">Scalability as the business grows</div>
+                <div class="cs-sub">More clients = more manual hours = more risk</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cs-col">
+          <div class="cs-header after">✅ With This System</div>
+          <div class="cs-rows">
+            <div class="cs-row">
+              <div class="cs-value green">8–12<span style="font-size:14px;color:var(--text-muted)"> min</span></div>
+              <div class="cs-info">
+                <div class="cs-label">Time to approve a ready-to-go program</div>
+                <div class="cs-sub">Coach reviews a structured draft — not building from scratch</div>
+              </div>
+            </div>
+            <div class="cs-row">
+              <div class="cs-value green">1</div>
+              <div class="cs-info">
+                <div class="cs-label">Unified view coaches work from</div>
+                <div class="cs-sub">All data in one place · Single source of truth</div>
+              </div>
+            </div>
+            <div class="cs-row">
+              <div class="cs-value green">Consistent</div>
+              <div class="cs-info">
+                <div class="cs-label">Output quality</div>
+                <div class="cs-sub">Rules-based logic applied the same way every time</div>
+              </div>
+            </div>
+            <div class="cs-row">
+              <div class="cs-value green">Scalable</div>
+              <div class="cs-info">
+                <div class="cs-label">Grows with the business</div>
+                <div class="cs-sub">New coaches, new locations, same standard</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BEFORE / AFTER WORKFLOW -->
+      <div class="card mb-24">
+        <div class="card-title">Current State vs Future State</div>
+        <div class="compare-grid">
+          <div>
+            <div class="compare-header before">❌ Today — Manual, Fragmented</div>
+            <div class="compare-body">
+              <div class="compare-item"><span>🔴</span> Consult data and physicals live separately — coach must cross-reference manually</div>
+              <div class="compare-item"><span>🔴</span> Programming logic lives in coach heads — inconsistent quality across team</div>
+              <div class="compare-item"><span>🔴</span> First program built from scratch every time — same decisions made repeatedly</div>
+              <div class="compare-item"><span>🔴</span> Slack updates are freeform — easy to miss, easy to forget to action</div>
+              <div class="compare-item"><span>🔴</span> Holiday programs require manual hotel research each time</div>
+              <div class="compare-item"><span>🔴</span> Onboarding new coaches to programming is slow and inconsistent</div>
+            </div>
+          </div>
+          <div>
+            <div class="compare-header after">✅ Future — Structured, Scalable</div>
+            <div class="compare-body">
+              <div class="compare-item"><span>🟢</span> Client data flows automatically — AI interprets flags and generates a draft</div>
+              <div class="compare-item"><span>🟢</span> Programming rules encoded in the system — consistent quality regardless of who builds it</div>
+              <div class="compare-item"><span>🟢</span> Coach reviews and approves a draft rather than building from scratch</div>
+              <div class="compare-item"><span>🟢</span> Structured change requests with tracked status — nothing falls through</div>
+              <div class="compare-item"><span>🟢</span> Hotel equipment database — research once, reuse forever</div>
+              <div class="compare-item"><span>🟢</span> New coaches follow the system — faster onboarding, lower risk</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FLOW -->
+      <div class="card mb-24">
+        <div class="card-title">End-to-End System Flow — click any step to explore</div>
+        <div class="flow-row">
+          <div class="flow-node highlight" onclick="openModal(0)"><div class="fn-label">📋 Intake</div><div class="fn-sub">Consult + Physicals</div></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node highlight" onclick="openModal(1)"><div class="fn-label">⚡ AI Interpretation</div><div class="fn-sub">Flags + Profile Built</div></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node highlight" onclick="openModal(2)"><div class="fn-label">🏗️ Draft Program</div><div class="fn-sub">Rules Engine Builds It</div></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node highlight" onclick="openModal(3)"><div class="fn-label">✅ Coach Review</div><div class="fn-sub">Approve or Adjust</div></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node highlight" onclick="openModal(4)"><div class="fn-label">📤 Delivered</div><div class="fn-sub">Into TeamBuildr</div></div>
+        </div>
+        <div class="flow-row" style="margin-top:10px;">
+          <div class="flow-node" style="max-width:180px;cursor:default;"><div class="fn-label">🏋️ Coach on Floor</div><div class="fn-sub">Observes + Notes</div></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node highlight" onclick="openModal(5)"><div class="fn-label">📥 Structured Update</div><div class="fn-sub">Logged + Assigned</div></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node highlight" onclick="openModal(6)"><div class="fn-label">🔄 Program Updated</div><div class="fn-sub">Actioned + Tracked</div></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node highlight" onclick="openModal(7)"><div class="fn-label">📊 Progress Reviewed</div><div class="fn-sub">Re-test + Progress</div></div>
+          <div style="flex:1"></div>
+        </div>
+      </div>
+
+      <!-- BOTTOM CARDS -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Encoded Programming Rules</div>
+          <div class="timeline">
+            <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">Session frequency locked to membership</div><div class="tl-sub">Can never be overridden by the AI</div></div>
+            <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">40-minute session cap enforced</div><div class="tl-sub">All set and rest logic fits inside this window</div></div>
+            <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">Max 2 exercises per series</div><div class="tl-sub">Rehab + A + B + C = 6–8 exercises total</div></div>
+            <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">All pairings must work at all sites</div><div class="tl-sub">Bridge, Bligh and Collins Street compatible · + future sites</div></div>
+            <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">C-series must be self-sufficient</div><div class="tl-sub">No benches or key machines required</div></div>
+            <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">Approved exercise library only</div><div class="tl-sub">No unapproved exercise selections</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Commercial Impact</div>
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;"><span>Programming time saved per client</span><span style="color:var(--green);font-weight:700;">~65%</span></div>
+            <div class="progress-bar"><div class="progress-fill green" style="width:65%"></div></div>
+          </div>
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;"><span>Consistency across programming team</span><span style="color:var(--gold);font-weight:700;">High</span></div>
+            <div class="progress-bar"><div class="progress-fill" style="width:90%"></div></div>
+          </div>
+          <div style="margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;"><span>Scalability with new coaches and locations</span><span style="color:var(--blue);font-weight:700;">Fast</span></div>
+            <div class="progress-bar"><div class="progress-fill blue" style="width:85%"></div></div>
+          </div>
+          <div class="divider"></div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Result</div>
+          <div style="font-size:14px;color:var(--text);line-height:1.65;font-weight:500;">The system turns expert coaching knowledge into a repeatable, scalable asset. Coach time shifts from manual building to strategic oversight — reducing dependence on any individual, maintaining quality at scale, and creating a platform strong enough to grow with the business.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== CLIENT QUEUE ====== -->
+    <div class="screen" id="screen-queue">
+      <div class="section-header"><div class="section-title">Client Queue</div><div class="section-sub">This week's programming workload at a glance</div></div>
+
+      <div class="card">
+        <!-- QUEUE TABS -->
+        <div class="day-tabs" style="margin-bottom:20px;">
+          <div class="day-tab active" onclick="switchDay(this,'cq-awaiting')" style="flex:1;text-align:center;">
+            Awaiting First Program &nbsp;<span style="background:rgba(217,119,6,0.15);color:#d97706;border:1px solid #fde68a;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;">6 remaining</span>
+          </div>
+          <div class="day-tab" onclick="switchDay(this,'cq-phase')" style="flex:1;text-align:center;">
+            New Training Phase Due &nbsp;<span style="background:rgba(37,99,235,0.1);color:var(--blue);border:1px solid #bfdbfe;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;">12 of 15 remaining</span>
+          </div>
+          <div class="day-tab" onclick="switchDay(this,'cq-recent')" style="flex:1;text-align:center;">
+            Recently Actioned &nbsp;<span style="background:#dcfce7;color:var(--green);border:1px solid #bbf7d0;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;">10 this week</span>
+          </div>
+        </div>
+
+        <!-- TAB: AWAITING FIRST PROGRAM -->
+        <div class="day-content active" id="cq-awaiting">
+          <div class="info-box gold" style="margin-bottom:14px;">
+            <div class="info-box-title">Awaiting First Program — 6 remaining this week</div>
+            New clients whose physicals are in. No program exists yet. Draft and approve before their first training session.
+          </div>
+          <div class="client-row" onclick="showScreen('intake')">
+            <div class="client-avatar">MH</div>
+            <div style="flex:1;"><div class="client-name">Marcus H.</div><div class="client-meta">Physicals in 2 hrs ago · 3×/week · Beginner · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-orange">Awaiting Draft</div><div style="font-size:11px;color:var(--text-muted);">→ Click to open</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:var(--blue);">SL</div>
+            <div style="flex:1;"><div class="client-name">Sarah L.</div><div class="client-meta">Physicals in 5 hrs ago · 2×/week · Intermediate · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-orange">Awaiting Draft</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:var(--purple);">JK</div>
+            <div style="flex:1;"><div class="client-name">James K.</div><div class="client-meta">Physicals in yesterday · 2×/week · Advanced · Strength</div></div>
+            <div class="client-status"><div class="badge badge-gold">Draft Ready</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#d97706;">OR</div>
+            <div style="flex:1;"><div class="client-name">Olivia R.</div><div class="client-meta">Physicals in yesterday · 4×/week · Intermediate · Weight loss</div></div>
+            <div class="client-status"><div class="badge badge-orange">Awaiting Draft</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#2563eb;">DF</div>
+            <div style="flex:1;"><div class="client-name">Daniel F.</div><div class="client-meta">Physicals in 2 days ago · 2×/week · Beginner · General fitness</div></div>
+            <div class="client-status"><div class="badge badge-orange">Awaiting Draft</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#be185d;">CM</div>
+            <div style="flex:1;"><div class="client-name">Chloe M.</div><div class="client-meta">Physicals in 3 days ago · 3×/week · Beginner · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-gold">Draft Ready</div></div>
+          </div>
+        </div>
+
+        <!-- TAB: NEW TRAINING PHASE DUE -->
+        <div class="day-content" id="cq-phase">
+          <div class="info-box blue" style="margin-bottom:14px;">
+            <div class="info-box-title">New Training Phase Due — 12 of 15 remaining this week</div>
+            These clients have completed their current phase or hit the progression threshold. 3 have already been actioned this week. New program needed before their next session.
+          </div>
+          <div class="client-row" onclick="showScreen('intake')">
+            <div class="client-avatar" style="background:#0891b2;">TW</div>
+            <div style="flex:1;"><div class="client-name">Tom W.</div><div class="client-meta">3×/week · Intermediate · Phase 1 complete — 6 wks, 85% adherence · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div><div style="font-size:11px;color:var(--text-muted);">→ Click to open</div></div>
+          </div>
+          <div class="client-row" onclick="showScreen('intake')">
+            <div class="client-avatar" style="background:#7c3aed;">PS</div>
+            <div style="flex:1;"><div class="client-name">Priya S.</div><div class="client-meta">2×/week · Beginner → Intermediate · Phase 1 complete — 5 wks · Strength</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div></div>
+          </div>
+          <div class="client-row" onclick="showScreen('intake')">
+            <div class="client-avatar" style="background:#059669;">LC</div>
+            <div style="flex:1;"><div class="client-name">Lee C.</div><div class="client-meta">4×/week · Advanced · Phase 2 complete — coach note: ready to progress · Performance</div></div>
+            <div class="client-status"><div class="badge badge-gold">Phase Extended</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#be185d;">SB</div>
+            <div style="flex:1;"><div class="client-name">Sophie B.</div><div class="client-meta">3×/week · Beginner · Phase 1 complete — 5 wks, 78% adherence · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#0284c7;">RK</div>
+            <div style="flex:1;"><div class="client-name">Ryan K.</div><div class="client-meta">2×/week · Intermediate · Phase 2 complete — 6 wks, 90% adherence · Strength</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#16a34a;">AT</div>
+            <div style="flex:1;"><div class="client-name">Amanda T.</div><div class="client-meta">4×/week · Advanced · Phase 1 complete — 6 wks · Performance</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#9333ea;">CN</div>
+            <div style="flex:1;"><div class="client-name">Chris N.</div><div class="client-meta">3×/week · Beginner · Phase 1 complete — 5 wks, 70% adherence · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#0891b2;">ML</div>
+            <div style="flex:1;"><div class="client-name">Mei L.</div><div class="client-meta">2×/week · Intermediate · Phase 2 complete — 6 wks · Weight loss</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#b45309;">JP</div>
+            <div style="flex:1;"><div class="client-name">Jack P.</div><div class="client-meta">3×/week · Advanced · Phase 3 complete — 6 wks, 92% adherence · Strength</div></div>
+            <div class="client-status"><div class="badge badge-gold">Phase Extended</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#db2777;">ZH</div>
+            <div style="flex:1;"><div class="client-name">Zoe H.</div><div class="client-meta">2×/week · Beginner · Phase 1 complete — 5 wks · General fitness</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#2563eb;">NG</div>
+            <div style="flex:1;"><div class="client-name">Nathan G.</div><div class="client-meta">3×/week · Intermediate · Phase 1 complete — 6 wks, 83% adherence · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#7c3aed;">BW</div>
+            <div style="flex:1;"><div class="client-name">Bella W.</div><div class="client-meta">4×/week · Advanced · Phase 2 complete — 6 wks · Performance</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#64748b;">SD</div>
+            <div style="flex:1;"><div class="client-name">Sam D.</div><div class="client-meta">1×/week · Beginner · Phase 1 complete — 6 wks, 67% adherence · General fitness</div></div>
+            <div class="client-status"><div class="badge badge-gold">Phase Extended</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#0f766e;">IF</div>
+            <div style="flex:1;"><div class="client-name">Imogen F.</div><div class="client-meta">3×/week · Intermediate · Phase 1 complete — 5 wks, 88% adherence · Strength</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#d97706;">JM</div>
+            <div style="flex:1;"><div class="client-name">Josh M.</div><div class="client-meta">2×/week · Intermediate · Phase 2 complete — 6 wks, 80% adherence · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-blue">New Phase Due</div></div>
+          </div>
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+            <div style="font-size:12px;color:var(--text-muted);">Also actioned this week:</div>
+            <div class="badge badge-green">✓ Rachel P.</div>
+            <div class="badge badge-green">✓ Ben T.</div>
+            <div class="badge badge-green">✓ Kate S.</div>
+          </div>
+        </div>
+
+        <!-- TAB: RECENTLY ACTIONED -->
+        <div class="day-content" id="cq-recent">
+          <div class="info-box green" style="margin-bottom:14px;">
+            <div class="info-box-title">Recently Actioned — 10 programs approved this week</div>
+            Programs approved and pushed to TeamBuildr. Clients are training on their current program.
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:var(--green);">RP</div>
+            <div style="flex:1;"><div class="client-name">Rachel P.</div><div class="client-meta">3×/week · Advanced · Phase 2 approved today · Rehab-led (shoulder)</div></div>
+            <div class="client-status"><div class="badge badge-green">✓ Today</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#94a3b8;">BT</div>
+            <div style="flex:1;"><div class="client-name">Ben T.</div><div class="client-meta">1×/week · Beginner · Phase 1 approved today · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-green">✓ Today</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#2563eb;">KS</div>
+            <div style="flex:1;"><div class="client-name">Kate S.</div><div class="client-meta">3×/week · Intermediate · Phase 2 approved yesterday · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-green">✓ Yesterday</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#059669;">AB</div>
+            <div style="flex:1;"><div class="client-name">Alex B.</div><div class="client-meta">2×/week · Intermediate · Phase progressed 2 days ago · Strength</div></div>
+            <div class="client-status"><div class="badge badge-green">✓ 2 days ago</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#be185d;">NC</div>
+            <div style="flex:1;"><div class="client-name">Nina C.</div><div class="client-meta">4×/week · Advanced · Phase 1 approved 3 days ago · Performance</div></div>
+            <div class="client-status"><div class="badge badge-green">✓ 3 days ago</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#7c3aed;">TM</div>
+            <div style="flex:1;"><div class="client-name">Tyler M.</div><div class="client-meta">3×/week · Intermediate · Phase 2 started 3 days ago · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-green">✓ 3 days ago</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#0891b2;">ER</div>
+            <div style="flex:1;"><div class="client-name">Emma R.</div><div class="client-meta">2×/week · Beginner · Program updated 4 days ago · General fitness</div></div>
+            <div class="client-status"><div class="badge badge-green">✓ 4 days ago</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#b45309;">LF</div>
+            <div style="flex:1;"><div class="client-name">Luke F.</div><div class="client-meta">3×/week · Beginner · Phase 1 approved 5 days ago · Body composition</div></div>
+            <div class="client-status"><div class="badge badge-green">✓ 5 days ago</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#db2777;">JO</div>
+            <div style="flex:1;"><div class="client-name">Jasmine O.</div><div class="client-meta">2×/week · Intermediate · Program approved 6 days ago · Weight loss</div></div>
+            <div class="client-status"><div class="badge badge-green">✓ 6 days ago</div></div>
+          </div>
+          <div class="client-row">
+            <div class="client-avatar" style="background:#64748b;">WP</div>
+            <div style="flex:1;"><div class="client-name">Will P.</div><div class="client-meta">4×/week · Advanced · Phase 3 approved 1 week ago · Strength</div></div>
+            <div class="client-status"><div class="badge badge-green">✓ 1 week ago</div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ====== INTAKE ====== -->
+    <div class="screen" id="screen-intake">
+      <div class="section-header"><div class="section-title">Client Intake — Marcus H.</div><div class="section-sub">Physicals form received from Supabase · Auto-populated from consult</div></div>
+      <div class="steps mb-24">
+        <div class="step"><div class="step-circle done">✓</div><div class="step-label done">Consult</div></div>
+        <div class="step-line done"></div>
+        <div class="step"><div class="step-circle done">✓</div><div class="step-label done">Physicals</div></div>
+        <div class="step-line done"></div>
+        <div class="step"><div class="step-circle active">3</div><div class="step-label active">AI Interpretation</div></div>
+        <div class="step-line"></div>
+        <div class="step"><div class="step-circle pending">4</div><div class="step-label pending">Draft Program</div></div>
+        <div class="step-line"></div>
+        <div class="step"><div class="step-circle pending">5</div><div class="step-label pending">Coach Review</div></div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab(this,'tab-profile')">Client Profile</div>
+        <div class="tab" onclick="switchTab(this,'tab-movement')">Movement Screen</div>
+        <div class="tab" onclick="switchTab(this,'tab-benchmarks')">Benchmarks</div>
+      </div>
+      <div id="tab-profile">
+        <div class="grid-2 mb-16">
+          <div class="card">
+            <div class="card-title">Membership & Logistics</div>
+            <div class="form-group"><div class="form-label">Sessions per week</div><div class="form-value highlight">3 × Perform Sessions</div></div>
+            <div class="form-group"><div class="form-label">Session duration</div><div class="form-value">40 minutes</div></div>
+            <div class="form-group">
+              <div class="form-label">Split structure</div>
+              <select class="form-select highlight">
+                <optgroup label="3×/week">
+                  <option selected>Upper · Lower · Mixed</option>
+                  <option>Push · Pull · Legs</option>
+                  <option>Full Body × 3</option>
+                </optgroup>
+                <optgroup label="2×/week">
+                  <option>Full Body × 2</option>
+                  <option>Upper · Lower</option>
+                </optgroup>
+                <optgroup label="4×/week">
+                  <option>Upper · Lower · Upper · Lower</option>
+                  <option>Push · Pull · Push · Pull</option>
+                </optgroup>
+                <optgroup label="1×/week">
+                  <option>Full Body × 1</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="form-group"><div class="form-label">VO2 / cardio</div><div class="form-value">1 × weekly, erg-based</div></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Experience & Goals</div>
+            <div class="form-group"><div class="form-label">Experience level</div><div class="form-value highlight">🟡 Beginner</div></div>
+            <div class="form-group"><div class="form-label">Primary goal</div><div class="form-value">Body composition — ↑ muscle, ↓ body fat</div></div>
+            <div class="form-group"><div class="form-label">Secondary goal</div><div class="form-value">Build strength</div></div>
+            <div class="form-group"><div class="form-label">Rehab / pain</div><div class="form-value">Lower back — occasional tightness, monitor</div></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">Health Screening</div>
+            <div class="form-group"><div class="form-label">Previous injuries</div><div class="form-value">Lower back strain (2 yrs ago, resolved)</div></div>
+            <div class="form-group"><div class="form-label">Current restrictions</div><div class="form-value">Avoid heavy floor-based hinge early on</div></div>
+            <div class="form-group"><div class="form-label">Medications</div><div class="form-value">None</div></div>
+            <div class="form-group"><div class="form-label">Physio input</div><div class="form-value">None currently — monitor lower back</div></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Body Composition (Scan)</div>
+            <div class="form-group"><div class="form-label">Weight</div><div class="form-value">88.4 kg</div></div>
+            <div class="form-group"><div class="form-label">Body fat %</div><div class="form-value">26.2%</div></div>
+            <div class="form-group"><div class="form-label">Muscle mass</div><div class="form-value">58.1 kg</div></div>
+            <div class="form-group"><div class="form-label">Training history</div><div class="form-value">Casual gym 2 yrs ago, no structured coaching</div></div>
+          </div>
+        </div>
+      </div>
+      <div id="tab-movement" style="display:none;">
+        <div class="grid-2 mb-16">
+          <div class="card">
+            <div class="card-title">Squat Pattern</div>
+            <div class="form-group"><div class="form-label">Depth achieved</div><div class="form-value" style="color:var(--orange);">⚠ Above 90° — limited range</div></div>
+            <div class="form-group"><div class="form-label">Control / balance</div><div class="form-value">Moderate — slight forward lean</div></div>
+            <div class="form-group"><div class="form-label">Pain during movement</div><div class="form-value" style="color:var(--green);">✓ None</div></div>
+            <div class="form-group"><div class="form-label">Coach note</div><div class="form-value">Squatting to bench works well. Needs ankle mobility work.</div></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Hinge Pattern</div>
+            <div class="form-group"><div class="form-label">Hip hinge awareness</div><div class="form-value" style="color:var(--red);">🔴 Poor — rounds spine early, cannot find hip hinge</div></div>
+            <div class="form-group"><div class="form-label">Straight-leg reach</div><div class="form-value">Mid-shin only</div></div>
+            <div class="form-group"><div class="form-label">Pain during movement</div><div class="form-value" style="color:var(--green);">✓ None</div></div>
+            <div class="form-group"><div class="form-label">Coach note</div><div class="form-value">No loaded hinge yet. Needs pattern teaching before any load is applied.</div></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">Overhead Pattern</div>
+            <div class="form-group"><div class="form-label">Range of motion</div><div class="form-value" style="color:var(--green);">✓ Full vertical range — no compensation</div></div>
+            <div class="form-group"><div class="form-label">Shoulder stability</div><div class="form-value">Good</div></div>
+            <div class="form-group"><div class="form-label">Pain</div><div class="form-value" style="color:var(--green);">✓ None</div></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Push Pattern</div>
+            <div class="form-group"><div class="form-label">Push-up capacity</div><div class="form-value" style="color:var(--orange);">⚠ 8 reps — low-moderate</div></div>
+            <div class="form-group"><div class="form-label">Control</div><div class="form-value">Elbows flare slightly, core sags at end range</div></div>
+            <div class="form-group"><div class="form-label">Pain</div><div class="form-value" style="color:var(--green);">✓ None</div></div>
+          </div>
+        </div>
+      </div>
+      <div id="tab-benchmarks" style="display:none;">
+        <div class="grid-3">
+          <div class="card"><div class="card-title">Grip Strength</div><div style="font-size:24px;font-weight:800;margin-bottom:6px;">38 kg</div><div class="badge badge-orange">Below average</div><div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Longevity marker · re-test at 12 weeks</div></div>
+          <div class="card"><div class="card-title">Chin-over-bar Hold</div><div style="font-size:24px;font-weight:800;margin-bottom:6px;">14 sec</div><div class="badge badge-orange">Below average</div><div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Upper body pulling capacity</div></div>
+          <div class="card"><div class="card-title">Vertical Jump</div><div style="font-size:24px;font-weight:800;margin-bottom:6px;">34 cm</div><div class="badge badge-grey">Average</div><div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Power benchmark</div></div>
+          <div class="card"><div class="card-title">RSI (Hopping Test)</div><div style="font-size:24px;font-weight:800;margin-bottom:6px;">1.24</div><div class="badge badge-grey">Average</div><div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Reactive strength index</div></div>
+          <div class="card"><div class="card-title">VO2 (12-min bike)</div><div style="font-size:24px;font-weight:800;margin-bottom:6px;">142 W</div><div class="badge badge-red">Below average</div><div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Average watts maintained</div></div>
+          <div class="card"><div class="card-title">Push-up Max</div><div style="font-size:24px;font-weight:800;margin-bottom:6px;">8 reps</div><div class="badge badge-orange">Low-moderate</div><div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Upper body strength endurance</div></div>
+        </div>
+      </div>
+      <div style="margin-top:24px;display:flex;justify-content:flex-end;">
+        <button class="btn btn-gold" onclick="showScreen('ai-draft')">Generate AI Draft →</button>
+      </div>
+    </div>
+
+    <!-- ====== AI DRAFT ====== -->
+    <div class="screen" id="screen-ai-draft">
+      <div class="section-header"><div class="section-title">AI Program Draft — Marcus H.</div><div class="section-sub">3×/week · Upper · Lower · Mixed · Beginner · Body composition</div></div>
+      <div class="steps mb-24">
+        <div class="step"><div class="step-circle done">✓</div><div class="step-label done">Consult</div></div>
+        <div class="step-line done"></div>
+        <div class="step"><div class="step-circle done">✓</div><div class="step-label done">Physicals</div></div>
+        <div class="step-line done"></div>
+        <div class="step"><div class="step-circle done">✓</div><div class="step-label done">AI Interpretation</div></div>
+        <div class="step-line done"></div>
+        <div class="step"><div class="step-circle active">4</div><div class="step-label active">Draft Program</div></div>
+        <div class="step-line"></div>
+        <div class="step"><div class="step-circle pending">5</div><div class="step-label pending">Coach Review</div></div>
+      </div>
+
+      <div class="grid-2 mb-16">
+        <div class="card">
+          <div class="card-title">⚡ Flags Generated from Intake Data</div>
+          <div class="flags-row">
+            <div class="flag flag-warn">⚠ Squat depth limited</div>
+            <div class="flag flag-block">🔴 Hinge pattern not ready for load</div>
+            <div class="flag flag-warn">⚠ Push capacity low-moderate</div>
+            <div class="flag flag-ok">✓ Overhead full range</div>
+            <div class="flag flag-ok">✓ No active injury</div>
+            <div class="flag flag-block">🔴 No loaded hinge exercises</div>
+            <div class="flag flag-info">ℹ Beginner — teach movements first</div>
+            <div class="flag flag-info">ℹ Lower back history — monitor</div>
+            <div class="flag flag-ok">✓ 3×/week locked to membership</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Programming Profile Applied</div>
+          <div class="form-group"><div class="form-label">Experience</div><div class="form-value">🟡 Beginner — simple, stable, high reps, pattern teaching</div></div>
+          <div class="form-group"><div class="form-label">Phase 1 intent</div><div class="form-value">Weeks 1–5: competency, consistency, confidence</div></div>
+          <div class="form-group">
+            <div class="form-label">Rep range</div>
+            <select class="form-select highlight">
+              <option>10–12 reps / 2–3 sets</option>
+              <option>8–10 reps / 3–4 sets (strength focus)</option>
+              <option>12–15 reps / 2–3 sets (volume)</option>
+              <option>15–20 reps / 2 sets (high rep / endurance)</option>
+              <option>6–8 reps / 4–5 sets (heavy strength)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <div class="form-label">Split</div>
+            <select class="form-select highlight">
+              <option>Day 1 Upper · Day 2 Lower · Day 3 Mixed</option>
+              <option>Day 1 Push · Day 2 Pull · Day 3 Legs</option>
+              <option>Day 1 Full Body · Day 2 Full Body · Day 3 Full Body</option>
+              <option>Day 1 Upper · Day 2 Lower · Day 3 Upper</option>
+            </select>
+          </div>
+          <div class="form-group"><div class="form-label">Key restriction</div><div class="form-value" style="color:var(--red);">No loaded hinge — pattern teaching only in rehab block</div></div>
+        </div>
+      </div>
+
+      <div class="info-box gold mb-16">
+        <div class="info-box-title">⚡ AI Note</div>
+        Hinge flag applied: Marcus cannot safely load a hinge pattern yet. Trap Bar Deadlift and RDL have been excluded. Leg Curl and Leg Extension used for lower body posterior chain work. Hinge wall drill included in rehab block as a teaching tool only — no load. Each day is a distinct session.
+      </div>
+
+      <!-- DAY TABS -->
+      <div class="card">
+        <div class="card-title">Draft Program — Select Day</div>
+        <div class="day-tabs">
+          <div class="day-tab active" onclick="switchDay(this,'day1')">Day 1 — Upper Body</div>
+          <div class="day-tab" onclick="switchDay(this,'day2')">Day 2 — Lower Body</div>
+          <div class="day-tab" onclick="switchDay(this,'day3')">Day 3 — Mixed</div>
+          <div class="day-tab" onclick="switchDay(this,'dayAll')" style="margin-left:auto;border-color:var(--gold);color:var(--gold);">📅 Full Week View</div>
+        </div>
+
+        <!-- DAY 1 - UPPER -->
+        <div class="day-content active" id="day1">
+          <div class="program-series series-r">
+            <div class="series-header"><span>🟢 REHAB / PREP</span><span class="badge badge-green">Upper prep</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">Cat-Cow Spinal Segmentation</div><div class="ex-sets">2</div><div class="ex-reps">10 slow</div><div class="ex-note">Lower back prep — history flag</div></div>
+              <div class="exercise-row"><div class="ex-name">Band Pull-Apart</div><div class="ex-sets">2</div><div class="ex-reps">12 reps</div><div class="ex-note">Shoulder warm-up · scapular activation</div></div>
+            </div>
+          </div>
+          <div class="program-series series-a">
+            <div class="series-header"><span>🟡 A SERIES — Primary Push + Pull</span><span class="badge badge-gold">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">DB Flat Bench Press</div><div class="ex-sets">3</div><div class="ex-reps">10–12</div><div class="ex-note">Horizontal push · benchmark lift</div></div>
+              <div class="exercise-row"><div class="ex-name">Medium Grip Pulldown</div><div class="ex-sets">3</div><div class="ex-reps">10–12</div><div class="ex-note">Vertical pull · benchmark lift</div></div>
+            </div>
+          </div>
+          <div class="program-series series-b">
+            <div class="series-header"><span>🔵 B SERIES — Secondary Upper</span><span class="badge badge-blue">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">Seated Cable Row</div><div class="ex-sets">3</div><div class="ex-reps">10–12</div><div class="ex-note">Horizontal pull · back thickness</div></div>
+              <div class="exercise-row"><div class="ex-name">DB Lateral Raise</div><div class="ex-sets">3</div><div class="ex-reps">12–15</div><div class="ex-note">Shoulder accessory · safe, low skill</div></div>
+            </div>
+          </div>
+          <div class="program-series series-c">
+            <div class="series-header"><span>🟣 C SERIES — Independent Finisher</span><span class="badge badge-pink">No bench / machine</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">DB Bicep Curl</div><div class="ex-sets">2</div><div class="ex-reps">12–15</div><div class="ex-note">Arm accessory · independent</div></div>
+              <div class="exercise-row"><div class="ex-name">Tricep Rope Pushdown</div><div class="ex-sets">2</div><div class="ex-reps">12–15</div><div class="ex-note">Arm accessory · cable, low risk</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DAY 2 - LOWER -->
+        <div class="day-content" id="day2">
+          <div class="program-series series-r">
+            <div class="series-header"><span>🟢 REHAB / PREP</span><span class="badge badge-green">Lower prep + hinge teaching</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">Hip Hinge Wall Drill</div><div class="ex-sets">2</div><div class="ex-reps">10 reps</div><div class="ex-note">🔴 Teaching only — no load · hinge flag</div></div>
+              <div class="exercise-row"><div class="ex-name">Glute Activation (Clamshell)</div><div class="ex-sets">2</div><div class="ex-reps">15 each side</div><div class="ex-note">Glute prep · supports lower back</div></div>
+            </div>
+          </div>
+          <div class="program-series series-a">
+            <div class="series-header"><span>🟡 A SERIES — Primary Lower</span><span class="badge badge-gold">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">Leg Press</div><div class="ex-sets">3</div><div class="ex-reps">10–12</div><div class="ex-note">⚠ Squat substitute · depth limited · benchmark</div></div>
+              <div class="exercise-row"><div class="ex-name">Leg Extension</div><div class="ex-sets">3</div><div class="ex-reps">10–12</div><div class="ex-note">Quad isolation · no hinge required</div></div>
+            </div>
+          </div>
+          <div class="program-series series-b">
+            <div class="series-header"><span>🔵 B SERIES — Secondary Lower</span><span class="badge badge-blue">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">Leg Curl (machine)</div><div class="ex-sets">3</div><div class="ex-reps">10–12</div><div class="ex-note">🔴 Hinge excluded — machine hamstring safe</div></div>
+              <div class="exercise-row"><div class="ex-name">Goblet Squat to Box</div><div class="ex-sets">3</div><div class="ex-reps">10–12</div><div class="ex-note">⚠ Squat depth limited — box controls range</div></div>
+            </div>
+          </div>
+          <div class="program-series series-c">
+            <div class="series-header"><span>🟣 C SERIES — Independent Finisher</span><span class="badge badge-pink">Self-sufficient</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">Standing Calf Raise</div><div class="ex-sets">2</div><div class="ex-reps">15–20</div><div class="ex-note">Low risk · independent · no equipment</div></div>
+              <div class="exercise-row"><div class="ex-name">Plank Hold</div><div class="ex-sets">2</div><div class="ex-reps">30–40 sec</div><div class="ex-note">Core · low risk · no equipment</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DAY 3 - MIXED -->
+        <div class="day-content" id="day3">
+          <div class="program-series series-r">
+            <div class="series-header"><span>🟢 REHAB / PREP</span><span class="badge badge-green">Full body prep</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">Cat-Cow Spinal Segmentation</div><div class="ex-sets">2</div><div class="ex-reps">10 slow</div><div class="ex-note">Lower back prep — history flag</div></div>
+              <div class="exercise-row"><div class="ex-name">Hip Hinge Wall Drill</div><div class="ex-sets">2</div><div class="ex-reps">10 reps</div><div class="ex-note">🔴 Teaching only — no load · continued practice</div></div>
+            </div>
+          </div>
+          <div class="program-series series-a">
+            <div class="series-header"><span>🟡 A SERIES — Lower + Upper Compound</span><span class="badge badge-gold">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">Hack Squat (Machine)</div><div class="ex-sets">3</div><div class="ex-reps">10–12</div><div class="ex-note">Quad focus — different pattern to Leg Press</div></div>
+              <div class="exercise-row"><div class="ex-name">Incline DB Press</div><div class="ex-sets">3</div><div class="ex-reps">10–12</div><div class="ex-note">Upper chest variation — complements flat bench day</div></div>
+            </div>
+          </div>
+          <div class="program-series series-b">
+            <div class="series-header"><span>🔵 B SERIES — Pull + Single-Leg Pattern</span><span class="badge badge-blue">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">Single Arm Cable Row</div><div class="ex-sets">3</div><div class="ex-reps">10–12</div><div class="ex-note">Horizontal pull variation — unilateral balance</div></div>
+              <div class="exercise-row"><div class="ex-name">DB Split Squat</div><div class="ex-sets">3</div><div class="ex-reps">10–12</div><div class="ex-note">Single-leg pattern — different to bilateral squat days</div></div>
+            </div>
+          </div>
+          <div class="program-series series-c">
+            <div class="series-header"><span>🟣 C SERIES — Independent Finisher</span><span class="badge badge-pink">Self-sufficient</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Reason</span></div>
+              <div class="exercise-row"><div class="ex-name">Hammer Curl</div><div class="ex-sets">2</div><div class="ex-reps">12–15</div><div class="ex-note">Brachialis focus — variation on standard curl</div></div>
+              <div class="exercise-row"><div class="ex-name">Dead Bug</div><div class="ex-sets">2</div><div class="ex-reps">8 each side</div><div class="ex-note">Anti-extension core — safer than plank for back history</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WEEK VIEW -->
+        <div class="day-content" id="dayAll">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">All three sessions side by side. Use this view to check balance, spot duplicates, or move exercises between days.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+
+            <!-- DAY 1 COMPACT -->
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green);margin-bottom:8px;padding:6px 10px;background:#dcfce7;border-radius:6px;">Day 1 — Upper Body</div>
+              <div style="font-size:11px;font-weight:600;color:#6b7280;padding:4px 8px;background:#f3f4f6;border-radius:4px;margin-bottom:4px;">Rehab / Prep</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">Cat-Cow Spinal Seg. <span style="float:right;color:var(--text-muted);">2×10</span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;">Band Pull-Apart <span style="float:right;color:var(--text-muted);">2×12</span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);padding:4px 8px;background:#dcfce7;border-radius:4px;margin-bottom:4px;">A Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">DB Flat Bench Press <span style="float:right;color:var(--text-muted);">3×10–12</span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;">Med. Grip Pulldown <span style="float:right;color:var(--text-muted);">3×10–12</span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--blue);padding:4px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;">B Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">Seated Cable Row <span style="float:right;color:var(--text-muted);">3×10–12</span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;">DB Lateral Raise <span style="float:right;color:var(--text-muted);">3×12–15</span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--pink);padding:4px 8px;background:#fce7f3;border-radius:4px;margin-bottom:4px;">C Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">DB Bicep Curl <span style="float:right;color:var(--text-muted);">2×12–15</span></div>
+              <div style="font-size:12px;padding:4px 8px;">Tricep Rope Pushdown <span style="float:right;color:var(--text-muted);">2×12–15</span></div>
+            </div>
+
+            <!-- DAY 2 COMPACT -->
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green);margin-bottom:8px;padding:6px 10px;background:#dcfce7;border-radius:6px;">Day 2 — Lower Body</div>
+              <div style="font-size:11px;font-weight:600;color:#6b7280;padding:4px 8px;background:#f3f4f6;border-radius:4px;margin-bottom:4px;">Rehab / Prep</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">Hip Hinge Wall Drill <span style="float:right;color:var(--text-muted);">2×10</span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;">Glute Activation <span style="float:right;color:var(--text-muted);">2×15ea</span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);padding:4px 8px;background:#dcfce7;border-radius:4px;margin-bottom:4px;">A Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">Leg Press <span style="float:right;color:var(--text-muted);">3×10–12</span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;">Leg Extension <span style="float:right;color:var(--text-muted);">3×10–12</span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--blue);padding:4px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;">B Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">Leg Curl (machine) <span style="float:right;color:var(--text-muted);">3×10–12</span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;">Goblet Squat to Box <span style="float:right;color:var(--text-muted);">3×10–12</span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--pink);padding:4px 8px;background:#fce7f3;border-radius:4px;margin-bottom:4px;">C Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">Standing Calf Raise <span style="float:right;color:var(--text-muted);">2×15–20</span></div>
+              <div style="font-size:12px;padding:4px 8px;">Plank Hold <span style="float:right;color:var(--text-muted);">2×30–40s</span></div>
+            </div>
+
+            <!-- DAY 3 COMPACT -->
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green);margin-bottom:8px;padding:6px 10px;background:#dcfce7;border-radius:6px;">Day 3 — Mixed</div>
+              <div style="font-size:11px;font-weight:600;color:#6b7280;padding:4px 8px;background:#f3f4f6;border-radius:4px;margin-bottom:4px;">Rehab / Prep</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">Cat-Cow Spinal Seg. <span style="float:right;color:var(--text-muted);">2×10</span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;">Hip Hinge Wall Drill <span style="float:right;color:var(--text-muted);">2×10</span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);padding:4px 8px;background:#dcfce7;border-radius:4px;margin-bottom:4px;">A Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">Hack Squat (Machine) <span style="float:right;color:var(--text-muted);">3×10–12</span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;">Incline DB Press <span style="float:right;color:var(--text-muted);">3×10–12</span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--blue);padding:4px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;">B Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">Single Arm Cable Row <span style="float:right;color:var(--text-muted);">3×10–12</span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;">DB Split Squat <span style="float:right;color:var(--text-muted);">3×10–12</span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--pink);padding:4px 8px;background:#fce7f3;border-radius:4px;margin-bottom:4px;">C Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);">Hammer Curl <span style="float:right;color:var(--text-muted);">2×12–15</span></div>
+              <div style="font-size:12px;padding:4px 8px;">Dead Bug <span style="float:right;color:var(--text-muted);">2×8ea</span></div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;justify-content:flex-end;">
+        <button class="btn btn-gold" onclick="showScreen('review')">Send to Coach Review →</button>
+      </div>
+    </div>
+
+    <!-- ====== COACH REVIEW ====== -->
+    <div class="screen" id="screen-review">
+      <div class="section-header"><div class="section-title">Coach Review — Marcus H.</div><div class="section-sub">AI draft ready for approval · Estimated review time: 5–8 minutes</div></div>
+      <div class="steps mb-24">
+        <div class="step"><div class="step-circle done">✓</div><div class="step-label done">Consult</div></div>
+        <div class="step-line done"></div>
+        <div class="step"><div class="step-circle done">✓</div><div class="step-label done">Physicals</div></div>
+        <div class="step-line done"></div>
+        <div class="step"><div class="step-circle done">✓</div><div class="step-label done">AI Interpretation</div></div>
+        <div class="step-line done"></div>
+        <div class="step"><div class="step-circle done">✓</div><div class="step-label done">Draft Program</div></div>
+        <div class="step-line done"></div>
+        <div class="step"><div class="step-circle active">5</div><div class="step-label active">Coach Review</div></div>
+      </div>
+      <div class="approval-bar">
+        <div class="approval-bar-text"><strong>1 program ready for your review.</strong> Marcus H. · 3×/week · Upper / Lower / Mixed · Beginner</div>
+        <div class="approval-actions">
+          <button class="btn-request" onclick="alert('Click any exercise, sets, or reps in the program below to edit directly.')">Edit Program</button>
+          <button class="btn-approve" onclick="alert('✅ Program approved! In a live system this pushes directly into TeamBuildr.')">Approve & Publish →</button>
+        </div>
+      </div>
+      <div class="grid-2 mb-16">
+        <div class="card">
+          <div class="card-title">Flags Summary</div>
+          <div class="flags-row">
+            <div class="flag flag-warn">⚠ Squat depth limited</div>
+            <div class="flag flag-block">🔴 No loaded hinge</div>
+            <div class="flag flag-warn">⚠ Push capacity low</div>
+            <div class="flag flag-ok">✓ No active injury</div>
+            <div class="flag flag-info">ℹ Back history — monitor</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Rules Check — All Passing</div>
+          <div class="timeline">
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Session count = membership (3×/week) ✓</div></div>
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">2 exercises per series ✓</div></div>
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">All pairings work at all sites ✓</div></div>
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">C-series self-sufficient ✓</div></div>
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Approved exercises only ✓</div></div>
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Fits 40-minute session ✓</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="info-box gold">
+        <div class="info-box-title">Reviewing 3 distinct sessions</div>
+        Day 1 — Upper Body · Day 2 — Lower Body · Day 3 — Mixed. Click any exercise, sets, or reps to edit directly. Changes are saved in real time.
+      </div>
+      <div class="card">
+        <div class="card-title">Program — Select Day to Review</div>
+        <div class="day-tabs">
+          <div class="day-tab active" onclick="switchDay(this,'rv-day1')">Day 1 — Upper Body</div>
+          <div class="day-tab" onclick="switchDay(this,'rv-day2')">Day 2 — Lower Body</div>
+          <div class="day-tab" onclick="switchDay(this,'rv-day3')">Day 3 — Mixed</div>
+          <div class="day-tab" onclick="switchDay(this,'rv-dayAll')" style="margin-left:auto;border-color:var(--gold);color:var(--gold);">📅 Full Week View</div>
+        </div>
+
+        <!-- RV DAY 1 - UPPER -->
+        <div class="day-content active" id="rv-day1">
+          <div class="program-series series-r">
+            <div class="series-header"><span>🟢 REHAB / PREP</span><span class="badge badge-grey">Full body prep</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Cat-Cow Spinal Segmentation</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10 slow</span></div><div class="ex-note">Lower back prep</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Band Pull-Apart</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12 reps</span></div><div class="ex-note">Shoulder prep</div></div>
+            </div>
+          </div>
+          <div class="program-series series-a">
+            <div class="series-header"><span>🟡 A SERIES — Push + Pull</span><span class="badge badge-gold">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Flat Bench Press</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10–12</span></div><div class="ex-note">Push benchmark</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Medium Grip Pulldown</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10–12</span></div><div class="ex-note">Pull benchmark</div></div>
+            </div>
+          </div>
+          <div class="program-series series-b">
+            <div class="series-header"><span>🔵 B SERIES — Row + Shoulder</span><span class="badge badge-blue">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Seated Cable Row</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10–12</span></div><div class="ex-note">Horizontal pull</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Lateral Raise</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Shoulder accessory</div></div>
+            </div>
+          </div>
+          <div class="program-series series-c">
+            <div class="series-header"><span>🟣 C SERIES — Arms Finisher</span><span class="badge badge-pink">Self-sufficient</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Bicep Curl</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Arm accessory</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Tricep Rope Pushdown</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Tricep accessory</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RV DAY 2 - LOWER -->
+        <div class="day-content" id="rv-day2">
+          <div class="program-series series-r">
+            <div class="series-header"><span>🟢 REHAB / PREP</span><span class="badge badge-grey">Lower body prep</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Hip Hinge Wall Drill</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10 reps</span></div><div class="ex-note">🔴 Teaching only — no load</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Glute Activation</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">15 each</span></div><div class="ex-note">Hip prep</div></div>
+            </div>
+          </div>
+          <div class="program-series series-a">
+            <div class="series-header"><span>🟡 A SERIES — Quad + Anterior</span><span class="badge badge-gold">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Leg Press</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10–12</span></div><div class="ex-note">Lower benchmark</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Leg Extension</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10–12</span></div><div class="ex-note">Quad isolation</div></div>
+            </div>
+          </div>
+          <div class="program-series series-b">
+            <div class="series-header"><span>🔵 B SERIES — Posterior Chain</span><span class="badge badge-blue">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Leg Curl (machine)</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10–12</span></div><div class="ex-note">Hamstring isolation</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Goblet Squat to Box</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10–12</span></div><div class="ex-note">Squat pattern — controlled depth</div></div>
+            </div>
+          </div>
+          <div class="program-series series-c">
+            <div class="series-header"><span>🟣 C SERIES — Calf + Core</span><span class="badge badge-pink">Self-sufficient</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Standing Calf Raise</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">15–20</span></div><div class="ex-note">Calf accessory</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Plank Hold</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">30–40 sec</span></div><div class="ex-note">Core — low risk</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RV DAY 3 - MIXED -->
+        <div class="day-content" id="rv-day3">
+          <div class="program-series series-r">
+            <div class="series-header"><span>🟢 REHAB / PREP</span><span class="badge badge-grey">Full body prep</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Cat-Cow Spinal Segmentation</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10 slow</span></div><div class="ex-note">Back prep</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Hip Hinge Wall Drill</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10 reps</span></div><div class="ex-note">🔴 Teaching only — continued practice</div></div>
+            </div>
+          </div>
+          <div class="program-series series-a">
+            <div class="series-header"><span>🟡 A SERIES — Lower + Upper Compound</span><span class="badge badge-gold">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Hack Squat (Machine)</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10–12</span></div><div class="ex-note">Quad focus — different to Leg Press</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Incline DB Press</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10–12</span></div><div class="ex-note">Upper chest variation</div></div>
+            </div>
+          </div>
+          <div class="program-series series-b">
+            <div class="series-header"><span>🔵 B SERIES — Pull + Single-Leg</span><span class="badge badge-blue">Superset · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Single Arm Cable Row</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10–12</span></div><div class="ex-note">Horizontal pull — unilateral</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Split Squat</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10–12</span></div><div class="ex-note">Single-leg pattern</div></div>
+            </div>
+          </div>
+          <div class="program-series series-c">
+            <div class="series-header"><span>🟣 C SERIES — Independent Finisher</span><span class="badge badge-pink">Self-sufficient</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right"></span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Hammer Curl</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Brachialis focus</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Dead Bug</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">8 each side</span></div><div class="ex-note">Anti-extension core</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RV WEEK VIEW -->
+        <div class="day-content" id="rv-dayAll">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">All three sessions side by side. Click any field to edit directly.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green);margin-bottom:8px;padding:6px 10px;background:#dcfce7;border-radius:6px;">Day 1 — Upper Body</div>
+              <div style="font-size:11px;font-weight:600;color:#6b7280;padding:4px 8px;background:#f3f4f6;border-radius:4px;margin-bottom:4px;">Rehab / Prep</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Cat-Cow Spinal Seg.</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">10</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">Band Pull-Apart</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">12</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);padding:4px 8px;background:#dcfce7;border-radius:4px;margin-bottom:4px;">A Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">DB Flat Bench Press</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">10–12</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">Med. Grip Pulldown</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">10–12</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--blue);padding:4px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;">B Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Seated Cable Row</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">10–12</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">DB Lateral Raise</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--pink);padding:4px 8px;background:#fce7f3;border-radius:4px;margin-bottom:4px;">C Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">DB Bicep Curl</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;"><span class="editable" contenteditable="true">Tricep Rope Pushdown</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green);margin-bottom:8px;padding:6px 10px;background:#dcfce7;border-radius:6px;">Day 2 — Lower Body</div>
+              <div style="font-size:11px;font-weight:600;color:#6b7280;padding:4px 8px;background:#f3f4f6;border-radius:4px;margin-bottom:4px;">Rehab / Prep</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Hip Hinge Wall Drill</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">10</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">Glute Activation</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">15ea</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);padding:4px 8px;background:#dcfce7;border-radius:4px;margin-bottom:4px;">A Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Leg Press</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">10–12</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">Leg Extension</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">10–12</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--blue);padding:4px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;">B Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Leg Curl (machine)</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">10–12</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">Goblet Squat to Box</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">10–12</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--pink);padding:4px 8px;background:#fce7f3;border-radius:4px;margin-bottom:4px;">C Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Standing Calf Raise</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">15–20</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;"><span class="editable" contenteditable="true">Plank Hold</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">30–40s</span></span></div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green);margin-bottom:8px;padding:6px 10px;background:#dcfce7;border-radius:6px;">Day 3 — Mixed</div>
+              <div style="font-size:11px;font-weight:600;color:#6b7280;padding:4px 8px;background:#f3f4f6;border-radius:4px;margin-bottom:4px;">Rehab / Prep</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Cat-Cow Spinal Seg.</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">10</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">Hip Hinge Wall Drill</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">10</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);padding:4px 8px;background:#dcfce7;border-radius:4px;margin-bottom:4px;">A Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Hack Squat (Machine)</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">10–12</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">Incline DB Press</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">10–12</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--blue);padding:4px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;">B Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Single Arm Cable Row</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">10–12</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">DB Split Squat</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">10–12</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--pink);padding:4px 8px;background:#fce7f3;border-radius:4px;margin-bottom:4px;">C Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Hammer Curl</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;"><span class="editable" contenteditable="true">Dead Bug</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">8ea</span></span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ====== UPDATES ====== -->
+    <div class="screen" id="screen-updates">
+      <div class="section-header"><div class="section-title">Program Updates</div><div class="section-sub">Structured change requests · 2 pending action</div></div>
+
+      <div class="info-box blue mb-16">
+        <div class="info-box-title">💡 How the Update Workflow Works</div>
+        Coaches continue posting in the Slack programming channel exactly as they do now — including the emoji trigger that routes the note to a programmer. Nothing changes there. The improvement is in what coaches are trained to include in that message: <strong>client name · exercise · issue type · severity · and the why</strong>. That's an onboarding standard, not a system change. When those five things are in the Slack note, this interface reads it, categorises it automatically, assigns it to the program owner, and tracks it until it's actioned. Same workflow — no drop-off.
+      </div>
+
+      <div class="grid-2 mb-16">
+        <div class="card">
+          <div class="card-title">📥 Pending Update Requests</div>
+          <div style="background:#f6f8fa;border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div style="font-size:13px;font-weight:700;">Rachel P. — Shoulder pain</div>
+              <div class="badge badge-red">Urgent</div>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">DB Overhead Press caused sharp pain left shoulder at top of range. Stopped set. Client okay. Needs exercise modified immediately.</div>
+            <div class="flags-row" style="margin-bottom:10px;">
+              <div class="flag flag-block">🔴 Pain in pressing pattern</div>
+              <div class="flag flag-info">Overhead press affected</div>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Logged by: Coach Dana · Today 9:42am</div>
+            <div class="info-box gold" style="margin-bottom:10px;">
+              <div class="info-box-title">AI Suggestion</div>
+              Remove DB Overhead Press. Replace with Cable Face Pull. Reduce overall pressing load. Flag for physio review if pain persists beyond next session.
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-approve" onclick="alert('Change applied — program updated in TeamBuildr')">Apply Change</button>
+              <button class="btn-request">Modify First</button>
+            </div>
+          </div>
+          <div style="background:#f6f8fa;border:1px solid var(--border);border-radius:8px;padding:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div style="font-size:13px;font-weight:700;">Ben T. — Exercise preference</div>
+              <div class="badge badge-blue">Low Priority</div>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">Client doesn't enjoy leg press. No pain, no injury. Wants a squat variation if possible.</div>
+            <div class="flags-row" style="margin-bottom:10px;">
+              <div class="flag flag-info">ℹ Client preference only</div>
+              <div class="flag flag-ok">No pain / injury</div>
+              <div class="flag flag-info">📅 9 months with LR</div>
+              <div class="flag flag-gold" style="background:#fef9c3;color:var(--gold);border:1px solid #fde68a;padding:5px 10px;border-radius:6px;font-size:12px;font-weight:500;">↗ Approaching Intermediate</div>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Logged by: Coach Tom · Yesterday 4:15pm</div>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px;margin-bottom:10px;">
+              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">⚡ AI Suggestions — based on 9 months training, movement progress & current level</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Ben has been training consistently for 9 months. Squat and hinge patterns have improved significantly. He is approaching Intermediate — the following options reflect where he is now and what he can safely progress to.</div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:10px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <div style="font-size:12px;font-weight:700;">Option 1 — Goblet Squat</div>
+                    <div class="badge badge-green" style="font-size:10px;">Beginner · Recommended now</div>
+                  </div>
+                  <div style="font-size:12px;color:var(--text-muted);">Natural next step from Leg Press. More technical demand, builds real squat pattern. No external bar load — still safe and coachable. Good bridge into barbell work.</div>
+                </div>
+                <div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:10px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <div style="font-size:12px;font-weight:700;">Option 2 — Box Squat (DB or Smith)</div>
+                    <div class="badge badge-gold" style="font-size:10px;">Beginner → Intermediate</div>
+                  </div>
+                  <div style="font-size:12px;color:var(--text-muted);">Controls depth, builds confidence loading a squat pattern, teaches mechanics under load. Good for a client who's ready for more but not yet at free barbell stage.</div>
+                </div>
+                <div style="background:#fff;border:1px solid #fde68a;border-radius:6px;padding:10px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <div style="font-size:12px;font-weight:700;">Option 3 — Smith Machine Back Squat</div>
+                    <div class="badge badge-orange" style="font-size:10px;">Intermediate · Coach sign-off needed</div>
+                  </div>
+                  <div style="font-size:12px;color:var(--text-muted);">Available if coach is satisfied with movement quality and consistency. Unlocks at Intermediate level. Ben is close — confirm via floor assessment before applying.</div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-approve" onclick="alert('Option 1 applied — Goblet Squat replaces Leg Press')">Apply Option 1</button>
+              <button class="btn-request" onclick="showScreen('progression')">View Ben\'s Progression →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📨 Slack — #programming-updates</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;">Currently: coaches add an emoji to Slack messages to trigger routing. In this system, that same note auto-populates as a structured update — no extra steps for coaches, full tracking for programmers.</div>
+          <div class="slack-msg">
+            <div class="slack-avatar" style="background:#E91E8C;color:#fff;">D</div>
+            <div>
+              <div><span class="slack-name">Dana</span><span class="slack-time">9:42 AM</span></div>
+              <div class="slack-text"><span class="slack-tag">@programming</span> Rachel P — DB Overhead Press caused sharp pain left shoulder top of range. Stopped it. She's fine but needs this changed ASAP 🚨</div>
+            </div>
+          </div>
+          <div class="slack-msg">
+            <div class="slack-avatar" style="background:var(--green);color:#fff;">✓</div>
+            <div>
+              <div><span class="slack-name">Programming Bot</span><span class="slack-time">9:42 AM</span></div>
+              <div class="slack-text">✅ Logged for Rachel P. · <strong>Urgent</strong> · AI suggestion queued · Assigned to program owner. <span class="slack-tag">View update →</span></div>
+            </div>
+          </div>
+          <div class="slack-msg">
+            <div class="slack-avatar" style="background:#2196F3;color:#fff;">T</div>
+            <div>
+              <div><span class="slack-name">Tom</span><span class="slack-time">Yesterday 4:15 PM</span></div>
+              <div class="slack-text"><span class="slack-tag">@programming</span> Ben T really doesn't like leg press. No issues, just preference. Can we look at a squat sub for Phase 2? 🔄</div>
+            </div>
+          </div>
+          <div class="slack-msg">
+            <div class="slack-avatar" style="background:var(--green);color:#fff;">✓</div>
+            <div>
+              <div><span class="slack-name">Programming Bot</span><span class="slack-time">Yesterday 4:15 PM</span></div>
+              <div class="slack-text">✅ Preference note logged for Ben T. · Low priority · Added to change queue. <span class="slack-tag">View update →</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Recent Change Log</div>
+        <div class="timeline">
+          <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Marcus H. — Program approved and delivered</div><div class="tl-sub">3×/week Upper/Lower/Mixed Phase 1 program pushed to TeamBuildr</div><div class="tl-time">Today 8:15am</div></div>
+          <div class="tl-item"><div class="tl-dot blue"></div><div class="tl-title">Sarah L. — Hinge exercise modified on floor</div><div class="tl-sub">RDL swapped for Leg Curl per coach note — better execution</div><div class="tl-time">Yesterday 3:30pm</div></div>
+          <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">Rachel P. — Program progressed to Phase 2</div><div class="tl-sub">Passed adherence and movement quality threshold at 6 weeks</div><div class="tl-time">2 days ago</div></div>
+          <div class="tl-item"><div class="tl-dot grey"></div><div class="tl-title">James K. — Phase extended by 2 weeks</div><div class="tl-sub">Low attendance (4/12 sessions) — not yet ready to progress</div><div class="tl-time">4 days ago</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== HOLIDAY ====== -->
+    <div class="screen" id="screen-holiday">
+      <div class="section-header"><div class="section-title">Holiday Programs</div><div class="section-sub">Travel program requests · Hotel equipment database · Solo training safety</div></div>
+
+      <div class="info-box blue mb-16">
+        <div class="info-box-title">🛡 Solo Training Safety Principle</div>
+        Holiday programs always apply a safety-first filter regardless of experience level. Exercises are selected for independent execution — higher rep ranges, simpler movement patterns, reduced loading risk. The goal is to keep the client moving, maintain the training habit, and avoid injury without a coach present.
+      </div>
+
+      <div class="grid-2 mb-16">
+        <div class="card">
+          <div class="card-title">🏨 Active Request — Sarah L.</div>
+          <div class="form-group"><div class="form-label">Travel dates</div><div class="form-value">14 Apr – 21 Apr 2026 (7 days)</div></div>
+          <div class="form-group"><div class="form-label">Destination</div><div class="form-value">Tokyo, Japan</div></div>
+          <div class="form-group"><div class="form-label">Hotel</div><div class="form-value highlight">Park Hyatt Tokyo</div></div>
+          <div class="form-group"><div class="form-label">Sessions wanted</div><div class="form-value">3 sessions while away</div></div>
+          <div class="form-group"><div class="form-label">Experience level</div><div class="form-value">🟢 Intermediate — adapt with solo safety filter</div></div>
+          <div class="form-group"><div class="form-label">Current phase</div><div class="form-value">Phase 2 · 2×/week · Full Body</div></div>
+          <div class="info-box green" style="margin-top:4px;">
+            <div class="info-box-title">✅ Hotel Found in Database</div>
+            Park Hyatt Tokyo — last verified March 2025. Equipment profile loaded. Program adapted in 2 min.
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">🏨 Hotel Equipment Profile — Park Hyatt Tokyo</div>
+          <div class="hotel-card">
+            <div class="hotel-name">Park Hyatt Tokyo — Fitness Centre</div>
+            <div class="hotel-location">📍 Shinjuku, Tokyo · Last verified: Mar 2025</div>
+            <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Available Equipment</div>
+            <div class="equip-list">
+              <div class="equip-tag">Dumbbells (5–40 kg)</div>
+              <div class="equip-tag">Barbells + rack</div>
+              <div class="equip-tag">Cable machine</div>
+              <div class="equip-tag">Lat pulldown</div>
+              <div class="equip-tag">Leg press</div>
+              <div class="equip-tag">Bench flat + incline</div>
+              <div class="equip-tag">Treadmill</div>
+              <div class="equip-tag">Bike</div>
+            </div>
+            <div style="margin-top:10px;"><div class="badge badge-green">Full gym access</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADAPTED PROGRAM -->
+      <div class="card mb-16">
+        <div class="card-title">⚡ AI-Adapted Travel Program — Sarah L. · 3 sessions · Solo training filter applied</div>
+        <div class="info-box gold mb-16">
+          <div class="info-box-title">Solo Safety Adjustments Applied</div>
+          Sarah is intermediate — she can use most equipment independently. Barbell Back Squat replaced with safer solo variations. Rep ranges increased to 12–15 (lighter loads, better form maintenance alone). All 3 sessions are distinct — no repeated exercises. Click any exercise, sets, or reps to edit.
+        </div>
+        <div class="day-tabs">
+          <div class="day-tab active" onclick="switchDay(this,'hl-day1')">Day 1 — Full Body A</div>
+          <div class="day-tab" onclick="switchDay(this,'hl-day2')">Day 2 — Full Body B</div>
+          <div class="day-tab" onclick="switchDay(this,'hl-day3')">Day 3 — Full Body C</div>
+          <div class="day-tab" onclick="switchDay(this,'hl-dayAll')" style="margin-left:auto;border-color:var(--gold);color:var(--gold);">📅 Full Week View</div>
+        </div>
+
+        <!-- HL DAY 1 -->
+        <div class="day-content active" id="hl-day1">
+          <div class="program-series series-a">
+            <div class="series-header"><span>🟡 A SERIES — Squat + Pull</span><span class="badge badge-gold">Solo safety · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Note</span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Goblet Squat</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">⚠ Barbell → safer solo option</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Lat Pulldown</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Hotel has pulldown ✓</div></div>
+            </div>
+          </div>
+          <div class="program-series series-b">
+            <div class="series-header"><span>🔵 B SERIES — Hinge + Push</span><span class="badge badge-blue">Solo safety · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Note</span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Romanian Deadlift</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">DB RDL · lighter load solo</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Flat Bench Press</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Flat bench available ✓</div></div>
+            </div>
+          </div>
+          <div class="program-series series-c">
+            <div class="series-header"><span>🟣 C SERIES — Finisher</span><span class="badge badge-pink">Self-sufficient</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Note</span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Bicep Curl</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Arms — independent</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Plank Hold</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">40 sec</span></div><div class="ex-note">Core — no equipment</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- HL DAY 2 -->
+        <div class="day-content" id="hl-day2">
+          <div class="program-series series-a">
+            <div class="series-header"><span>🟡 A SERIES — Lower + Row</span><span class="badge badge-gold">Solo safety · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Note</span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Leg Press</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Hotel has leg press ✓ · higher reps solo</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Seated Cable Row</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Cable machine available ✓</div></div>
+            </div>
+          </div>
+          <div class="program-series series-b">
+            <div class="series-header"><span>🔵 B SERIES — Single-Leg + Incline Push</span><span class="badge badge-blue">Solo safety · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Note</span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Split Squat</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Single-leg — controlled load solo</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Incline DB Press</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Incline bench available ✓</div></div>
+            </div>
+          </div>
+          <div class="program-series series-c">
+            <div class="series-header"><span>🟣 C SERIES — Finisher</span><span class="badge badge-pink">Self-sufficient</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Note</span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Lateral Raise</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">15</span></div><div class="ex-note">Shoulder accessory — light load</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Dead Bug</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">8 each side</span></div><div class="ex-note">Core — no equipment</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- HL DAY 3 -->
+        <div class="day-content" id="hl-day3">
+          <div class="program-series series-a">
+            <div class="series-header"><span>🟡 A SERIES — Pull-Through + Horizontal Push</span><span class="badge badge-gold">Solo safety · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Note</span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Single Arm DB Row</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Unilateral row — safe solo</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Push Press</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Overhead variation — light DB solo</div></div>
+            </div>
+          </div>
+          <div class="program-series series-b">
+            <div class="series-header"><span>🔵 B SERIES — Hip Hinge + Posterior Chain</span><span class="badge badge-blue">Solo safety · 3 sets</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Note</span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Sumo Squat</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Wide stance squat — glute emphasis</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">DB Bent Over Row</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">3</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Bilateral row variation — different to Session 2</div></div>
+            </div>
+          </div>
+          <div class="program-series series-c">
+            <div class="series-header"><span>🟣 C SERIES — Finisher</span><span class="badge badge-pink">Self-sufficient</span></div>
+            <div class="series-body">
+              <div class="ex-cols"><span style="flex:1">Exercise</span><span style="width:80px;text-align:center">Sets</span><span style="width:90px;text-align:center">Reps</span><span style="flex:1;text-align:right">Note</span></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Hammer Curl</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">12–15</span></div><div class="ex-note">Arm variation — brachialis focus</div></div>
+              <div class="exercise-row"><div class="ex-name"><span class="editable" contenteditable="true">Bird Dog</span><span class="editable-hint">✏ click to edit</span></div><div class="ex-sets"><span class="editable" contenteditable="true">2</span></div><div class="ex-reps"><span class="editable" contenteditable="true">10 each side</span></div><div class="ex-note">Core stability — no equipment</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- HL WEEK VIEW -->
+        <div class="day-content" id="hl-dayAll">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">All 3 travel sessions — no repeated exercises across the week. Click any field to edit directly.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green);margin-bottom:8px;padding:6px 10px;background:#dcfce7;border-radius:6px;">Day 1 — Full Body A</div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);padding:4px 8px;background:#dcfce7;border-radius:4px;margin-bottom:4px;">A Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">DB Goblet Squat</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">Lat Pulldown</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--blue);padding:4px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;">B Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">DB Romanian Deadlift</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">DB Flat Bench Press</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--pink);padding:4px 8px;background:#fce7f3;border-radius:4px;margin-bottom:4px;">C Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">DB Bicep Curl</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;"><span class="editable" contenteditable="true">Plank Hold</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">40s</span></span></div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green);margin-bottom:8px;padding:6px 10px;background:#dcfce7;border-radius:6px;">Day 2 — Full Body B</div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);padding:4px 8px;background:#dcfce7;border-radius:4px;margin-bottom:4px;">A Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Leg Press</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">Seated Cable Row</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--blue);padding:4px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;">B Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">DB Split Squat</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">Incline DB Press</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--pink);padding:4px 8px;background:#fce7f3;border-radius:4px;margin-bottom:4px;">C Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">DB Lateral Raise</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">15</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;"><span class="editable" contenteditable="true">Dead Bug</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">8ea</span></span></div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green);margin-bottom:8px;padding:6px 10px;background:#dcfce7;border-radius:6px;">Day 3 — Full Body C</div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);padding:4px 8px;background:#dcfce7;border-radius:4px;margin-bottom:4px;">A Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Single Arm DB Row</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">DB Push Press</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--blue);padding:4px 8px;background:#dbeafe;border-radius:4px;margin-bottom:4px;">B Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">DB Sumo Squat</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;margin-bottom:8px;"><span class="editable" contenteditable="true">DB Bent Over Row</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">3</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--pink);padding:4px 8px;background:#fce7f3;border-radius:4px;margin-bottom:4px;">C Series</div>
+              <div style="font-size:12px;padding:4px 8px;border-bottom:1px solid var(--border);"><span class="editable" contenteditable="true">Hammer Curl</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">12–15</span></span></div>
+              <div style="font-size:12px;padding:4px 8px;"><span class="editable" contenteditable="true">Bird Dog</span> <span style="float:right;color:var(--text-muted);"><span class="editable" contenteditable="true">2</span>×<span class="editable" contenteditable="true">10ea</span></span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- HOTEL DATABASE -->
+      <div class="card">
+        <div class="card-title">🗄️ Hotel Equipment Database — Research once, reuse always</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Every new hotel lookup is saved permanently. As the database grows, holiday programs take minutes rather than research sessions.</div>
+        <div class="grid-3">
+          <div class="hotel-card">
+            <div class="hotel-name">Park Hyatt Tokyo</div>
+            <div class="hotel-location">📍 Tokyo, Japan · Verified Mar 2025</div>
+            <div class="badge badge-green" style="margin-bottom:8px;">Full gym</div>
+            <div class="equip-list"><div class="equip-tag">DB 5–40kg</div><div class="equip-tag">Barbells</div><div class="equip-tag">Cable</div><div class="equip-tag">Leg Press</div><div class="equip-tag">Pulldown</div></div>
+          </div>
+          <div class="hotel-card">
+            <div class="hotel-name">Sofitel Sydney CBD</div>
+            <div class="hotel-location">📍 Sydney, Australia · Verified Jan 2025</div>
+            <div class="badge badge-orange" style="margin-bottom:8px;">Limited gym</div>
+            <div class="equip-list"><div class="equip-tag">DB 5–25kg</div><div class="equip-tag">Cable (basic)</div><div class="equip-tag">Bench</div><div class="equip-tag">Treadmill</div></div>
+          </div>
+          <div class="hotel-card">
+            <div class="hotel-name">Four Seasons Bali</div>
+            <div class="hotel-location">📍 Bali, Indonesia · Verified Nov 2024</div>
+            <div class="badge badge-red" style="margin-bottom:8px;">Minimal</div>
+            <div class="equip-list"><div class="equip-tag">DB 5–15kg</div><div class="equip-tag">Bands</div><div class="equip-tag">Bike</div></div>
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;justify-content:flex-end;">
+          <button class="btn btn-ghost" onclick="alert('Add new hotel — in live system this opens a quick-entry form')">+ Add New Hotel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== PROGRESSION TRACKER ====== -->
+    <div class="screen" id="screen-progression">
+      <div class="section-header">
+        <div class="section-title">Progression Tracker</div>
+        <div class="section-sub">Client level tracking · Transition criteria · Exercise library tiers</div>
+      </div>
+
+      <!-- CLIENT EXAMPLE -->
+      <div class="card mb-16">
+        <div class="card-title">📈 Client Example — Ben T. · 9 months with Locker Room</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+              <div style="width:44px;height:44px;border-radius:50%;background:#94a3b8;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;">BT</div>
+              <div>
+                <div style="font-size:14px;font-weight:700;">Ben T.</div>
+                <div style="font-size:11px;color:var(--text-muted);">Started April 2025 · 1×/week · Body composition</div>
+              </div>
+              <div class="badge badge-gold" style="margin-left:auto;">🟡 Beginner</div>
+            </div>
+            <div style="margin-bottom:6px;display:flex;justify-content:space-between;font-size:12px;">
+              <span style="font-weight:600;">Progress to Intermediate</span>
+              <span style="color:var(--gold);font-weight:700;">68%</span>
+            </div>
+            <div class="progress-bar" style="height:10px;margin-bottom:6px;"><div class="progress-fill" style="width:68%;background:var(--gold);"></div></div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:16px;">Estimated 6–8 weeks to qualification at current rate</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Transition Criteria — Beginner → Intermediate</div>
+            <div class="timeline">
+              <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">6+ months consistent training</div><div class="tl-sub">✓ 9 months · Attendance 74%</div></div>
+              <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Squat pattern: Competent</div><div class="tl-sub">✓ Goblet Squat full depth · stable under load</div></div>
+              <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Push pattern: Competent</div><div class="tl-sub">✓ DB Bench Press controlled · strength trending up</div></div>
+              <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Pull pattern: Competent</div><div class="tl-sub">✓ Pulldown strength improved 22% from baseline</div></div>
+              <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">Hinge pattern: In progress</div><div class="tl-sub">⏳ Hip hinge improving — not yet consistently loaded</div></div>
+              <div class="tl-item"><div class="tl-dot grey"></div><div class="tl-title">Benchmark lifts trending across all 4 movements</div><div class="tl-sub">Pending hinge — others confirmed</div></div>
+              <div class="tl-item"><div class="tl-dot grey"></div><div class="tl-title">Coach sign-off</div><div class="tl-sub">Pending — awaiting hinge confirmation</div></div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Benchmark Lift Progress</div>
+            <div style="margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>Leg Press (squat benchmark)</span><span style="color:var(--green);font-weight:600;">+34 kg ↑</span></div>
+              <div class="progress-bar"><div class="progress-fill green" style="width:72%"></div></div>
+            </div>
+            <div style="margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>Med. Grip Pulldown (pull benchmark)</span><span style="color:var(--green);font-weight:600;">+22% ↑</span></div>
+              <div class="progress-bar"><div class="progress-fill green" style="width:60%"></div></div>
+            </div>
+            <div style="margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>DB Flat Bench (push benchmark)</span><span style="color:var(--green);font-weight:600;">+8 kg ↑</span></div>
+              <div class="progress-bar"><div class="progress-fill green" style="width:55%"></div></div>
+            </div>
+            <div style="margin-bottom:20px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>Hinge pattern (teaching stage)</span><span style="color:var(--orange);font-weight:600;">In progress</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:35%;background:var(--orange)"></div></div>
+            </div>
+            <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:12px;">
+              <div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:6px;">🔓 What Unlocks at Intermediate</div>
+              <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">Smith Machine Back Squat · Box Squat with load · Trap Bar Deadlift (floor) · Barbell RDL · Dips (assisted) · Bent Over Row · Chin-ups (bodyweight) · Bulgarian Split Squat · More complex accessory patterns</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEVEL DEFINITIONS -->
+      <div class="grid-3 mb-16">
+        <div class="card" style="border-top:3px solid #94a3b8;">
+          <div style="font-size:13px;font-weight:800;margin-bottom:4px;">🟡 Beginner</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">Entry level · Movement teaching phase</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px;">Qualifies when:</div>
+          <div class="timeline" style="font-size:12px;">
+            <div class="tl-item"><div class="tl-dot grey"></div><div class="tl-title">New to structured training</div></div>
+            <div class="tl-item"><div class="tl-dot grey"></div><div class="tl-title">No consistent formal coaching history</div></div>
+            <div class="tl-item"><div class="tl-dot grey"></div><div class="tl-title">Movement patterns need teaching</div></div>
+            <div class="tl-item"><div class="tl-dot grey"></div><div class="tl-title">Begins with simple, stable exercises</div></div>
+          </div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--gold);">
+          <div style="font-size:13px;font-weight:800;margin-bottom:4px;color:var(--gold);">🟠 Intermediate</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">6–12+ months · Pattern refinement phase</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px;">Qualifies when:</div>
+          <div class="timeline" style="font-size:12px;">
+            <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">6+ months consistent attendance (70%+)</div></div>
+            <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">All 4 movement patterns: Competent</div></div>
+            <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">Benchmark lifts trending on all patterns</div></div>
+            <div class="tl-item"><div class="tl-dot gold"></div><div class="tl-title">Coach sign-off confirmed</div></div>
+          </div>
+        </div>
+        <div class="card" style="border-top:3px solid var(--green);">
+          <div style="font-size:13px;font-weight:800;margin-bottom:4px;color:var(--green);">🟢 Advanced</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">12+ months · Performance phase</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px;">Qualifies when:</div>
+          <div class="timeline" style="font-size:12px;">
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">12+ months structured coaching</div></div>
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Strong sport/lifting background OR advanced movement mastery</div></div>
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Benchmarks significantly above baseline</div></div>
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Reliable under heavy load, complex patterns</div></div>
+            <div class="tl-item"><div class="tl-dot green"></div><div class="tl-title">Coach sign-off confirmed</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXERCISE LIBRARY TIERS -->
+      <div class="card">
+        <div class="card-title">Exercise Library — Tiered by Level</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">The AI only selects from the pool available at a client's current level. Advancing a client unlocks the next tier automatically.</div>
+        <div class="tabs" id="prog-tabs">
+          <div class="tab active" onclick="switchProgTab(this,'pt-squat')">Squat Pattern</div>
+          <div class="tab" onclick="switchProgTab(this,'pt-hinge')">Hinge Pattern</div>
+          <div class="tab" onclick="switchProgTab(this,'pt-push')">Horizontal Push</div>
+          <div class="tab" onclick="switchProgTab(this,'pt-pull')">Vertical Pull</div>
+        </div>
+
+        <div id="pt-squat">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div style="border:1px solid #e5e7eb;border-top:3px solid #94a3b8;border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:10px;">🟡 Beginner Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">Leg Press<br>Goblet Squat to Box<br>Goblet Squat<br>Box Squat (bodyweight)<br>Split Squat (bodyweight)</div>
+            </div>
+            <div style="border:1px solid #fde68a;border-top:3px solid var(--gold);border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;margin-bottom:10px;">🟠 Intermediate Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">Smith Machine Back Squat<br>Box Squat (loaded)<br>Bulgarian Split Squat (DB)<br>Hack Squat (machine)<br>DB Walking Lunge*</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:6px;">*avoid where possible per floor rules</div>
+            </div>
+            <div style="border:1px solid #bbf7d0;border-top:3px solid var(--green);border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:10px;">🟢 Advanced Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">Barbell Back Squat<br>Barbell Front Squat<br>Pause Squat<br>Tempo Squat<br>Barbell Split Squat</div>
+            </div>
+          </div>
+        </div>
+        <div id="pt-hinge" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div style="border:1px solid #e5e7eb;border-top:3px solid #94a3b8;border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:10px;">🟡 Beginner Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">Hip Hinge Wall Drill (teaching)<br>Trap Bar DL — 2 blocks<br>Trap Bar DL — 1 block<br>DB Romanian Deadlift<br>Leg Curl (machine)</div>
+            </div>
+            <div style="border:1px solid #fde68a;border-top:3px solid var(--gold);border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;margin-bottom:10px;">🟠 Intermediate Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">Trap Bar Deadlift (floor)<br>Barbell Romanian DL<br>Single Leg RDL (DB)<br>Good Morning<br>Nordic Curl</div>
+            </div>
+            <div style="border:1px solid #bbf7d0;border-top:3px solid var(--green);border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:10px;">🟢 Advanced Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">Barbell Conventional DL<br>Barbell Sumo DL<br>Snatch Grip DL<br>Deficit Deadlift<br>Barbell Hip Thrust</div>
+            </div>
+          </div>
+        </div>
+        <div id="pt-push" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div style="border:1px solid #e5e7eb;border-top:3px solid #94a3b8;border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:10px;">🟡 Beginner Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">DB Flat Bench Press<br>Machine Chest Press<br>Cable Chest Press<br>Push-up (modified)<br>DB Incline Press (light)</div>
+            </div>
+            <div style="border:1px solid #fde68a;border-top:3px solid var(--gold);border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;margin-bottom:10px;">🟠 Intermediate Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">Barbell Bench Press<br>DB Incline Press<br>Dips (assisted)<br>Push-up (weighted)<br>DB Floor Press</div>
+            </div>
+            <div style="border:1px solid #bbf7d0;border-top:3px solid var(--green);border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:10px;">🟢 Advanced Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">Barbell Incline Press<br>Close Grip Bench Press<br>Dips (bodyweight)<br>Landmine Press<br>Barbell Floor Press</div>
+            </div>
+          </div>
+        </div>
+        <div id="pt-pull" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div style="border:1px solid #e5e7eb;border-top:3px solid #94a3b8;border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:10px;">🟡 Beginner Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">Medium Grip Pulldown<br>Assisted Chin-up<br>Cable Row (seated)<br>Face Pull<br>Band Pull-Apart</div>
+            </div>
+            <div style="border:1px solid #fde68a;border-top:3px solid var(--gold);border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;margin-bottom:10px;">🟠 Intermediate Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">Neutral Grip Pulldown<br>Chin-ups (bodyweight)<br>Bent Over BB Row<br>Chest-Supported Row<br>Single Arm DB Row</div>
+            </div>
+            <div style="border:1px solid #bbf7d0;border-top:3px solid var(--green);border-radius:8px;padding:14px;">
+              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:10px;">🟢 Advanced Pool</div>
+              <div style="font-size:12px;line-height:1.8;color:var(--text);">Weighted Chin-ups<br>Barbell Pendlay Row<br>Meadows Row<br>Snatch Grip Pulldown<br>Rack Pull (mid-shin)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+  // ── SCREEN NAV ──
+  const titles = {
+    overview: ['System Overview','LR Programming Automation — Prototype'],
+    queue: ['Client Queue','3 clients awaiting first program'],
+    intake: ['Intake & Assessment — Marcus H.','Physicals received · Auto-populated from consult'],
+    'ai-draft': ['AI Program Draft — Marcus H.','3×/week · Upper · Lower · Mixed · Beginner'],
+    review: ['Coach Review — Marcus H.','Draft ready for approval · ~5–8 min review'],
+    updates: ['Program Updates','Structured change requests · 2 pending'],
+    holiday: ['Holiday Programs','Travel programs · Hotel database · Solo safety'],
+    progression: ['Progression Tracker','Client level tracking · Transition criteria · Exercise library tiers']
+  };
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+    if (titles[id]) {
+      document.getElementById('top-title').textContent = titles[id][0];
+      document.getElementById('top-sub').textContent = titles[id][1];
+    }
+    const navMap = {overview:0,queue:1,intake:2,'ai-draft':3,review:4,updates:5,holiday:6,progression:7};
+    if (navMap[id] !== undefined) document.querySelectorAll('.nav-item')[navMap[id]].classList.add('active');
+  }
+
+  // ── TABS ──
+  function switchTab(el, targetId) {
+    el.closest('.tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    ['tab-profile','tab-movement','tab-benchmarks'].forEach(p => {
+      const el2 = document.getElementById(p);
+      if (el2) el2.style.display = 'none';
+    });
+    const t = document.getElementById(targetId);
+    if (t) t.style.display = 'block';
+  }
+
+  // ── CLIENT QUEUE EXPAND/COLLAPSE ──
+  function toggleQueue(btn, sectionId) {
+    const extra = document.getElementById(sectionId);
+    const isHidden = extra.style.display === 'none';
+    extra.style.display = isHidden ? 'block' : 'none';
+    btn.textContent = isHidden ? btn.dataset.less : btn.dataset.more;
+  }
+
+  // ── DAY TABS ──
+  function switchDay(el, targetId) {
+    el.closest('.day-tabs').querySelectorAll('.day-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    // Scope to the parent card so multiple day-tab groups on the page don't interfere
+    const container = el.closest('.card') || el.closest('.screen');
+    container.querySelectorAll('.day-content').forEach(d => d.classList.remove('active'));
+    document.getElementById(targetId).classList.add('active');
+  }
+
+  // ── PROGRESSION TABS ──
+  function switchProgTab(el, targetId) {
+    document.getElementById('prog-tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    ['pt-squat','pt-hinge','pt-push','pt-pull'].forEach(id => {
+      const el2 = document.getElementById(id);
+      if (el2) el2.style.display = 'none';
+    });
+    document.getElementById(targetId).style.display = 'block';
+  }
+
+  // ── MODAL ──
+  const steps = [
+    {
+      title: '📋 Intake — Consult + Physicals',
+      desc: 'The client journey starts with two structured data captures: an initial consultation (body scan, training history, injuries, goals) and a physicals session (movement screen, strength benchmarks, VO2 test). Both flow into Supabase, which auto-populates a standardised summary pushed to Slack — giving the programming team everything they need in one place.',
+      tags: ['Body scan','Training history','Injury screening','Goals','Movement screen','Grip strength','Vertical jump','VO2 test','Supabase → Slack']
+    },
+    {
+      title: '⚡ AI Interpretation — Flags + Profile',
+      desc: 'The system reads the structured intake data and converts it into actionable flags. Poor hinge control? Flagged — no loaded hinge. Squat depth limited? Flagged — regression to leg press or box squat. Lower back history? Flagged — rehab block added. The client\'s experience level (Beginner / Intermediate / Advanced), goal bucket, and membership frequency are also locked in here.',
+      tags: ['Movement flags','Restriction flags','Experience level','Goal bucket','Membership lock','No guesswork']
+    },
+    {
+      title: '🏗️ Draft Program — Rules Engine',
+      desc: 'Using the flags and client profile, the rules engine builds a complete program: the right split for their frequency (Upper/Lower/Mixed for 3×/week), distinct sessions per day, exercises selected from the approved library only, paired correctly for both gym locations, with rehab first and C-series self-sufficient. All within 40 minutes.',
+      tags: ['Split logic','Distinct days','Approved library','40-min cap','2 per series','Site-compatible pairings','Rehab block']
+    },
+    {
+      title: '✅ Coach Review — Approve or Adjust',
+      desc: 'The programming coach receives a ready-to-review draft — not a blank page. They check the flags summary, confirm the rules have passed, and review each session. They can approve in one click, or request specific changes. The average review time drops from 20–25 minutes of building to 8–12 minutes of reviewing.',
+      tags: ['Draft not blank page','Rules check','Flags visible','One-click approve','Request changes','8–12 min review']
+    },
+    {
+      title: '📤 Delivered — Into TeamBuildr',
+      desc: 'Once approved, the program is pushed into TeamBuildr against the client\'s profile. The coach on the floor opens the correct session for that day — Day 1, Day 2, or Day 3 — and delivers as normal. No manual data entry, no re-building, no version confusion.',
+      tags: ['Auto-populated','TeamBuildr','Coach-ready','Correct day pulled','No manual entry']
+    },
+    {
+      title: '📥 Structured Update — Logged + Assigned',
+      desc: 'When a coach on the floor observes something that should change the program — pain, poor exercise fit, client preference, physio note — they log it as a structured update. Today this happens via Slack with an emoji-triggered workflow. In this system, the same note is auto-categorised, assigned to the program owner, and tracked until actioned. Nothing falls through.',
+      tags: ['Structured submission','Auto-categorised','Assigned to owner','Tracked status','Replaces emoji workflow']
+    },
+    {
+      title: '🔄 Program Updated — Actioned + Tracked',
+      desc: 'The programming coach reviews the change request, sees the AI suggestion alongside the coach\'s note, and applies or modifies the change. The update is logged with a timestamp. The program owner always knows what changed, when, and why — building a clean record over time.',
+      tags: ['AI suggestion','Coach note','Apply or modify','Timestamped','Audit trail','Program owner visibility']
+    },
+    {
+      title: '📊 Progress Reviewed — Re-test + Progression',
+      desc: 'At 4–6 weeks (or longer if attendance is low), the system prompts a phase review. Benchmark lifts and body composition are tracked against the baseline. If the client has been consistent and movement quality is improving, the program progresses — heavier loads, lower reps, more advanced variations. If not, the phase is extended.',
+      tags: ['4–6 week cadence','Attendance check','Benchmark comparison','Body composition trend','Progression or extend','Phase 2 logic']
+    }
+  ];
+
+  let currentStep = 0;
+
+  function openModal(index) {
+    currentStep = index;
+    renderModal();
+    document.getElementById('flowModal').classList.add('open');
+  }
+  function closeModal() {
+    document.getElementById('flowModal').classList.remove('open');
+  }
+  function closeModalOnOverlay(e) {
+    if (e.target === document.getElementById('flowModal')) closeModal();
+  }
+  function stepModal(dir) {
+    currentStep = Math.max(0, Math.min(steps.length - 1, currentStep + dir));
+    renderModal();
+  }
+  function renderModal() {
+    const s = steps[currentStep];
+    document.getElementById('modal-title').textContent = s.title;
+    document.getElementById('modal-step').textContent = (currentStep + 1) + ' of ' + steps.length;
+    document.getElementById('modal-desc').textContent = s.desc;
+    document.getElementById('modal-tags').innerHTML = s.tags.map(t => `<span class="modal-tag">${t}</span>`).join('');
+    document.getElementById('modal-dots').textContent = steps.map((_,i) => i === currentStep ? '●' : '○').join(' ');
+    document.getElementById('modal-prev').disabled = currentStep === 0;
+    const nextBtn = document.getElementById('modal-next');
+    if (currentStep === steps.length - 1) {
+      nextBtn.textContent = 'Close ✕';
+      nextBtn.onclick = closeModal;
+    } else {
+      nextBtn.textContent = 'Next →';
+      nextBtn.onclick = () => stepModal(1);
+    }
+  }
+
+  // ── TEAMBUILDR EXERCISE LIBRARY (placeholder — in production: fetched from TeamBuildr API) ──
+  const tbExercises = [
+    // SQUAT / LOWER COMPOUND
+    { name: 'Barbell Back Squat',       cat: 'Squat' },
+    { name: 'Barbell Front Squat',      cat: 'Squat' },
+    { name: 'Box Squat',                cat: 'Squat' },
+    { name: 'Smith Machine Back Squat', cat: 'Squat' },
+    { name: 'Goblet Squat',             cat: 'Squat' },
+    { name: 'Goblet Squat to Box',      cat: 'Squat' },
+    { name: 'DB Split Squat',           cat: 'Squat' },
+    { name: 'Bulgarian Split Squat',    cat: 'Squat' },
+    { name: 'Hack Squat (Machine)',     cat: 'Squat' },
+    { name: 'DB Sumo Squat',            cat: 'Squat' },
+    { name: 'Leg Press',                cat: 'Squat' },
+    { name: 'Pause Squat',              cat: 'Squat' },
+    { name: 'Bodyweight Squat',         cat: 'Squat' },
+    // HINGE
+    { name: 'Barbell Deadlift',         cat: 'Hinge' },
+    { name: 'Trap Bar Deadlift',        cat: 'Hinge' },
+    { name: 'DB Romanian Deadlift',     cat: 'Hinge' },
+    { name: 'Barbell RDL',              cat: 'Hinge' },
+    { name: 'Single Leg RDL (DB)',      cat: 'Hinge' },
+    { name: 'Hip Thrust (Barbell)',     cat: 'Hinge' },
+    { name: 'Hip Thrust (Machine)',     cat: 'Hinge' },
+    { name: 'Good Morning',             cat: 'Hinge' },
+    { name: 'Kettlebell Swing',         cat: 'Hinge' },
+    // HORIZONTAL PUSH
+    { name: 'DB Flat Bench Press',      cat: 'H. Push' },
+    { name: 'Barbell Flat Bench Press', cat: 'H. Push' },
+    { name: 'Incline DB Press',         cat: 'H. Push' },
+    { name: 'Incline Barbell Press',    cat: 'H. Push' },
+    { name: 'DB Push Press',            cat: 'H. Push' },
+    { name: 'Cable Chest Press',        cat: 'H. Push' },
+    { name: 'Push Up',                  cat: 'H. Push' },
+    { name: 'Close Grip Bench Press',   cat: 'H. Push' },
+    // VERTICAL PUSH
+    { name: 'DB Shoulder Press',        cat: 'V. Push' },
+    { name: 'Barbell Overhead Press',   cat: 'V. Push' },
+    { name: 'Arnold Press',             cat: 'V. Push' },
+    { name: 'Smith Machine Press',      cat: 'V. Push' },
+    { name: 'Landmine Press',           cat: 'V. Push' },
+    // VERTICAL PULL
+    { name: 'Lat Pulldown',             cat: 'V. Pull' },
+    { name: 'Medium Grip Pulldown',     cat: 'V. Pull' },
+    { name: 'Wide Grip Pulldown',       cat: 'V. Pull' },
+    { name: 'Close Grip Pulldown',      cat: 'V. Pull' },
+    { name: 'Chin-Up',                  cat: 'V. Pull' },
+    { name: 'Pull-Up',                  cat: 'V. Pull' },
+    { name: 'Assisted Pull-Up',         cat: 'V. Pull' },
+    // HORIZONTAL PULL
+    { name: 'Seated Cable Row',         cat: 'H. Pull' },
+    { name: 'Single Arm Cable Row',     cat: 'H. Pull' },
+    { name: 'Single Arm DB Row',        cat: 'H. Pull' },
+    { name: 'DB Bent Over Row',         cat: 'H. Pull' },
+    { name: 'Barbell Bent Over Row',    cat: 'H. Pull' },
+    { name: 'T-Bar Row',                cat: 'H. Pull' },
+    { name: 'Chest Supported Row',      cat: 'H. Pull' },
+    { name: 'Face Pull',                cat: 'H. Pull' },
+    { name: 'Band Pull-Apart',          cat: 'H. Pull' },
+    // LEG ISOLATION
+    { name: 'Leg Extension',            cat: 'Legs' },
+    { name: 'Leg Curl (Machine)',       cat: 'Legs' },
+    { name: 'Standing Calf Raise',      cat: 'Legs' },
+    { name: 'Seated Calf Raise',        cat: 'Legs' },
+    { name: 'Glute Kickback',           cat: 'Legs' },
+    { name: 'Hip Abduction Machine',    cat: 'Legs' },
+    { name: 'Hip Adduction Machine',    cat: 'Legs' },
+    // SHOULDER ACCESSORY
+    { name: 'DB Lateral Raise',         cat: 'Shoulder' },
+    { name: 'Cable Lateral Raise',      cat: 'Shoulder' },
+    { name: 'DB Front Raise',           cat: 'Shoulder' },
+    { name: 'Rear Delt Fly (DB)',       cat: 'Shoulder' },
+    { name: 'Cable Rear Delt Fly',      cat: 'Shoulder' },
+    // ARM ACCESSORY
+    { name: 'DB Bicep Curl',            cat: 'Arms' },
+    { name: 'Hammer Curl',              cat: 'Arms' },
+    { name: 'Barbell Curl',             cat: 'Arms' },
+    { name: 'Cable Curl',               cat: 'Arms' },
+    { name: 'Preacher Curl',            cat: 'Arms' },
+    { name: 'Tricep Rope Pushdown',     cat: 'Arms' },
+    { name: 'Tricep Bar Pushdown',      cat: 'Arms' },
+    { name: 'Skull Crusher',            cat: 'Arms' },
+    { name: 'Overhead Tricep Extension',cat: 'Arms' },
+    { name: 'Dips (Assisted)',          cat: 'Arms' },
+    // CORE / REHAB
+    { name: 'Plank Hold',               cat: 'Core' },
+    { name: 'Dead Bug',                 cat: 'Core' },
+    { name: 'Bird Dog',                 cat: 'Core' },
+    { name: 'Ab Wheel Rollout',         cat: 'Core' },
+    { name: 'Cable Pallof Press',       cat: 'Core' },
+    { name: 'Hanging Knee Raise',       cat: 'Core' },
+    { name: 'Cat-Cow Spinal Segmentation', cat: 'Rehab' },
+    { name: 'Hip Hinge Wall Drill',     cat: 'Rehab' },
+    { name: 'Glute Activation',         cat: 'Rehab' },
+    { name: 'Glute Bridge',             cat: 'Rehab' },
+    { name: 'Thoracic Rotation',        cat: 'Rehab' },
+    { name: '90/90 Hip Stretch',        cat: 'Rehab' },
+  ];
+
+  // ── SHARED: remove any body-level floating picker ──
+  let _activeBodyEl = null;
+  function removeBodyEl() {
+    if (_activeBodyEl && _activeBodyEl.parentNode) {
+      _activeBodyEl.parentNode.removeChild(_activeBodyEl);
+    }
+    _activeBodyEl = null;
+  }
+
+  // ── EXERCISE AUTOCOMPLETE (fixed, body-appended) ──
+  let activeExWrapper = null;
+
+  function openExSearch(span) {
+    removeBodyEl();
+    if (activeExWrapper) commitExSearch(activeExWrapper, null);
+
+    const currentName = span.textContent.trim();
+
+    // Build the inline input wrapper (replaces span in DOM)
+    const wrapper = document.createElement('div');
+    wrapper.className = 'ex-autocomplete-wrapper';
+    wrapper._originalName = currentName;
+
+    const input = document.createElement('input');
+    input.className = 'ex-autocomplete-input';
+    input.value = currentName;
+    input.placeholder = 'Search TeamBuildr exercises…';
+    input.setAttribute('autocomplete', 'off');
+    wrapper.appendChild(input);
+    activeExWrapper = wrapper;
+
+    span.parentNode.replaceChild(wrapper, span);
+    input.focus();
+    input.select();
+
+    // Build dropdown appended to body (fixed positioning — floats above everything)
+    const dropdown = document.createElement('div');
+    dropdown.className = 'ex-dropdown';
+    const header = document.createElement('div');
+    header.className = 'ex-dropdown-header';
+    header.textContent = '⚡ TeamBuildr Exercise Library';
+    dropdown.appendChild(header);
+    document.body.appendChild(dropdown);
+    _activeBodyEl = dropdown;
+
+    function positionDropdown() {
+      const r = input.getBoundingClientRect();
+      dropdown.style.top  = (r.bottom + 4) + 'px';
+      dropdown.style.left = r.left + 'px';
+      dropdown.style.width = Math.max(280, r.width) + 'px';
+      // Flip up if not enough space below
+      const spaceBelow = window.innerHeight - r.bottom - 8;
+      if (spaceBelow < 200 && r.top > 200) {
+        dropdown.style.top = '';
+        dropdown.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+      } else {
+        dropdown.style.bottom = '';
+      }
+    }
+
+    let focusedIndex = -1;
+
+    function renderDropdown(query) {
+      const q = query.toLowerCase().trim();
+      let matches;
+      if (q) {
+        matches = tbExercises.filter(ex => ex.name.toLowerCase().includes(q));
+      } else {
+        const seed = currentName.slice(0, 2).toLowerCase();
+        const top = tbExercises.filter(ex => ex.name.toLowerCase().startsWith(seed));
+        const rest = tbExercises.filter(ex => !ex.name.toLowerCase().startsWith(seed));
+        matches = [...top, ...rest];
+      }
+      const shown = matches.slice(0, 14);
+
+      while (dropdown.children.length > 1) dropdown.removeChild(dropdown.lastChild);
+      focusedIndex = -1;
+
+      if (shown.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'ex-dropdown-empty';
+        empty.textContent = 'No exercises found';
+        dropdown.appendChild(empty);
+      } else {
+        shown.forEach(ex => {
+          const item = document.createElement('div');
+          item.className = 'ex-dropdown-item';
+          item.innerHTML = `<span>${ex.name}</span><span class="ex-dropdown-cat">${ex.cat}</span>`;
+          item.onmousedown = e => { e.preventDefault(); commitExSearch(wrapper, ex.name); };
+          dropdown.appendChild(item);
+        });
+      }
+      dropdown.style.display = 'block';
+      positionDropdown();
+    }
+
+    function moveFocus(dir) {
+      const items = dropdown.querySelectorAll('.ex-dropdown-item');
+      if (!items.length) return;
+      items[focusedIndex]?.classList.remove('focused');
+      focusedIndex = Math.max(0, Math.min(items.length - 1, focusedIndex + dir));
+      items[focusedIndex].classList.add('focused');
+      items[focusedIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    input.oninput  = () => renderDropdown(input.value);
+    input.onblur   = () => { setTimeout(() => commitExSearch(wrapper, input.value), 200); };
+    input.onkeydown = e => {
+      if (e.key === 'Escape')    { commitExSearch(wrapper, currentName); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveFocus(1);  return; }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); moveFocus(-1); return; }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const items = dropdown.querySelectorAll('.ex-dropdown-item');
+        const focused = items[focusedIndex];
+        const chosen = focused ? focused.querySelector('span').textContent : input.value;
+        commitExSearch(wrapper, chosen || input.value);
+      }
+    };
+
+    renderDropdown(currentName);
+  }
+
+  function commitExSearch(wrapper, finalName) {
+    if (!wrapper.parentNode) return;
+    removeBodyEl();
+    activeExWrapper = null;
+    const name = (finalName || wrapper._originalName || '').trim();
+    const newSpan = document.createElement('span');
+    newSpan.className = 'editable ex-name-editable';
+    newSpan.textContent = name;
+    newSpan.onclick = () => openExSearch(newSpan);
+    wrapper.parentNode.replaceChild(newSpan, wrapper);
+  }
+
+  // ── SETS PICKER (1–5, fixed, body-appended) ──
+  let activeSetsSpan = null;
+
+  function openSetsPicker(span) {
+    removeBodyEl();
+    if (activeSetsSpan) commitSetsPicker(activeSetsSpan, null);
+    activeSetsSpan = span;
+
+    const current = span.textContent.trim();
+
+    // Style the span as "open"
+    span.style.background = '#fef9c3';
+    span.style.outline = '2px solid var(--gold)';
+    span.style.borderRadius = '3px';
+
+    const picker = document.createElement('div');
+    picker.className = 'sets-picker';
+
+    const hdr = document.createElement('div');
+    hdr.className = 'sets-picker-header';
+    hdr.textContent = 'Sets';
+    picker.appendChild(hdr);
+
+    [1, 2, 3, 4, 5].forEach(n => {
+      const item = document.createElement('div');
+      item.className = 'sets-picker-item' + (String(n) === current ? ' selected' : '');
+      item.textContent = n;
+      item.onmousedown = e => { e.preventDefault(); commitSetsPicker(span, String(n)); };
+      picker.appendChild(item);
+    });
+
+    document.body.appendChild(picker);
+    _activeBodyEl = picker;
+
+    // Position below the span
+    const r = span.getBoundingClientRect();
+    picker.style.left = (r.left + r.width / 2 - 30) + 'px';
+    const spaceBelow = window.innerHeight - r.bottom - 8;
+    if (spaceBelow < 220 && r.top > 220) {
+      picker.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+    } else {
+      picker.style.top = (r.bottom + 4) + 'px';
+    }
+
+    // Close on outside click
+    function outsideClick(e) {
+      if (!picker.contains(e.target) && e.target !== span) {
+        commitSetsPicker(span, span.textContent.trim());
+        document.removeEventListener('mousedown', outsideClick);
+      }
+    }
+    setTimeout(() => document.addEventListener('mousedown', outsideClick), 50);
+  }
+
+  function commitSetsPicker(span, value) {
+    removeBodyEl();
+    activeSetsSpan = null;
+    span.style.background = '';
+    span.style.outline = '';
+    span.style.borderRadius = '';
+    if (value !== null) span.textContent = value;
+  }
+
+  // ── INIT: wire up exercise names → search, sets → picker ──
+  document.addEventListener('DOMContentLoaded', () => {
+    // Exercise names
+    document.querySelectorAll('.ex-name .editable[contenteditable]').forEach(span => {
+      span.removeAttribute('contenteditable');
+      span.classList.add('ex-name-editable');
+      span.onclick = () => openExSearch(span);
+    });
+    document.querySelectorAll('.ex-name .editable-hint').forEach(h => {
+      h.textContent = '🔍 search';
+    });
+    // Sets spans
+    document.querySelectorAll('.ex-sets .editable[contenteditable]').forEach(span => {
+      span.removeAttribute('contenteditable');
+      span.onclick = e => { e.stopPropagation(); openSetsPicker(span); };
+    });
+  });
+</script>
+</body>
+</html>

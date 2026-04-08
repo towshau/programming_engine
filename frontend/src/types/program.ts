@@ -20,6 +20,17 @@ export interface ProgramExercise {
   row_id?: string
 }
 
+export interface ExerciseBest {
+  result: number
+  reps: number
+  set_number: number
+}
+
+export type ExerciseBestsMap = Record<string, {
+  period: ExerciseBest | null
+  allTime: ExerciseBest | null
+}>
+
 export interface ProgramSession {
   day: number
   exercises: ProgramExercise[]
@@ -87,6 +98,19 @@ export interface GeneratedProgram {
   coach_approved: boolean
   uploaded_to_teambuildr: boolean
   next_due_date: string | null
+  program_type: 'regular' | 'holiday'
+  holiday_start_date: string | null
+  holiday_end_date: string | null
   created_at: string
   updated_at: string
+}
+
+export interface MemberHold {
+  id: string
+  member_id: string
+  membership_id: string | null
+  hold_start: string
+  hold_end: string
+  hold_notes: string | null
+  travel_programming_notes: string | null
 }

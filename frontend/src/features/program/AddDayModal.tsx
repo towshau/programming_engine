@@ -18,17 +18,19 @@ export function AddDayModal({ onSelect, onClose }: AddDayModalProps) {
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] bg-black/60"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]"
+      style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose()
       }}
     >
-      <div className="w-full max-w-sm bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl">
-        <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-          <h3 className="text-sm font-semibold text-zinc-200">Add Training Day</h3>
+      <div className="w-full max-w-sm rounded-xl shadow-xl bg-white" style={{ border: '1px solid var(--border)' }}>
+        <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--border)' }}>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Add Training Day</h3>
           <button
             onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="transition-opacity opacity-60 hover:opacity-100"
+            style={{ color: 'var(--text-muted)' }}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -41,10 +43,13 @@ export function AddDayModal({ onSelect, onClose }: AddDayModalProps) {
             <button
               key={opt.type}
               onClick={() => onSelect(opt.type)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-left transition-colors hover:border-emerald-500/50 hover:bg-zinc-800/80"
+              className="w-full rounded-lg border px-4 py-3 text-left transition-colors"
+              style={{ borderColor: 'var(--border)', background: 'var(--bg3)' }}
+              onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--color-gold)'; e.currentTarget.style.background = 'rgba(184,134,11,0.05)' }}
+              onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg3)' }}
             >
-              <p className="text-sm font-medium text-zinc-200">{opt.label}</p>
-              <p className="mt-0.5 text-xs text-zinc-500">{opt.description}</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{opt.label}</p>
+              <p className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>{opt.description}</p>
             </button>
           ))}
         </div>

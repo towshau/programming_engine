@@ -1,0 +1,13 @@
+{
+  "plugins": {
+    "supabase": {
+      "enabled": true
+    },
+    "superpowers": {
+      "enabled": false
+    },
+    "tldraw": {
+      "enabled": false
+    }
+  }
+}

@@ -1,0 +1,21 @@
+feat: Workbook tab, exercise PBs, progress improvements, Coach OS rebrand
+
+Programming Engine:
+- Exercise PB display: 6-month rolling best + all-time best below each exercise name
+- Weekly view: hide and auto-collapse Last Program accordion when switching modes
+- Progress tab: reorder sections (body comp, benchmarks, radar, master trend)
+- Progress tab: add 12-month time range, default expanded to 6 months
+- Radar chart: solid black polygon outer boundary, visible grey inner lines
+- Radar chart: score floor so zero values still render a visible polygon shape
+- Master trend chart: increased height for better trend visibility
+
+Workbook tab (new):
+- Full port of coach_workbook repo into frontend/src/features/workbook/
+- Member table with notes (personal, team, goals, habits), check-ins, session stats
+- Gym filter (BLIGH/BRIDGE/COLLINS) and active-only toggle, right-aligned in page header
+- Coach selection driven by existing AppShell top-bar selector (not independent)
+- All hooks wired to existing Supabase client; no new env vars or schema changes
+
+App shell:
+- Rebranded to "Coach OS / Lockeroom" (corrected spelling, single R)
+- Added Workbook nav tab and /workbook route

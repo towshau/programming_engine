@@ -29,7 +29,8 @@ export function NotesInput({ value, onChange }: NotesInputProps) {
         }}
         autoFocus
         placeholder="Add note..."
-        className="w-full rounded bg-zinc-700 border border-emerald-500 px-2 py-1 text-xs text-zinc-200 focus:outline-none"
+        className="w-full rounded border px-2 py-1 text-xs focus:outline-none focus:ring-1 bg-white"
+        style={{ borderColor: 'var(--color-gold)', color: 'var(--text)' }}
       />
     )
   }
@@ -42,10 +43,11 @@ export function NotesInput({ value, onChange }: NotesInputProps) {
       }}
       className={cn(
         'text-xs rounded px-2 py-1 text-left truncate max-w-[200px] transition-colors',
-        value
-          ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'
-          : 'text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800 italic'
+        !value && 'italic'
       )}
+      style={{ color: 'var(--text-muted)' }}
+      onMouseOver={e => e.currentTarget.style.background = 'var(--bg3)'}
+      onMouseOut={e => e.currentTarget.style.background = ''}
     >
       {value || 'Add note...'}
     </button>

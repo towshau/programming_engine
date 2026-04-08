@@ -2,12 +2,14 @@ import { useState, useRef, useEffect } from 'react'
 import { cn, seriesColor, seriesGroup } from '../../lib/utils'
 
 const SERIES_OPTIONS = [
-  'WU1', 'WU2', 'WU3', 'WU4',
-  'A1', 'A2', 'A3', 'A4',
-  'B1', 'B2', 'B3', 'B4',
-  'C1', 'C2', 'C3', 'C4',
-  'D1', 'D2', 'D3', 'D4',
-  'CD1', 'CD2', 'CD3', 'CD4',
+  'WU1', 'WU2', 'WU3', 'WU4', 'WU5',
+  'A1', 'A2', 'A3', 'A4', 'A5',
+  'B1', 'B2', 'B3', 'B4', 'B5',
+  'C1', 'C2', 'C3', 'C4', 'C5',
+  'D1', 'D2', 'D3', 'D4', 'D5',
+  'E1', 'E2', 'E3', 'E4', 'E5',
+  'F1', 'F2', 'F3', 'F4', 'F5',
+  'CD1', 'CD2', 'CD3', 'CD4', 'CD5',
 ]
 
 interface SeriesLabelDropdownProps {
@@ -52,8 +54,11 @@ export function SeriesLabelDropdown({ value, onChange, disabled = false }: Serie
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl p-2 space-y-1 w-44">
-          {['WU', 'A', 'B', 'C', 'D', 'CD'].map((grp) => {
+        <div
+          className="absolute top-full left-0 mt-1 z-50 rounded-lg p-2 space-y-1 w-56"
+          style={{ background: 'white', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)' }}
+        >
+          {['WU', 'A', 'B', 'C', 'D', 'E', 'F', 'CD'].map((grp) => {
             const opts = SERIES_OPTIONS.filter((o) => seriesGroup(o) === grp)
             return (
               <div key={grp} className="flex gap-0.5">
@@ -66,10 +71,13 @@ export function SeriesLabelDropdown({ value, onChange, disabled = false }: Serie
                     }}
                     className={cn(
                       'flex-1 rounded px-1.5 py-1 text-xs font-medium transition-colors',
-                      opt === value
-                        ? 'bg-emerald-600 text-white'
-                        : 'text-zinc-300 hover:bg-zinc-700'
                     )}
+                    style={opt === value
+                      ? { background: 'var(--color-gold)', color: 'white' }
+                      : { color: 'var(--text)' }
+                    }
+                    onMouseOver={e => { if (opt !== value) e.currentTarget.style.background = 'var(--bg3)' }}
+                    onMouseOut={e => { if (opt !== value) e.currentTarget.style.background = '' }}
                   >
                     {opt}
                   </button>

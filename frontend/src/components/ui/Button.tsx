@@ -1,36 +1,62 @@
 import { cn } from '../../lib/utils'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost'
-  size?: 'sm' | 'md'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline'
+  size?: 'xs' | 'sm' | 'md'
+  isLoading?: boolean
 }
 
 export function Button({
   variant = 'primary',
-  size = 'md',
+  size = 'sm',
   className,
   children,
+  isLoading,
+  disabled,
   ...props
 }: ButtonProps) {
+  const base =
+    'inline-flex items-center justify-center gap-1.5 font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]/40 disabled:opacity-50 disabled:cursor-not-allowed'
+
+  const sizeClass = {
+    xs: 'px-2.5 py-1 text-xs',
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2 text-sm',
+  }[size]
+
+  const variantStyle: React.CSSProperties = (() => {
+    switch (variant) {
+      case 'primary':
+        return { background: 'var(--color-gold)', color: 'white' }
+      case 'secondary':
+        return { background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border)' }
+      case 'ghost':
+        return { background: 'transparent', color: 'var(--text-muted)' }
+      case 'danger':
+        return { background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red-border)' }
+      case 'outline':
+        return { background: 'white', color: 'var(--text)', border: '1px solid var(--border)' }
+    }
+  })()
+
   return (
     <button
-      className={cn(
-        'inline-flex items-center justify-center rounded-lg font-medium transition-colors',
-        'focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-zinc-900',
-        'disabled:opacity-50 disabled:cursor-not-allowed',
-        variant === 'primary' &&
-          'bg-emerald-600 text-white hover:bg-emerald-500',
-        variant === 'secondary' &&
-          'bg-zinc-700 text-zinc-200 hover:bg-zinc-600 border border-zinc-600',
-        variant === 'ghost' &&
-          'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800',
-        size === 'sm' && 'px-2.5 py-1 text-xs',
-        size === 'md' && 'px-4 py-2 text-sm',
-        className
-      )}
+      disabled={disabled ?? isLoading}
+      className={cn(base, sizeClass, className)}
+      style={variantStyle}
       {...props}
     >
-      {children}
+      {isLoading ? (
+        <>
+          <div
+            className="h-3.5 w-3.5 animate-spin rounded-full border-2"
+            style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }}
+          />
+          {children}
+        </>
+      ) : (
+        children
+      )}
     </button>
   )
 }

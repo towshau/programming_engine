@@ -28,7 +28,7 @@ export function seriesGroup(label: string): string {
 }
 
 const SERIES_SORT_ORDER: Record<string, number> = {
-  WU: 0, A: 1, B: 2, C: 3, D: 4, CD: 5,
+  WU: 0, A: 1, B: 2, C: 3, D: 4, E: 5, F: 6, CD: 7,
 }
 
 export function seriesSortKey(group: string): number {
@@ -38,19 +38,23 @@ export function seriesSortKey(group: string): number {
 export function seriesColor(seriesLetter: string): string {
   switch (seriesLetter) {
     case 'WU':
-      return 'text-purple-400 bg-purple-400/10 border-purple-400/20'
+      return 'series-wu'
     case 'A':
-      return 'text-blue-400 bg-blue-400/10 border-blue-400/20'
+      return 'series-a'
     case 'B':
-      return 'text-teal-400 bg-teal-400/10 border-teal-400/20'
+      return 'series-b'
     case 'C':
-      return 'text-amber-400 bg-amber-400/10 border-amber-400/20'
+      return 'series-c'
     case 'D':
-      return 'text-zinc-400 bg-zinc-400/10 border-zinc-400/20'
+      return 'series-d'
+    case 'E':
+      return 'series-e'
+    case 'F':
+      return 'series-f'
     case 'CD':
-      return 'text-rose-400 bg-rose-400/10 border-rose-400/20'
+      return 'series-cd'
     default:
-      return 'text-zinc-400 bg-zinc-400/10 border-zinc-400/20'
+      return 'series-d'
   }
 }
 
@@ -62,6 +66,9 @@ export function seriesGroupLabel(seriesLetter: string): string {
       return 'Primary'
     case 'B':
       return 'Accessory'
+    case 'E':
+    case 'F':
+      return 'Extra'
     case 'CD':
       return 'Cool Down'
     default:

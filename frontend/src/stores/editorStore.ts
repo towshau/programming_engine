@@ -1,8 +1,11 @@
 import { create } from 'zustand'
+
+export type ProgramViewMode = 'day' | 'weekly'
 import type {
   Coach,
   MemberWithCoach,
   GeneratedProgram,
+  MemberHold,
   CoachEdit,
   ExerciseLibraryItem,
   ProgressionScheme,
@@ -10,6 +13,7 @@ import type {
   PastProgramInfo,
   PendingEdit,
   EditType,
+  ExerciseBestsMap,
 } from '../types'
 import { supabase } from '../lib/supabase'
 import { applyEdits } from '../lib/applyEdits'
@@ -127,6 +131,7 @@ function collectChain(
 }
 
 type ActiveView = 'next' | 'last'
+export type ProgramViewMode = 'day' | 'weekly'
 
 interface EditorState {
   coaches: Coach[]
@@ -148,9 +153,12 @@ interface EditorState {
   regenError: string | null
   lastProgramExpanded: boolean
   complianceDates: string[]
+  exerciseBests: ExerciseBestsMap
   saveValidationErrors: RepsValidationError[] | null
   saveError: string | null
   selectedDay: number | null
+  memberHolds: MemberHold[]
+  holidayPrograms: GeneratedProgram[]
   configDraft: {
     scheme_name: string
     rep_range: string
@@ -192,8 +200,11 @@ interface EditorState {
     rep_range: string
     duration_weeks: number
   }) => Promise<void>
+  programViewMode: ProgramViewMode
+  setProgramViewMode: (mode: ProgramViewMode) => void
   toggleLastProgram: () => void
   fetchComplianceDates: (memberId: string, startDate: string, endDate: string) => Promise<void>
+  fetchExerciseBests: (memberId: string, exerciseNames: string[], periodStart?: string, periodEnd?: string) => Promise<void>
   copyPreviousToNext: () => Promise<boolean>
   addDay: (dayType: DayType) => Promise<boolean>
   deleteDay: (dayNumber: number) => Promise<boolean>
@@ -202,6 +213,17 @@ interface EditorState {
   clearRegenError: () => void
   clearSaveValidationError: () => void
   hasRepsError: (sessionDay: number, seriesLabel: string) => boolean
+  fetchMemberHolds: (memberId: string) => Promise<void>
+  fetchHolidayPrograms: (memberId: string) => Promise<void>
+  generateHolidayProgram: (config: {
+    holiday_start_date: string
+    holiday_end_date: string
+    sessions_per_week: number
+    scheme_name: string
+    rep_range: string
+    duration_weeks: number
+  }) => Promise<GeneratedProgram | null>
+  loadProgramById: (programId: string) => Promise<void>
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -223,11 +245,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   pendingRegen: null,
   lastProgramExpanded: false,
   complianceDates: [],
+  exerciseBests: {},
   regenError: null,
   saveValidationErrors: null,
   saveError: null,
   selectedDay: null,
+  memberHolds: [],
+  holidayPrograms: [],
   configDraft: null,
+  programViewMode: 'day' as ProgramViewMode,
   loading: { coaches: false, members: false, program: false, saving: false, regenerating: false },
 
   fetchCoaches: async () => {
@@ -304,7 +330,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const cutoffStr = cutoff.toISOString().slice(0, 10)
     const today = new Date().toISOString().slice(0, 10)
 
-    const [allMembersRes, activeMembershipRes, pgRes, mpRes] = await Promise.all([
+    const [allMembersRes, activeMembershipRes, pgRes, mpRes, holdsRes, holidayProgRes] = await Promise.all([
       supabase
         .from('member_database')
         .select('id, first_name, last_name, member_name')
@@ -321,10 +347,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .limit(2000),
       supabase
         .from('programming_generated')
-        .select('member_id, next_due_date, created_at, duration_weeks')
+        .select('member_id, next_due_date, created_at, duration_weeks, coach_approved, uploaded_to_teambuildr')
         .order('created_at', { ascending: false })
         .limit(5000),
-      supabase.from('member_programs').select('member_id, programming_coach_id').limit(5000),
+      supabase.from('member_programs').select('member_id, programming_coach_id, sessions_per_week, scheme_name').limit(5000),
+      supabase
+        .from('member_holds')
+        .select('id, member_id, membership_id, hold_start, hold_end, hold_notes, travel_programming_notes')
+        .gte('hold_end', today)
+        .order('hold_start', { ascending: true })
+        .limit(2000),
+      supabase
+        .from('programming_generated')
+        .select('id, member_id, sessions_per_week, duration_weeks, scheme_name, rep_range, program_type, holiday_start_date, holiday_end_date, coach_approved, changes_summary, created_at, updated_at, run_id, assigned_to, phase_number, rules_applied, payload, coach_edited, uploaded_to_teambuildr, next_due_date')
+        .eq('program_type', 'holiday')
+        .gte('holiday_end_date', today)
+        .order('holiday_start_date', { ascending: true })
+        .limit(2000),
     ])
 
     // Keep track of the most recent program for each member to check expiration
@@ -332,24 +371,52 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       next_due_date: string | null
       created_at: string
       duration_weeks: number | null
+      coach_approved: boolean
+      uploaded_to_teambuildr: boolean
     }
     const pgMap = new Map<string, ProgInfo>()
-    for (const row of (pgRes.data ?? []) as { member_id: string, next_due_date: string | null, created_at: string, duration_weeks: number | null }[]) {
+    for (const row of (pgRes.data ?? []) as { member_id: string, next_due_date: string | null, created_at: string, duration_weeks: number | null, coach_approved: boolean, uploaded_to_teambuildr: boolean }[]) {
       if (!pgMap.has(row.member_id)) {
         pgMap.set(row.member_id, {
           next_due_date: row.next_due_date,
           created_at: row.created_at,
           duration_weeks: row.duration_weeks,
+          coach_approved: row.coach_approved ?? false,
+          uploaded_to_teambuildr: row.uploaded_to_teambuildr ?? false,
         })
       }
     }
 
     /** Source of truth for coach assignment in Program Editor (aligns with run_weekly_batch, Retool). */
-    const mpCoachMap = new Map<string, string>()
+    interface MpInfo {
+      coach_id: string
+      sessions_per_week: number | null
+      scheme_name: string | null
+    }
+    const mpCoachMap = new Map<string, MpInfo>()
     for (const row of (mpRes.data ?? []) as Record<string, unknown>[]) {
       const mid = row.member_id as string
-      const cid = (row.programming_coach_id as string) || ''
-      if (mid) mpCoachMap.set(mid, cid)
+      if (mid) mpCoachMap.set(mid, {
+        coach_id: (row.programming_coach_id as string) || '',
+        sessions_per_week: (row.sessions_per_week as number) ?? null,
+        scheme_name: (row.scheme_name as string) ?? null,
+      })
+    }
+
+    // Build holds map: member_id → MemberHold[]
+    const holdsMap = new Map<string, MemberHold[]>()
+    for (const row of (holdsRes.data ?? []) as MemberHold[]) {
+      const existing = holdsMap.get(row.member_id)
+      if (existing) existing.push(row)
+      else holdsMap.set(row.member_id, [row])
+    }
+
+    // Build holiday programs map: member_id → GeneratedProgram[]
+    const holidayProgMap = new Map<string, GeneratedProgram[]>()
+    for (const row of (holidayProgRes.data ?? []) as GeneratedProgram[]) {
+      const existing = holidayProgMap.get(row.member_id)
+      if (existing) existing.push(row)
+      else holidayProgMap.set(row.member_id, [row])
     }
 
     interface ActiveInfo {
@@ -379,7 +446,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const mid = row.id as string
       const active = activeMap.get(mid)
       const isActive = !!active && !active.not_renewing
-      const mpCoach = mpCoachMap.get(mid) || ''
+      const mpInfo = mpCoachMap.get(mid)
+      const mpCoach = mpInfo?.coach_id || ''
 
       if (coachId && mpCoach !== coachId) continue
 
@@ -415,6 +483,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const withinNewWindow = (startDate > today) || (!!startDate && startDate >= cutoffStr)
       const isNew = withinNewWindow && active?.membership_stage === 'newsale'
 
+      // Derive draft workflow status for the "Awaiting First Program" tab
+      let draftStatus: import('../types/database').ProgramDraftStatus = 'awaiting_draft'
+      if (progInfo) {
+        if (progInfo.uploaded_to_teambuildr) draftStatus = 'uploaded'
+        else if (progInfo.coach_approved) draftStatus = 'approved'
+        else draftStatus = 'draft_ready'
+      }
+
       members.push({
         member_id: mid,
         member_name: fullName,
@@ -425,6 +501,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         membership_status: isActive ? 'active' : 'inactive',
         program_status: (!hasProgram || isExpiring) ? 'needs_program' : isNew ? 'new_member' : 'has_program',
         is_new: isNew,
+        sessions_per_week: mpInfo?.sessions_per_week ?? null,
+        scheme_name: mpInfo?.scheme_name ?? null,
+        draft_status: draftStatus,
+        holds: holdsMap.get(mid) ?? [],
+        holiday_programs: holidayProgMap.get(mid) ?? [],
       })
     }
 
@@ -462,8 +543,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       pendingRegen: null,
       lastProgramExpanded: false,
       complianceDates: [],
+      memberHolds: [],
+      holidayPrograms: [],
     })
-    if (member) get().fetchProgram(member.member_id)
+    if (member) {
+      get().fetchProgram(member.member_id)
+      void get().fetchMemberHolds(member.member_id)
+      void get().fetchHolidayPrograms(member.member_id)
+    }
   },
 
   fetchProgram: async (memberId: string) => {
@@ -473,6 +560,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       .from('programming_generated')
       .select('*')
       .eq('member_id', memberId)
+      .neq('program_type', 'holiday')
       .order('created_at', { ascending: false })
       .limit(2)
 
@@ -555,8 +643,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       } else {
         set({ pendingRegen: null })
       }
+
+      const exerciseNames = new Set<string>()
+      current.payload.sessions.forEach(s => {
+        s.exercises.forEach(e => {
+          if (e.exercise_name) exerciseNames.add(e.exercise_name)
+        })
+      })
+      const sixMonthsAgo = new Date()
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+      const pStart = sixMonthsAgo.toISOString().slice(0, 10)
+      const pEnd = new Date().toISOString().slice(0, 10)
+      void get().fetchExerciseBests(memberId, Array.from(exerciseNames), pStart, pEnd)
     } else {
-      set({ program: null, previousProgram: null, pastProgramInfo: null, configDraft: null, previousSavedEdits: [], previousPendingEdits: [], previousSelectedDay: null, lastProgramExpanded: false, complianceDates: [] })
+      set({ program: null, previousProgram: null, pastProgramInfo: null, configDraft: null, previousSavedEdits: [], previousPendingEdits: [], previousSelectedDay: null, lastProgramExpanded: false, complianceDates: [], exerciseBests: {} })
     }
     set((s) => ({ loading: { ...s.loading, program: false } }))
   },
@@ -605,6 +705,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setActiveView: (view) => set({ activeView: view, saveValidationErrors: null, saveError: null }),
   setPreviousSelectedDay: (day) => set({ previousSelectedDay: day }),
 
+  setProgramViewMode: (mode) => set({ programViewMode: mode }),
+
   toggleLastProgram: () => {
     set((s) => ({
       lastProgramExpanded: !s.lastProgramExpanded,
@@ -634,6 +736,64 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ].sort()
       set({ complianceDates: dates })
     }
+  },
+
+  fetchExerciseBests: async (memberId, exerciseNames, periodStart, periodEnd) => {
+    if (!exerciseNames || exerciseNames.length === 0) {
+      set({ exerciseBests: {} })
+      return
+    }
+
+    const [periodRes, allTimeRes] = await Promise.all([
+      periodStart && periodEnd
+        ? supabase
+            .from('member_tbresults')
+            .select('exercise_name, result, reps, set_number')
+            .eq('member_id', memberId)
+            .in('exercise_name', exerciseNames)
+            .gte('completed_date', periodStart)
+            .lte('completed_date', periodEnd)
+            .not('result', 'is', null)
+            .not('result', 'eq', '0')
+            .not('result', 'eq', '')
+            .gt('reps', 0)
+        : Promise.resolve({ data: null }),
+      supabase
+        .from('member_tbresults')
+        .select('exercise_name, result, reps, set_number')
+        .eq('member_id', memberId)
+        .in('exercise_name', exerciseNames)
+        .not('result', 'is', null)
+        .not('result', 'eq', '0')
+        .not('result', 'eq', '')
+        .gt('reps', 0),
+    ])
+
+    const processRows = (rows: { exercise_name: string; result: string; reps: number; set_number: number }[] | null) => {
+      const bests = new Map<string, { result: number; reps: number; set_number: number }>()
+      for (const r of (rows || [])) {
+        const val = parseFloat(r.result)
+        if (isNaN(val)) continue
+        const current = bests.get(r.exercise_name)
+        if (!current || val > current.result || (val === current.result && r.reps > current.reps)) {
+          bests.set(r.exercise_name, { result: val, reps: r.reps, set_number: r.set_number })
+        }
+      }
+      return bests
+    }
+
+    const periodMap = processRows(periodRes.data)
+    const allTimeMap = processRows(allTimeRes.data)
+
+    const finalBests: ExerciseBestsMap = {}
+    for (const name of exerciseNames) {
+      finalBests[name] = {
+        period: periodMap.get(name) || null,
+        allTime: allTimeMap.get(name) || null,
+      }
+    }
+
+    set({ exerciseBests: finalBests })
   },
 
   addPendingEdit: (edit: PendingEdit) => {
@@ -1330,5 +1490,134 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   hasRepsError: (sessionDay, seriesLabel) => {
     const errs = get().saveValidationErrors
     return !!errs?.some((e) => e.sessionDay === sessionDay && e.seriesLabel === seriesLabel)
+  },
+
+  fetchMemberHolds: async (memberId: string) => {
+    const today = new Date().toISOString().slice(0, 10)
+    const { data } = await supabase
+      .from('member_holds')
+      .select('id, member_id, membership_id, hold_start, hold_end, hold_notes, travel_programming_notes')
+      .eq('member_id', memberId)
+      .gte('hold_end', today)
+      .order('hold_start', { ascending: true })
+    set({ memberHolds: (data ?? []) as MemberHold[] })
+  },
+
+  fetchHolidayPrograms: async (memberId: string) => {
+    // Requires migration 20260408130000 (adds program_type column). Fails silently pre-migration.
+    const { data, error } = await supabase
+      .from('programming_generated')
+      .select('*')
+      .eq('member_id', memberId)
+      .eq('program_type', 'holiday')
+      .order('holiday_start_date', { ascending: true })
+    if (!error) {
+      set({ holidayPrograms: (data ?? []) as GeneratedProgram[] })
+    }
+  },
+
+  generateHolidayProgram: async (config) => {
+    const { selectedMember, selectedCoach } = get()
+    if (!selectedMember) return null
+
+    let exerciseLibrary = get().exerciseLibrary
+    if (exerciseLibrary.length === 0) {
+      await get().fetchExerciseLibrary()
+      exerciseLibrary = get().exerciseLibrary
+    }
+    if (exerciseLibrary.length === 0) {
+      set({ regenError: 'No exercise library found. Please try again.' })
+      return null
+    }
+
+    set((s) => ({ loading: { ...s.loading, regenerating: true }, regenError: null }))
+
+    try {
+      const templatePayload = buildTemplateProgram(
+        config.sessions_per_week,
+        config.rep_range,
+        exerciseLibrary,
+      )
+
+      if ((templatePayload.sessions ?? []).length === 0) {
+        set({ regenError: 'Could not build a template from the exercise library.' })
+        return null
+      }
+
+      const runId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
+      const { data, error } = await supabase
+        .from('programming_generated')
+        .insert({
+          run_id: runId,
+          member_id: selectedMember.member_id,
+          assigned_to: selectedCoach?.id ?? null,
+          sessions_per_week: config.sessions_per_week,
+          duration_weeks: config.duration_weeks,
+          scheme_name: config.scheme_name,
+          rep_range: config.rep_range,
+          program_type: 'holiday',
+          holiday_start_date: config.holiday_start_date || null,
+          holiday_end_date: config.holiday_end_date || null,
+          changes_summary: `Holiday program${config.holiday_start_date ? `: ${config.holiday_start_date} – ${config.holiday_end_date}` : ''}`,
+          rules_applied: [],
+          payload: templatePayload,
+          coach_edited: false,
+          coach_approved: false,
+          uploaded_to_teambuildr: false,
+        })
+        .select('*')
+        .single()
+
+      if (error || !data) {
+        set({ regenError: error?.message ?? 'Failed to create holiday program.' })
+        return null
+      }
+
+      const newProgram = data as GeneratedProgram
+      // Refresh the holiday programs list in state
+      await get().fetchHolidayPrograms(selectedMember.member_id)
+      return newProgram
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ regenError: `Holiday program creation error: ${msg}` })
+      return null
+    } finally {
+      set((s) => ({ loading: { ...s.loading, regenerating: false } }))
+    }
+  },
+
+  loadProgramById: async (programId: string) => {
+    set((s) => ({ loading: { ...s.loading, program: true } }))
+    const { data } = await supabase
+      .from('programming_generated')
+      .select('*')
+      .eq('id', programId)
+      .single()
+    set((s) => ({ loading: { ...s.loading, program: false } }))
+    if (!data) return
+    const prog = data as GeneratedProgram
+    set({
+      program: prog,
+      previousProgram: null,
+      pastProgramInfo: null,
+      savedEdits: [],
+      pendingEdits: [],
+      activeView: 'next' as ActiveView,
+      previousSavedEdits: [],
+      previousPendingEdits: [],
+      selectedDay: prog.payload?.sessions?.[0]?.day ?? 1,
+      lastProgramExpanded: false,
+      configDraft: {
+        scheme_name: prog.scheme_name ?? 'GPP',
+        rep_range: prog.rep_range ?? '8-10',
+        sessions_per_week: prog.sessions_per_week,
+        duration_weeks: prog.duration_weeks,
+      },
+    })
+    get().fetchEdits(prog.id)
   },
 }))
