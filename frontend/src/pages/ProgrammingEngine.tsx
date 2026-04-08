@@ -36,7 +36,7 @@ export function ProgrammingEngine() {
   return (
     <div className="flex h-full">
       <MemberSidebar onSelectMember={handleSelectMember} />
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <ProgramViewer />
       </div>
     </div>

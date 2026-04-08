@@ -1,5 +1,5 @@
 import type { GeneratedProgram, PastProgramInfo } from '../../types'
-import { useEditorStore } from '../../stores/editorStore'
+import { useEditorStore, type ProgramViewMode } from '../../stores/editorStore'
 import { Badge } from '../../components/ui/Badge'
 import { cn } from '../../lib/utils'
 
@@ -9,6 +9,8 @@ interface ProgramHeaderProps {
   pastProgramInfo: PastProgramInfo | null
   memberName: string
   editCount: number
+  programViewMode: ProgramViewMode
+  onViewModeChange: (mode: ProgramViewMode) => void
 }
 
 function formatDateAU(dateStr: string) {
@@ -86,6 +88,8 @@ export function ProgramHeader({
   pastProgramInfo,
   memberName,
   editCount,
+  programViewMode,
+  onViewModeChange,
 }: ProgramHeaderProps) {
   const { lastProgramExpanded, toggleLastProgram } = useEditorStore()
 
@@ -96,7 +100,32 @@ export function ProgramHeader({
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between">
-        <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>{memberName}</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>{memberName}</h2>
+          <div
+            className="flex gap-0.5 p-0.5 rounded-lg"
+            style={{ background: 'var(--bg3)', border: '1px solid var(--border)' }}
+          >
+            {(['day', 'weekly'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => onViewModeChange(mode)}
+                className={cn(
+                  'px-4 py-1.5 rounded-md text-sm font-semibold transition-all',
+                  programViewMode === mode
+                    ? 'text-white shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                )}
+                style={programViewMode === mode
+                  ? { background: 'var(--color-gold)', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }
+                  : {}
+                }
+              >
+                {mode === 'day' ? 'Day View' : 'Weekly View'}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           {program.coach_edited && (
             <Badge variant="blue">Edited</Badge>
