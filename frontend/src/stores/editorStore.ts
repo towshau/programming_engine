@@ -340,7 +340,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .limit(2000),
       supabase
         .from('member_memberships')
-        .select('member_id, gym, start_date, end_date, journey_stage, status, membership_stage, pipeline_lost, coach_id, handoff_coach_id')
+        .select('member_id, gym, start_date, end_date, journey_stage, status, membership_stage, pipeline_lost, programming_coach_id, coach_id, handoff_coach_id')
         .gt('end_date', today)
         .not('journey_stage', 'eq', 'no_sale')
         .not('journey_stage', 'eq', 'not_renewing')
@@ -423,6 +423,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     interface ActiveInfo {
       gym: string
+      programming_coach_id: string
       start_date: string
       membership_stage: string
       not_renewing: boolean
@@ -438,6 +439,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!existing || startDate > existing.start_date) {
         activeMap.set(mid, {
           gym: (row.gym as string) || '',
+          programming_coach_id: (row.programming_coach_id as string) || '',
           start_date: startDate,
           membership_stage: (row.membership_stage as string) || '',
           not_renewing: notRenewing,
@@ -454,9 +456,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const active = activeMap.get(mid)
       const isActive = !!active && !active.not_renewing
       const mpInfo = mpCoachMap.get(mid)
-      const mpCoach = mpInfo?.coach_id || ''
+      const progCoach = active?.programming_coach_id || ''
 
-      const isProgrammingCoach = !coachId || mpCoach === coachId
+      const isProgrammingCoach = !coachId || progCoach === coachId
       const isIntakeCoach = !coachId || membershipCoachMemberIds.has(mid)
 
       if (!isProgrammingCoach && !isIntakeCoach) continue
@@ -507,7 +509,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         first_name: firstName,
         last_name: lastName,
         gym: active?.gym || '',
-        programming_coach_id: mpCoach,
+        programming_coach_id: progCoach,
         membership_status: isActive ? 'active' : 'inactive',
         program_status: (!hasProgram || isExpiring) ? 'needs_program' : isNew ? 'new_member' : 'has_program',
         is_new: isNew,
