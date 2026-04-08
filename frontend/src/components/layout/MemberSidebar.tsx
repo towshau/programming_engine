@@ -21,6 +21,8 @@ function getStatusDotClass(membership: MembershipStatus, program: ProgramStatus)
 
 interface MemberSidebarProps {
   onSelectMember?: (member: MemberWithCoach | null) => void
+  /** 'intake' uses members filtered by membership coach_id; default 'programming' uses programming_coach_id */
+  source?: 'programming' | 'intake'
 }
 
 function ChevronLeftIcon() {
@@ -39,14 +41,17 @@ function ChevronRightIcon() {
   )
 }
 
-export function MemberSidebar({ onSelectMember }: MemberSidebarProps = {}) {
+export function MemberSidebar({ onSelectMember, source = 'programming' }: MemberSidebarProps = {}) {
   const {
     selectedCoach,
     members,
+    intakeMembers,
     selectedMember,
     selectMember,
     loading,
   } = useEditorStore()
+
+  const memberList = source === 'intake' ? intakeMembers : members
 
   const [collapsed, setCollapsed] = useState(false)
   const [query, setQuery] = useState('')
@@ -62,7 +67,7 @@ export function MemberSidebar({ onSelectMember }: MemberSidebarProps = {}) {
   }
 
   const filtered = useMemo(() => {
-    let list = members
+    let list = memberList
 
     if (statusFilter !== 'all') {
       list = list.filter((m) => {
@@ -92,18 +97,18 @@ export function MemberSidebar({ onSelectMember }: MemberSidebarProps = {}) {
     }
 
     return list
-  }, [members, debouncedQuery, statusFilter])
+  }, [memberList, debouncedQuery, statusFilter])
 
   const counts = useMemo(() => {
-    const active = members.filter((m) => m.membership_status === 'active')
+    const active = memberList.filter((m) => m.membership_status === 'active')
     return {
-      all: members.length,
+      all: memberList.length,
       active: active.length,
       needs_program: active.filter((m) => m.program_status === 'needs_program').length,
-      new_member: members.filter((m) => m.is_new).length,
-      inactive: members.filter((m) => m.membership_status !== 'active').length,
+      new_member: memberList.filter((m) => m.is_new).length,
+      inactive: memberList.filter((m) => m.membership_status !== 'active').length,
     }
-  }, [members])
+  }, [memberList])
 
   const filters: { key: StatusFilter; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: counts.all },

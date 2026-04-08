@@ -136,6 +136,7 @@ interface EditorState {
   coaches: Coach[]
   selectedCoach: Coach | null
   members: MemberWithCoach[]
+  intakeMembers: MemberWithCoach[]
   selectedMember: MemberWithCoach | null
   program: GeneratedProgram | null
   previousProgram: GeneratedProgram | null
@@ -229,6 +230,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   coaches: [],
   selectedCoach: null,
   members: [],
+  intakeMembers: [],
   selectedMember: null,
   program: null,
   previousProgram: null,
@@ -312,6 +314,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       previousSelectedDay: null,
       selectedDay: null,
       members: [],
+      intakeMembers: [],
       configDraft: null,
       pendingRegen: null,
       lastProgramExpanded: false,
@@ -337,7 +340,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .limit(2000),
       supabase
         .from('member_memberships')
-        .select('member_id, gym, start_date, end_date, journey_stage, status, membership_stage, pipeline_lost')
+        .select('member_id, gym, start_date, end_date, journey_stage, status, membership_stage, pipeline_lost, coach_id, handoff_coach_id')
         .gt('end_date', today)
         .not('journey_stage', 'eq', 'no_sale')
         .not('journey_stage', 'eq', 'not_renewing')
@@ -425,6 +428,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       not_renewing: boolean
     }
     const activeMap = new Map<string, ActiveInfo>()
+    /** Member IDs whose primary effective coach (handoff_coach_id ?? coach_id) matches the selected coach. Used for Intake filtering. */
+    const membershipCoachMemberIds = new Set<string>()
     for (const row of (activeMembershipRes.data ?? []) as Record<string, unknown>[]) {
       const mid = row.member_id as string
       const existing = activeMap.get(mid)
@@ -438,9 +443,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           not_renewing: notRenewing,
         })
       }
+      const effectiveCoach = ((row.handoff_coach_id as string) || (row.coach_id as string) || '')
+      if (!coachId || effectiveCoach === coachId) membershipCoachMemberIds.add(mid)
     }
 
     const members: MemberWithCoach[] = []
+    const intakeMembers: MemberWithCoach[] = []
     for (const row of (allMembersRes.data ?? []) as Record<string, unknown>[]) {
       const mid = row.id as string
       const active = activeMap.get(mid)
@@ -448,7 +456,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const mpInfo = mpCoachMap.get(mid)
       const mpCoach = mpInfo?.coach_id || ''
 
-      if (coachId && mpCoach !== coachId) continue
+      const isProgrammingCoach = !coachId || mpCoach === coachId
+      const isIntakeCoach = !coachId || membershipCoachMemberIds.has(mid)
+
+      if (!isProgrammingCoach && !isIntakeCoach) continue
 
       const fullName = (row.member_name as string) || ''
       const firstName = (row.first_name as string) || fullName.split(' ')[0] || ''
@@ -490,7 +501,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         else draftStatus = 'draft_ready'
       }
 
-      members.push({
+      const memberObj: MemberWithCoach = {
         member_id: mid,
         member_name: fullName,
         first_name: firstName,
@@ -505,12 +516,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         draft_status: draftStatus,
         holds: holdsMap.get(mid) ?? [],
         holiday_programs: holidayProgMap.get(mid) ?? [],
-      })
+      }
+
+      if (isProgrammingCoach) members.push(memberObj)
+      if (isIntakeCoach) intakeMembers.push(memberObj)
     }
 
     type PStatus = 'new_member' | 'needs_program' | 'has_program'
     const programRank: Record<PStatus, number> = { needs_program: 0, new_member: 1, has_program: 2 }
-    members.sort((a, b) => {
+    const memberSort = (a: MemberWithCoach, b: MemberWithCoach) => {
       const aActive = a.membership_status === 'active' ? 0 : 1
       const bActive = b.membership_status === 'active' ? 0 : 1
       if (aActive !== bActive) return aActive - bActive
@@ -519,9 +533,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (ps !== 0) return ps
       }
       return a.member_name.localeCompare(b.member_name)
-    })
+    }
+    members.sort(memberSort)
+    intakeMembers.sort(memberSort)
 
-    set({ members })
+    set({ members, intakeMembers })
     set((s) => ({ loading: { ...s.loading, members: false } }))
   },
 

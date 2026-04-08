@@ -175,7 +175,7 @@ function FormField({ label, value }: { label: string; value: string | null | und
 export function Intake() {
   const { memberId } = useParams<{ memberId: string }>()
   const navigate = useNavigate()
-  const { members, selectedMember, selectMember, loading } = useEditorStore()
+  const { intakeMembers, selectedMember, selectMember, loading } = useEditorStore()
   const [activeTab, setActiveTab] = useState<IntakeTab>('profile')
 
   // Latest-row data (profile, movement screen, benchmarks)
@@ -195,9 +195,9 @@ export function Intake() {
   useEffect(() => {
     if (!memberId || loading.members) return
     if (selectedMember?.member_id === memberId) return
-    const match = members.find((m) => m.member_id === memberId)
+    const match = intakeMembers.find((m) => m.member_id === memberId)
     if (match) selectMember(match)
-  }, [memberId, members, selectedMember, selectMember, loading.members])
+  }, [memberId, intakeMembers, selectedMember, selectMember, loading.members])
 
   useEffect(() => {
     const id = memberId ?? selectedMember?.member_id
@@ -379,7 +379,7 @@ export function Intake() {
 
   return (
     <div className="flex h-full">
-      <MemberSidebar onSelectMember={handleSelectMember} />
+      <MemberSidebar onSelectMember={handleSelectMember} source="intake" />
       <div className="flex-1 overflow-y-auto p-7">
         {!currentMemberId ? (
           <div className="flex items-center justify-center py-24">
