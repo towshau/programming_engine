@@ -57,7 +57,6 @@ export function ProgramViewer() {
     setPreviousSelectedDay,
     selectedDay,
     setSelectedDay,
-    lastProgramExpanded,
     complianceDates,
     configDraft,
     loading,
@@ -80,9 +79,18 @@ export function ProgramViewer() {
     swapDays,
     memberHolds,
     holidayPrograms,
+    lastProgramExpanded,
+    toggleLastProgram,
   } = useEditorStore()
 
   const [programViewMode, setProgramViewMode] = useState<ProgramViewMode>('day')
+
+  const handleViewModeChange = (mode: ProgramViewMode) => {
+    setProgramViewMode(mode)
+    if (mode === 'weekly' && lastProgramExpanded) {
+      toggleLastProgram()
+    }
+  }
   const [showAddDayModal, setShowAddDayModal] = useState(false)
   const [firstProgramConfig, setFirstProgramConfig] = useState({
     sessions_per_week: 3,
@@ -370,7 +378,7 @@ export function ProgramViewer() {
         memberName={memberName}
         editCount={nextEditCount}
         programViewMode={programViewMode}
-        onViewModeChange={setProgramViewMode}
+        onViewModeChange={handleViewModeChange}
       />
 
       {/* ── Holds & Holiday banner ── */}

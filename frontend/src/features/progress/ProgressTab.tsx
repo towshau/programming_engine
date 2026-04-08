@@ -10,12 +10,19 @@ import { cn } from '../../lib/utils'
 // Time filter helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-type TimeRange = '3m' | '6m' | 'all'
+type TimeRange = '3m' | '6m' | '12m' | 'all'
 
 const TIME_LABELS: Record<TimeRange, string> = {
   '3m': 'Last 3 Months',
   '6m': 'Last 6 Months',
+  '12m': 'Last 12 Months',
   all: 'All Time',
+}
+
+const RANGE_MONTHS: Partial<Record<TimeRange, number>> = {
+  '3m': 3,
+  '6m': 6,
+  '12m': 12,
 }
 
 function filterByRange<T extends { submission_date?: string | null; date_created?: string | null }>(
@@ -24,8 +31,10 @@ function filterByRange<T extends { submission_date?: string | null; date_created
   dateKey: 'submission_date' | 'date_created',
 ): T[] {
   if (range === 'all') return rows
+  const months = RANGE_MONTHS[range]
+  if (!months) return rows
   const cutoff = new Date()
-  cutoff.setMonth(cutoff.getMonth() - (range === '3m' ? 3 : 6))
+  cutoff.setMonth(cutoff.getMonth() - months)
   return rows.filter((r) => {
     const d = r[dateKey]
     if (!d) return false
@@ -162,10 +171,9 @@ export function ProgressTab({
 
       {/* Exportable content area */}
       <div id={exportId} className="space-y-5 rounded-xl p-1">
-        {/* Radar */}
-        <RadarOverview physicals={latestPhysicals} />
+        {/* Body Composition — top */}
+        <IndividualBodyCompCharts data={filteredHealth} />
 
-        {/* Master trend chart */}
         {filteredPhysicals.length === 0 && filteredHealth.length === 0 ? (
           <div
             className="rounded-xl border p-8 text-center"
@@ -180,9 +188,12 @@ export function ProgressTab({
           </div>
         ) : (
           <>
-            <MasterTrendChart data={filteredPhysicals} />
+            {/* Benchmark Breakdown */}
             <IndividualBenchmarkCharts data={filteredPhysicals} />
-            <IndividualBodyCompCharts data={filteredHealth} />
+            {/* Physical Capacity Radar */}
+            <RadarOverview physicals={latestPhysicals} />
+            {/* All Metrics trend — bottom */}
+            <MasterTrendChart data={filteredPhysicals} />
           </>
         )}
       </div>

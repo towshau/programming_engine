@@ -2,7 +2,7 @@ import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useEditorStore } from '../stores/editorStore'
 import { cn, getInitials } from '../lib/utils'
-import type { MemberWithCoach, ProgramDraftStatus } from '../types/database'
+import type { MemberWithCoach, ProgramDraftStatus, MemberHold, GeneratedProgram } from '../types'
 
 type QueueTab = 'awaiting' | 'phasedue' | 'active' | 'holiday'
 
@@ -140,6 +140,161 @@ function MemberRow({
   )
 }
 
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function HoldEntry({ hold }: { hold: MemberHold }) {
+  return (
+    <div
+      className="rounded-lg border px-3 py-2.5 space-y-1"
+      style={{ borderColor: 'var(--blue-border)', background: 'var(--blue-bg)' }}
+    >
+      <div className="flex items-center gap-1.5">
+        <svg className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--blue)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+        </svg>
+        <span className="text-xs font-semibold" style={{ color: 'var(--blue)' }}>
+          {formatDate(hold.hold_start)} – {formatDate(hold.hold_end)}
+        </span>
+      </div>
+      {hold.travel_programming_notes && (
+        <p className="text-xs leading-snug" style={{ color: '#1d4ed8' }}>
+          <span className="font-medium">Travel notes:</span> {hold.travel_programming_notes}
+        </p>
+      )}
+      {hold.hold_notes && (
+        <p className="text-xs leading-snug" style={{ color: '#1d4ed8' }}>
+          <span className="font-medium">Hold notes:</span> {hold.hold_notes}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function HolidayProgramEntry({ prog }: { prog: GeneratedProgram }) {
+  return (
+    <div
+      className="rounded-lg border px-3 py-2.5 space-y-1"
+      style={{ borderColor: 'var(--color-gold-100)', background: 'var(--color-gold-50)' }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <svg className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--color-gold)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
+          </svg>
+          <span className="text-xs font-semibold" style={{ color: 'var(--color-gold)' }}>
+            {prog.holiday_start_date && prog.holiday_end_date
+              ? `${formatDate(prog.holiday_start_date)} – ${formatDate(prog.holiday_end_date)}`
+              : 'No dates set'}
+          </span>
+        </div>
+        <span
+          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+          style={
+            prog.coach_approved
+              ? { background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid var(--green-border)' }
+              : { background: 'rgba(184,134,11,0.15)', color: 'var(--color-gold)', border: '1px solid var(--color-gold-100)' }
+          }
+        >
+          {prog.coach_approved ? 'Approved' : 'Draft'}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 text-[11px]" style={{ color: '#92680a' }}>
+        {prog.sessions_per_week && <span>{prog.sessions_per_week}×/week</span>}
+        {prog.scheme_name && <span>· {prog.scheme_name}</span>}
+        {prog.rep_range && <span>· {prog.rep_range}</span>}
+        {prog.duration_weeks && <span>· {prog.duration_weeks}wk</span>}
+      </div>
+    </div>
+  )
+}
+
+function HolidayHoldRow({
+  member,
+  onClick,
+}: {
+  member: MemberWithCoach
+  onClick: () => void
+}) {
+  const initials = getInitials(member.first_name, member.last_name)
+  const bgColor = avatarColor(member.member_id)
+  const holds = member.holds ?? []
+  const holidayProgs = member.holiday_programs ?? []
+
+  return (
+    <div
+      className="border-b transition-colors"
+      style={{ borderColor: 'var(--border)' }}
+    >
+      {/* Member name header row */}
+      <button
+        onClick={onClick}
+        className="w-full flex items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-[var(--bg3)] group"
+      >
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+          style={{ background: bgColor }}
+        >
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+            {member.first_name} {member.last_name}
+          </p>
+          {member.gym && (
+            <span
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+              style={{ background: 'var(--bg3)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+            >
+              {member.gym}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <span className="text-xs font-medium" style={{ color: 'var(--blue)' }}>
+            Open in Holiday Programs
+          </span>
+          <svg
+            className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ color: 'var(--text-muted)' }}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </button>
+
+      {/* Two-column layout */}
+      <div className="grid grid-cols-2 gap-0 px-5 pb-4">
+        {/* Column A: Holds */}
+        <div className="pr-3 space-y-2 border-r" style={{ borderColor: 'var(--border)' }}>
+          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--blue)' }}>
+            Holds ({holds.length})
+          </p>
+          {holds.length === 0 ? (
+            <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No upcoming holds</p>
+          ) : (
+            holds.map((h) => <HoldEntry key={h.id} hold={h} />)
+          )}
+        </div>
+
+        {/* Column B: Holiday Programs */}
+        <div className="pl-3 space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--color-gold)' }}>
+            Holiday Programs ({holidayProgs.length})
+          </p>
+          {holidayProgs.length === 0 ? (
+            <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>No holiday program</p>
+          ) : (
+            holidayProgs.map((p) => <HolidayProgramEntry key={p.id} prog={p} />)
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const TAB_CONFIG: { key: QueueTab; label: string; emptyMessage: string }[] = [
   {
     key: 'awaiting',
@@ -158,14 +313,14 @@ const TAB_CONFIG: { key: QueueTab; label: string; emptyMessage: string }[] = [
   },
   {
     key: 'holiday',
-    label: 'Holiday Programs',
-    emptyMessage: 'No holiday programs set up yet.',
+    label: 'Holiday Programs & Holds',
+    emptyMessage: 'No members with upcoming holds or holiday programs.',
   },
 ]
 
 export function ClientQueue() {
   const navigate = useNavigate()
-  const { members, loading, selectedCoach } = useEditorStore()
+  const { members, loading, selectedCoach, selectMember } = useEditorStore()
   const [activeTab, setActiveTab] = React.useState<QueueTab>('awaiting')
 
   const tabMembers = useMemo(() => {
@@ -178,7 +333,9 @@ export function ClientQueue() {
         (m) => m.membership_status === 'active' && m.program_status === 'needs_program' && !m.is_new
       ),
       active: activeMembersWithProgram.filter((m) => m.program_status === 'has_program'),
-      holiday: [] as MemberWithCoach[],
+      holiday: members.filter(
+        (m) => (m.holds?.length ?? 0) > 0 || (m.holiday_programs?.length ?? 0) > 0
+      ),
     }
   }, [members])
 
@@ -187,7 +344,7 @@ export function ClientQueue() {
       awaiting: tabMembers.awaiting.length,
       phasedue: tabMembers.phasedue.length,
       active: tabMembers.active.length,
-      holiday: 0,
+      holiday: tabMembers.holiday.length,
     }),
     [tabMembers]
   )
@@ -266,6 +423,17 @@ export function ClientQueue() {
               {currentTab.emptyMessage}
             </p>
           </div>
+        ) : activeTab === 'holiday' ? (
+          currentMembers.map((m) => (
+            <HolidayHoldRow
+              key={m.member_id}
+              member={m}
+              onClick={() => {
+                selectMember(m)
+                navigate('/holiday')
+              }}
+            />
+          ))
         ) : (
           currentMembers.map((m) => (
             <MemberRow
@@ -319,10 +487,10 @@ function InfoBanner({ tab, count }: { tab: QueueTab; count: number }) {
         style={{ background: 'var(--blue-bg)', borderColor: 'var(--blue-border)' }}
       >
         <p className="text-xs font-bold uppercase tracking-wide mb-0.5" style={{ color: 'var(--blue)' }}>
-          Holiday Programs
+          Holiday Programs & Holds — {count} member{count !== 1 ? 's' : ''}
         </p>
         <p className="text-xs" style={{ color: '#1d4ed8' }}>
-          Travel-friendly and hotel gym programs for members on holiday. These will appear here once configured.
+          Members with upcoming holds. Left column shows hold dates and notes; right column shows any associated holiday programs. Click a member to open their Holiday Programs page.
         </p>
       </div>
     )

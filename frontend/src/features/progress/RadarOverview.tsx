@@ -60,8 +60,12 @@ function CustomTooltip({
   )
 }
 
+const RADAR_SCORE_FLOOR = 5
+
 export function RadarOverview({ physicals }: Props) {
-  const data = computeRadarData(physicals)
+  const rawData = computeRadarData(physicals)
+  // Floor scores so zero/null axes still produce a visible polygon shape
+  const chartData = rawData.map((d) => ({ ...d, score: Math.max(RADAR_SCORE_FLOOR, d.score) }))
   const breakdown = getRadarBreakdown(physicals)
   const hasAnyData = physicals !== null
 
@@ -113,10 +117,29 @@ export function RadarOverview({ physicals }: Props) {
         ))}
       </div>
 
-      <div className="h-72">
+      <div className="h-72 relative">
+        <style>{`
+          /* Outer pentagon — solid black */
+          .recharts-polar-grid-concentric-polygon:last-of-type {
+            stroke: #1a1f2e !important;
+            stroke-width: 2px !important;
+            stroke-opacity: 1 !important;
+          }
+          /* Inner concentric polygons — visible light grey */
+          .recharts-polar-grid-concentric-polygon:not(:last-of-type) {
+            stroke: #9ca3af !important;
+            stroke-width: 1px !important;
+            stroke-opacity: 1 !important;
+          }
+          /* Spoke lines from centre — visible light grey */
+          .recharts-polar-grid-angle line {
+            stroke: #9ca3af !important;
+            stroke-opacity: 1 !important;
+          }
+        `}</style>
         <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={data} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
-            <PolarGrid gridType="circle" stroke="var(--border)" />
+          <RadarChart data={chartData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
+            <PolarGrid gridType="polygon" stroke="#9ca3af" strokeWidth={1} />
             <PolarAngleAxis
               dataKey="axis"
               tick={{
@@ -153,7 +176,7 @@ export function RadarOverview({ physicals }: Props) {
         className="grid grid-cols-5 gap-3 mt-6 pt-5"
         style={{ borderTop: '1px solid var(--border)' }}
       >
-        {data.map((d) => {
+        {rawData.map((d) => {
           const pct = d.score
           const color =
             d.axis === 'Bloods'

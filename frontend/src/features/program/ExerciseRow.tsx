@@ -31,11 +31,53 @@ export function ExerciseRow({
   compact = false,
 }: ExerciseRowProps) {
   void _programId; void _memberId; void _coachId;
-  const { addPendingEdit, hasRepsError } = useEditorStore()
+  const { addPendingEdit, hasRepsError, exerciseBests } = useEditorStore()
   const [showSwapModal, setShowSwapModal] = useState(false)
   const rowId = exercise.row_id
   const edited = isExerciseEdited(edits, sessionDay, exercise.series_label, rowId)
   const repsInvalid = !readOnly && hasRepsError(sessionDay, exercise.series_label)
+
+  const bests = exerciseBests[exercise.exercise_name]
+  const periodBest = bests?.period
+  const allTimeBest = bests?.allTime
+
+  const renderPB = (isCompact: boolean) => {
+    if (!bests) return null
+    const textClass = isCompact ? "text-[10px]" : "text-xs"
+    if (!periodBest && !allTimeBest) {
+      return <span className={`${textClass} block truncate`} style={{ color: 'var(--text-muted)' }}>No lifts recorded</span>
+    }
+    
+    const formatPB = (pb: { result: number; reps: number; set_number: number }) => `${pb.result}kg x ${pb.reps} | Set ${pb.set_number}`
+    
+    if (periodBest && allTimeBest) {
+      if (periodBest.result === allTimeBest.result && periodBest.reps === allTimeBest.reps) {
+        return (
+          <span className={`${textClass} block truncate`} style={{ color: 'var(--text-muted)' }}>
+            PB: <span style={{ color: 'var(--color-gold)' }}>{formatPB(periodBest)}</span> (all-time)
+          </span>
+        )
+      }
+      return (
+        <span className={`${textClass} block truncate`} style={{ color: 'var(--text-muted)' }}>
+          Recent PB: <span style={{ color: 'var(--color-gold)' }}>{formatPB(periodBest)}</span>
+          {' • '}All-time: {allTimeBest.result}kg
+        </span>
+      )
+    }
+    if (periodBest) {
+      return (
+        <span className={`${textClass} block truncate`} style={{ color: 'var(--text-muted)' }}>
+          Recent PB: <span style={{ color: 'var(--color-gold)' }}>{formatPB(periodBest)}</span>
+        </span>
+      )
+    }
+    return (
+      <span className={`${textClass} block truncate`} style={{ color: 'var(--text-muted)' }}>
+        All-time PB: {allTimeBest.result}kg
+      </span>
+    )
+  }
 
   const handleSeriesChange = (newLabel: string) => {
     if (readOnly) return
@@ -162,9 +204,12 @@ export function ExerciseRow({
               disabled={readOnly}
             />
             {readOnly ? (
-              <span className="flex-1 text-xs leading-tight min-w-0 truncate" style={{ color: 'var(--text)' }}>
-                {exercise.exercise_name}
-              </span>
+              <div className="flex-1 min-w-0">
+                <span className="text-xs leading-tight truncate block" style={{ color: 'var(--text)' }}>
+                  {exercise.exercise_name}
+                </span>
+                {renderPB(true)}
+              </div>
             ) : (
               <button
                 onClick={() => setShowSwapModal(true)}
@@ -174,6 +219,7 @@ export function ExerciseRow({
                 <span className="text-xs leading-tight truncate block transition-colors group-hover/name:text-[var(--color-gold)]" style={{ color: 'var(--text)' }}>
                   {exercise.exercise_name}
                 </span>
+                {renderPB(true)}
               </button>
             )}
             {edited && (
@@ -246,6 +292,7 @@ export function ExerciseRow({
             <span className="text-sm truncate block" style={{ color: 'var(--text)' }}>
               {exercise.exercise_name}
             </span>
+            {renderPB(false)}
             {exercise.tags && (
               <span className="text-xs truncate block" style={{ color: 'var(--text-muted)' }}>
                 {exercise.tags}
@@ -261,6 +308,7 @@ export function ExerciseRow({
             <span className="text-sm truncate block transition-colors group-hover/name:text-[var(--color-gold)]" style={{ color: 'var(--text)' }}>
               {exercise.exercise_name}
             </span>
+            {renderPB(false)}
             {exercise.tags && (
               <span className="text-xs truncate block" style={{ color: 'var(--text-muted)' }}>
                 {exercise.tags}

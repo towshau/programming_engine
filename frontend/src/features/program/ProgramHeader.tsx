@@ -149,8 +149,8 @@ export function ProgramHeader({
         </div>
       </div>
 
-      {/* Last program — collapsible card */}
-      {pastProgramInfo && (
+      {/* Last program — collapsible card (day view only) */}
+      {pastProgramInfo && programViewMode === 'day' && (
         <button
           type="button"
           onClick={toggleLastProgram}

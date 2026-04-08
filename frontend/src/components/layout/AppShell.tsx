@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { label: 'Intake & Assessment', href: '/intake', exact: false },
   { label: 'Programming Engine', href: '/program', exact: false },
   { label: 'Holiday Programs', href: '/holiday', exact: false },
+  { label: 'Workbook', href: '/workbook', exact: false },
 ]
 
 export function AppShell() {
@@ -43,10 +44,10 @@ export function AppShell() {
             </div>
             <div className="leading-tight">
               <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>
-                Programming OS
+                Coach OS
               </div>
               <div className="text-[9px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                Locker Room
+                Lockeroom
               </div>
             </div>
           </div>
@@ -128,7 +129,7 @@ export function AppShell() {
       </header>
 
       {/* ── Page content ── */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-y-auto">
         <Outlet />
       </main>
     </div>

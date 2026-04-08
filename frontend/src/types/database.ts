@@ -30,6 +30,8 @@ export interface MemberWithCoach {
   sessions_per_week: number | null
   scheme_name: string | null
   draft_status: ProgramDraftStatus
+  holds?: import('./program').MemberHold[]
+  holiday_programs?: import('./program').GeneratedProgram[]
 }
 
 export interface ExerciseLibraryItem {

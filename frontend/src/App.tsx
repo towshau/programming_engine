@@ -4,6 +4,7 @@ import { ClientQueue } from './pages/ClientQueue'
 import { Intake } from './pages/Intake'
 import { ProgrammingEngine } from './pages/ProgrammingEngine'
 import { HolidayPrograms } from './pages/HolidayPrograms'
+import { Workbook } from './pages/Workbook'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/program" element={<ProgrammingEngine />} />
           <Route path="/program/:memberId" element={<ProgrammingEngine />} />
           <Route path="/holiday" element={<HolidayPrograms />} />
+          <Route path="/workbook" element={<Workbook />} />
         </Route>
       </Routes>
     </BrowserRouter>

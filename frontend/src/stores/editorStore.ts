@@ -13,6 +13,7 @@ import type {
   PastProgramInfo,
   PendingEdit,
   EditType,
+  ExerciseBestsMap,
 } from '../types'
 import { supabase } from '../lib/supabase'
 import { applyEdits } from '../lib/applyEdits'
@@ -152,6 +153,7 @@ interface EditorState {
   regenError: string | null
   lastProgramExpanded: boolean
   complianceDates: string[]
+  exerciseBests: ExerciseBestsMap
   saveValidationErrors: RepsValidationError[] | null
   saveError: string | null
   selectedDay: number | null
@@ -202,6 +204,7 @@ interface EditorState {
   setProgramViewMode: (mode: ProgramViewMode) => void
   toggleLastProgram: () => void
   fetchComplianceDates: (memberId: string, startDate: string, endDate: string) => Promise<void>
+  fetchExerciseBests: (memberId: string, exerciseNames: string[], periodStart?: string, periodEnd?: string) => Promise<void>
   copyPreviousToNext: () => Promise<boolean>
   addDay: (dayType: DayType) => Promise<boolean>
   deleteDay: (dayNumber: number) => Promise<boolean>
@@ -242,6 +245,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   pendingRegen: null,
   lastProgramExpanded: false,
   complianceDates: [],
+  exerciseBests: {},
   regenError: null,
   saveValidationErrors: null,
   saveError: null,
@@ -326,7 +330,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const cutoffStr = cutoff.toISOString().slice(0, 10)
     const today = new Date().toISOString().slice(0, 10)
 
-    const [allMembersRes, activeMembershipRes, pgRes, mpRes] = await Promise.all([
+    const [allMembersRes, activeMembershipRes, pgRes, mpRes, holdsRes, holidayProgRes] = await Promise.all([
       supabase
         .from('member_database')
         .select('id, first_name, last_name, member_name')
@@ -347,6 +351,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .order('created_at', { ascending: false })
         .limit(5000),
       supabase.from('member_programs').select('member_id, programming_coach_id, sessions_per_week, scheme_name').limit(5000),
+      supabase
+        .from('member_holds')
+        .select('id, member_id, membership_id, hold_start, hold_end, hold_notes, travel_programming_notes')
+        .gte('hold_end', today)
+        .order('hold_start', { ascending: true })
+        .limit(2000),
+      supabase
+        .from('programming_generated')
+        .select('id, member_id, sessions_per_week, duration_weeks, scheme_name, rep_range, program_type, holiday_start_date, holiday_end_date, coach_approved, changes_summary, created_at, updated_at, run_id, assigned_to, phase_number, rules_applied, payload, coach_edited, uploaded_to_teambuildr, next_due_date')
+        .eq('program_type', 'holiday')
+        .gte('holiday_end_date', today)
+        .order('holiday_start_date', { ascending: true })
+        .limit(2000),
     ])
 
     // Keep track of the most recent program for each member to check expiration
@@ -384,6 +401,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         sessions_per_week: (row.sessions_per_week as number) ?? null,
         scheme_name: (row.scheme_name as string) ?? null,
       })
+    }
+
+    // Build holds map: member_id → MemberHold[]
+    const holdsMap = new Map<string, MemberHold[]>()
+    for (const row of (holdsRes.data ?? []) as MemberHold[]) {
+      const existing = holdsMap.get(row.member_id)
+      if (existing) existing.push(row)
+      else holdsMap.set(row.member_id, [row])
+    }
+
+    // Build holiday programs map: member_id → GeneratedProgram[]
+    const holidayProgMap = new Map<string, GeneratedProgram[]>()
+    for (const row of (holidayProgRes.data ?? []) as GeneratedProgram[]) {
+      const existing = holidayProgMap.get(row.member_id)
+      if (existing) existing.push(row)
+      else holidayProgMap.set(row.member_id, [row])
     }
 
     interface ActiveInfo {
@@ -471,6 +504,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         sessions_per_week: mpInfo?.sessions_per_week ?? null,
         scheme_name: mpInfo?.scheme_name ?? null,
         draft_status: draftStatus,
+        holds: holdsMap.get(mid) ?? [],
+        holiday_programs: holidayProgMap.get(mid) ?? [],
       })
     }
 
@@ -608,8 +643,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       } else {
         set({ pendingRegen: null })
       }
+
+      const exerciseNames = new Set<string>()
+      current.payload.sessions.forEach(s => {
+        s.exercises.forEach(e => {
+          if (e.exercise_name) exerciseNames.add(e.exercise_name)
+        })
+      })
+      const sixMonthsAgo = new Date()
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+      const pStart = sixMonthsAgo.toISOString().slice(0, 10)
+      const pEnd = new Date().toISOString().slice(0, 10)
+      void get().fetchExerciseBests(memberId, Array.from(exerciseNames), pStart, pEnd)
     } else {
-      set({ program: null, previousProgram: null, pastProgramInfo: null, configDraft: null, previousSavedEdits: [], previousPendingEdits: [], previousSelectedDay: null, lastProgramExpanded: false, complianceDates: [] })
+      set({ program: null, previousProgram: null, pastProgramInfo: null, configDraft: null, previousSavedEdits: [], previousPendingEdits: [], previousSelectedDay: null, lastProgramExpanded: false, complianceDates: [], exerciseBests: {} })
     }
     set((s) => ({ loading: { ...s.loading, program: false } }))
   },
@@ -689,6 +736,64 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ].sort()
       set({ complianceDates: dates })
     }
+  },
+
+  fetchExerciseBests: async (memberId, exerciseNames, periodStart, periodEnd) => {
+    if (!exerciseNames || exerciseNames.length === 0) {
+      set({ exerciseBests: {} })
+      return
+    }
+
+    const [periodRes, allTimeRes] = await Promise.all([
+      periodStart && periodEnd
+        ? supabase
+            .from('member_tbresults')
+            .select('exercise_name, result, reps, set_number')
+            .eq('member_id', memberId)
+            .in('exercise_name', exerciseNames)
+            .gte('completed_date', periodStart)
+            .lte('completed_date', periodEnd)
+            .not('result', 'is', null)
+            .not('result', 'eq', '0')
+            .not('result', 'eq', '')
+            .gt('reps', 0)
+        : Promise.resolve({ data: null }),
+      supabase
+        .from('member_tbresults')
+        .select('exercise_name, result, reps, set_number')
+        .eq('member_id', memberId)
+        .in('exercise_name', exerciseNames)
+        .not('result', 'is', null)
+        .not('result', 'eq', '0')
+        .not('result', 'eq', '')
+        .gt('reps', 0),
+    ])
+
+    const processRows = (rows: { exercise_name: string; result: string; reps: number; set_number: number }[] | null) => {
+      const bests = new Map<string, { result: number; reps: number; set_number: number }>()
+      for (const r of (rows || [])) {
+        const val = parseFloat(r.result)
+        if (isNaN(val)) continue
+        const current = bests.get(r.exercise_name)
+        if (!current || val > current.result || (val === current.result && r.reps > current.reps)) {
+          bests.set(r.exercise_name, { result: val, reps: r.reps, set_number: r.set_number })
+        }
+      }
+      return bests
+    }
+
+    const periodMap = processRows(periodRes.data)
+    const allTimeMap = processRows(allTimeRes.data)
+
+    const finalBests: ExerciseBestsMap = {}
+    for (const name of exerciseNames) {
+      finalBests[name] = {
+        period: periodMap.get(name) || null,
+        allTime: allTimeMap.get(name) || null,
+      }
+    }
+
+    set({ exerciseBests: finalBests })
   },
 
   addPendingEdit: (edit: PendingEdit) => {

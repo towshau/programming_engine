@@ -20,6 +20,17 @@ export interface ProgramExercise {
   row_id?: string
 }
 
+export interface ExerciseBest {
+  result: number
+  reps: number
+  set_number: number
+}
+
+export type ExerciseBestsMap = Record<string, {
+  period: ExerciseBest | null
+  allTime: ExerciseBest | null
+}>
+
 export interface ProgramSession {
   day: number
   exercises: ProgramExercise[]
