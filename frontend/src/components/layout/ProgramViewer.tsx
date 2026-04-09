@@ -710,7 +710,6 @@ export function ProgramViewer() {
       >
 
       {(() => {
-        const durationWeeks = configDraft?.duration_weeks ?? program.duration_weeks
         const nextExpiresDate = program.end_date ? new Date(program.end_date) : null
         const nextStartDate = program.start_date ? new Date(program.start_date) : null
         return (

@@ -95,7 +95,7 @@ export function ProgramHeader({
   programViewMode,
   onViewModeChange,
 }: ProgramHeaderProps) {
-  const { lastProgramExpanded, toggleLastProgram, subsequentPrograms, showSubsequent, toggleShowSubsequent, editingFutureProgram } = useEditorStore()
+  const { lastProgramExpanded, toggleLastProgram, subsequentPrograms, editingFutureProgram } = useEditorStore()
 
   const expiresDate = pastProgramInfo && previousProgram
     ? computeExpiresDate(previousProgram, program)
