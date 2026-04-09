@@ -72,6 +72,7 @@ class RegenerateRequest(BaseModel):
     duration_weeks: int = 6
     requested_by: str | None = None
     program_id: str | None = None
+    start_date: str | None = None
 
 
 class RegenerateResponse(BaseModel):
@@ -204,6 +205,14 @@ async def regenerate(req: RegenerateRequest, _creds=Depends(verify_api_key)):
             "rules_applied": rules_applied,
             "payload": program,
         }
+
+        if req.start_date:
+            from datetime import datetime, timedelta
+            start_date = datetime.strptime(req.start_date, "%Y-%m-%d").date()
+            end_date = start_date + timedelta(days=req.duration_weeks * 7)
+            gen_row["start_date"] = start_date.strftime("%Y-%m-%d")
+            gen_row["end_date"] = end_date.strftime("%Y-%m-%d")
+
         result = sb.table("programming_generated").insert(gen_row).execute()
         new_program_id = result.data[0]["id"] if result.data else run_id
 

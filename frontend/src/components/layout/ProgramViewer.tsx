@@ -4,6 +4,7 @@ import { useEditorStore } from '../../stores/editorStore'
 import type { ProgramViewMode } from '../../stores/editorStore'
 import { applyEdits } from '../../lib/applyEdits'
 import { DayPicker } from '../ui/DayPicker'
+import { Badge } from '../ui/Badge'
 import { ProgramHeader } from '../../features/program/ProgramHeader'
 import { ComplianceHeatmap } from '../../features/program/ComplianceHeatmap'
 import { ExerciseCategoryGroup } from '../../features/program/ExerciseCategoryGroup'
@@ -11,6 +12,7 @@ import { AddExerciseButton } from '../../features/program/AddExerciseButton'
 import { AddDayModal } from '../../features/program/AddDayModal'
 import { ProgramConfigEditor } from '../../features/program/ProgramConfigEditor'
 import { WeeklyView } from '../../features/program/WeeklyView'
+import { TimelineView } from '../../features/program/TimelineView'
 import type { ProgramExercise, CoachEdit } from '../../types'
 import { seriesGroup, seriesSortKey } from '../../lib/utils'
 
@@ -81,6 +83,16 @@ export function ProgramViewer() {
     holidayPrograms,
     lastProgramExpanded,
     toggleLastProgram,
+    subsequentPrograms,
+    showSubsequent,
+    toggleShowSubsequent,
+    addSubsequentProgram,
+    deleteSubsequentProgram,
+    editFutureProgram,
+    returnToCurrentProgram,
+    editingFutureProgram,
+    stashedCurrentProgram,
+    pastPrograms,
   } = useEditorStore()
 
   const [programViewMode, setProgramViewMode] = useState<ProgramViewMode>('day')
@@ -381,6 +393,44 @@ export function ProgramViewer() {
         onViewModeChange={handleViewModeChange}
       />
 
+      {/* When editing a future program, show the real current program as a collapsed read-only summary above */}
+      {editingFutureProgram && stashedCurrentProgram && (
+        <div
+          className="rounded-xl border p-4 space-y-3"
+          style={{ borderColor: 'var(--border)', background: 'var(--bg3)' }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                Current Program
+              </span>
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                {stashedCurrentProgram.start_date
+                  ? `${new Date(stashedCurrentProgram.start_date).toLocaleDateString('en-AU')} – `
+                  : ''}
+                {stashedCurrentProgram.end_date
+                  ? new Date(stashedCurrentProgram.end_date).toLocaleDateString('en-AU')
+                  : ''}
+              </span>
+            </div>
+            <button
+              onClick={returnToCurrentProgram}
+              className="flex-shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-colors"
+              style={{ background: 'var(--color-gold)' }}
+            >
+              ← Back to Current Program
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {stashedCurrentProgram.scheme_name && <Badge variant="blue">{stashedCurrentProgram.scheme_name}</Badge>}
+            {stashedCurrentProgram.rep_range && <Badge variant="teal">{stashedCurrentProgram.rep_range} reps</Badge>}
+            {stashedCurrentProgram.phase_number != null && <Badge variant="default">Phase {stashedCurrentProgram.phase_number}</Badge>}
+            <Badge variant="default">{stashedCurrentProgram.sessions_per_week}x / week</Badge>
+            <Badge variant="default">{stashedCurrentProgram.duration_weeks} weeks</Badge>
+          </div>
+        </div>
+      )}
+
       {/* ── Holds & Holiday banner ── */}
       {(memberHolds.length > 0 || holidayPrograms.length > 0) && (
         <div
@@ -435,6 +485,17 @@ export function ProgramViewer() {
             setProgramViewMode('day')
             setSelectedDay(day)
           }}
+        />
+      )}
+
+      {/* ── Timeline View ── */}
+      {programViewMode === 'timeline' && (
+        <TimelineView
+          pastPrograms={pastPrograms}
+          currentProgram={program}
+          subsequentPrograms={subsequentPrograms}
+          holidayPrograms={holidayPrograms}
+          memberHolds={memberHolds}
         />
       )}
 
@@ -639,35 +700,38 @@ export function ProgramViewer() {
         </section>
       )}
 
-      {/* ── Next / Current Program section (gold wash) ── */}
-      <section className="rounded-xl border p-4 space-y-4" style={{ borderColor: 'var(--color-gold-100)', background: 'rgba(184,134,11,0.06)' }}>
+      {/* ── Next / Current / Future Program section ── */}
+      <section
+        className="rounded-xl border p-4 space-y-4"
+        style={editingFutureProgram
+          ? { borderColor: '#c4b5fd', background: 'rgba(139,92,246,0.05)' }
+          : { borderColor: 'var(--color-gold-100)', background: 'rgba(184,134,11,0.06)' }
+        }
+      >
 
       {(() => {
         const durationWeeks = configDraft?.duration_weeks ?? program.duration_weeks
-        const nextExpiresDate = (() => {
-          if (program.created_at && durationWeeks) {
-            const d = new Date(program.created_at)
-            d.setDate(d.getDate() + durationWeeks * 7)
-            return d
-          }
-          if (program.next_due_date) {
-            const d = new Date(program.next_due_date)
-            d.setDate(d.getDate() - 1)
-            return d
-          }
-          return null
-        })()
+        const nextExpiresDate = program.end_date ? new Date(program.end_date) : null
+        const nextStartDate = program.start_date ? new Date(program.start_date) : null
         return (
           <div className="space-y-4">
             <div className="w-full text-left rounded-lg p-3 space-y-2 border bg-white" style={{ borderColor: 'var(--border)' }}>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-gold)' }}>
-                  {pastProgramInfo ? 'Next Program' : 'Current Program'}
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-wider"
+                  style={{ color: editingFutureProgram ? '#7c3aed' : 'var(--color-gold)' }}
+                >
+                  {editingFutureProgram ? 'Future Program' : pastProgramInfo ? 'Next Program' : 'Current Program'}
                 </span>
                 <div className="flex items-center gap-3">
                   <span className="text-[10px] text-zinc-500">
                     Generated {formatDateAU(program.created_at)}
                   </span>
+                  {nextStartDate && (
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      Starts {nextStartDate.toLocaleDateString('en-AU')}
+                    </span>
+                  )}
                   {nextExpiresDate && (
                     <span
                       className="text-[10px]"
@@ -756,6 +820,132 @@ export function ProgramViewer() {
       )}
 
       </section>
+
+      {!editingFutureProgram && showSubsequent && subsequentPrograms.map((subProg, idx) => (
+        <section
+          key={subProg.id}
+          className="rounded-xl border p-4 space-y-4"
+          style={{ borderColor: '#c4b5fd', background: 'rgba(139,92,246,0.05)' }}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#7c3aed' }}>
+              Future Program {idx + 1}
+            </span>
+            <span className="text-[10px] font-medium" style={{ color: '#7c3aed' }}>
+              {subProg.start_date
+                ? new Date(subProg.start_date).toLocaleDateString('en-AU')
+                : new Date(subProg.created_at).toLocaleDateString('en-AU')}
+              {subProg.end_date && ` – ${new Date(subProg.end_date).toLocaleDateString('en-AU')}`}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {subProg.scheme_name && <Badge variant="blue">{subProg.scheme_name}</Badge>}
+            {subProg.rep_range && <Badge variant="teal">{subProg.rep_range} reps</Badge>}
+            {subProg.phase_number != null && <Badge variant="default">Phase {subProg.phase_number}</Badge>}
+            <Badge variant="default">{subProg.sessions_per_week}x / week</Badge>
+            <Badge variant="default">{subProg.duration_weeks} weeks</Badge>
+            {subProg.payload?.sessions && (
+              <Badge variant="default">{subProg.payload.sessions.length} day{subProg.payload.sessions.length !== 1 ? 's' : ''}</Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={() => editFutureProgram(idx)}
+              className="rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors"
+              style={{ borderColor: '#7c3aed', color: '#7c3aed', background: 'rgba(139,92,246,0.08)' }}
+            >
+              Edit Program
+            </button>
+            <button
+              onClick={async () => {
+                if (window.confirm(`Delete future program ${idx + 1}? This cannot be undone.`)) {
+                  await deleteSubsequentProgram(subProg.id)
+                }
+              }}
+              disabled={loading.saving}
+              className="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-red-50 disabled:opacity-50"
+              style={{ borderColor: 'var(--red)', color: 'var(--red)' }}
+            >
+              Delete
+            </button>
+          </div>
+        </section>
+      ))}
+
+      {/* Next Phase Footer — always visible at the bottom of the day view (hidden when editing a future program) */}
+      {!editingFutureProgram && (
+        <>
+          {subsequentPrograms && subsequentPrograms.length > 0 && !showSubsequent && (
+            /* Future programs already planned — show a compact info strip */
+            <section
+              className="rounded-xl border p-4 flex items-center justify-between gap-4"
+              style={{ borderColor: 'var(--border)', background: 'var(--bg3)' }}
+            >
+              <div className="flex items-center gap-2.5">
+                <svg className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--color-gold)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                    {subsequentPrograms.length} future program{subsequentPrograms.length !== 1 ? 's' : ''} planned
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Next starts {subsequentPrograms[0].start_date
+                      ? new Date(subsequentPrograms[0].start_date).toLocaleDateString('en-AU')
+                      : '—'}
+                    {subsequentPrograms[0].end_date
+                      ? ` – Expires ${new Date(subsequentPrograms[0].end_date).toLocaleDateString('en-AU')}`
+                      : ''}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={toggleShowSubsequent}
+                className="flex-shrink-0 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors"
+                style={{ borderColor: 'var(--border)', background: 'var(--bg2)', color: 'var(--text)' }}
+              >
+                Show Future Programs
+              </button>
+            </section>
+          )}
+
+          {(!subsequentPrograms || subsequentPrograms.length === 0 || showSubsequent) && (
+            /* No future programs, OR future programs expanded — show the add buttons */
+            <section className="rounded-xl border border-dashed p-6 text-center space-y-4" style={{ borderColor: 'var(--border)', background: 'var(--bg3)' }}>
+              <div>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Plan Next Phase</h3>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Create the next program block to continue the timeline.</p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  onClick={async () => await addSubsequentProgram('generate_next', configDraft)}
+                  disabled={loading.saving || loading.regenerating}
+                  className="rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors disabled:opacity-50"
+                  style={{ background: 'var(--color-gold)' }}
+                >
+                  {loading.regenerating ? 'Generating…' : 'Generate Next Phase'}
+                </button>
+                <button
+                  onClick={async () => await addSubsequentProgram('clone')}
+                  disabled={loading.saving || loading.regenerating}
+                  className="rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+                  style={{ borderColor: 'var(--border)', background: 'var(--bg2)', color: 'var(--text)' }}
+                >
+                  Clone Current Program
+                </button>
+                <button
+                  onClick={async () => await addSubsequentProgram('randomise', configDraft)}
+                  disabled={loading.saving || loading.regenerating}
+                  className="rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+                  style={{ borderColor: 'var(--border)', background: 'var(--bg2)', color: 'var(--text)' }}
+                >
+                  Randomise New Workout
+                </button>
+              </div>
+            </section>
+          )}
+        </>
+      )}
 
       {showAddDayModal && (
         <AddDayModal

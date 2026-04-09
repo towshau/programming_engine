@@ -101,6 +101,8 @@ export interface GeneratedProgram {
   program_type: 'regular' | 'holiday'
   holiday_start_date: string | null
   holiday_end_date: string | null
+  start_date: string | null
+  end_date: string | null
   created_at: string
   updated_at: string
 }

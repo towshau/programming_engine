@@ -29,6 +29,7 @@ export function ProgramConfigEditor() {
     requestRegeneration,
     hasConfigChanges,
     clearRegenError,
+    editingFutureProgram,
   } = useEditorStore()
 
   const schemeNames = useMemo(() => {
@@ -93,6 +94,7 @@ export function ProgramConfigEditor() {
         <select
           value={configDraft.scheme_name}
           onChange={(e) => handleSchemeChange(e.target.value)}
+          disabled={!!editingFutureProgram}
           className={selectCls}
           style={{ ...selectStyle, color: 'var(--blue)' }}
         >
@@ -107,6 +109,7 @@ export function ProgramConfigEditor() {
         <select
           value={configDraft.rep_range}
           onChange={(e) => handleRepRangeChange(e.target.value)}
+          disabled={!!editingFutureProgram}
           className={selectCls}
           style={{ ...selectStyle, color: '#0d9488' }}
         >
@@ -168,7 +171,7 @@ export function ProgramConfigEditor() {
         )}
 
         {/* Regenerate button */}
-        {configChanged && !pendingRegen && (
+        {!editingFutureProgram && configChanged && !pendingRegen && (
           <button
             onClick={requestRegeneration}
             disabled={loading.regenerating}

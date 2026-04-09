@@ -66,6 +66,8 @@ def main():
     ap.add_argument("--rep-range", default=None, help="e.g. 8-10")
     ap.add_argument("--changes-summary", default=None, help="Human-readable what changed")
     ap.add_argument("--rules-applied", default=None, help="JSON array of rule_keys, e.g. '[\"max_exercises_per_series\"]'")
+    ap.add_argument("--start-date", default=None, help="Start date (YYYY-MM-DD)")
+    ap.add_argument("--end-date", default=None, help="End date (YYYY-MM-DD)")
     args = ap.parse_args()
 
     # Payload: file or stdin
@@ -107,6 +109,16 @@ def main():
         "duration_weeks": args.duration_weeks,
         "payload": payload,
     }
+
+    if args.start_date:
+        row["start_date"] = args.start_date
+    if args.end_date:
+        row["end_date"] = args.end_date
+    elif args.start_date:
+        from datetime import datetime, timedelta
+        start_date = datetime.strptime(args.start_date, "%Y-%m-%d").date()
+        row["end_date"] = (start_date + timedelta(days=args.duration_weeks * 7)).strftime("%Y-%m-%d")
+
     if args.phase_number is not None:
         row["phase_number"] = args.phase_number
     if args.scheme_name:

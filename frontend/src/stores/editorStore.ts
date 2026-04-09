@@ -130,7 +130,7 @@ function collectChain(
 }
 
 type ActiveView = 'next' | 'last'
-export type ProgramViewMode = 'day' | 'weekly'
+export type ProgramViewMode = 'day' | 'weekly' | 'timeline'
 
 interface EditorState {
   coaches: Coach[]
@@ -140,7 +140,12 @@ interface EditorState {
   selectedMember: MemberWithCoach | null
   program: GeneratedProgram | null
   previousProgram: GeneratedProgram | null
+  subsequentPrograms: GeneratedProgram[]
+  showSubsequent: boolean
+  editingFutureProgram: GeneratedProgram | null
+  stashedCurrentProgram: GeneratedProgram | null
   pastProgramInfo: PastProgramInfo | null
+  pastPrograms: GeneratedProgram[]
   savedEdits: CoachEdit[]
   pendingEdits: PendingEdit[]
   activeView: ActiveView
@@ -224,6 +229,12 @@ interface EditorState {
     duration_weeks: number
   }) => Promise<GeneratedProgram | null>
   loadProgramById: (programId: string) => Promise<void>
+  toggleShowSubsequent: () => void
+  addSubsequentProgram: (mode: 'clone' | 'generate_next' | 'randomise', config?: any) => Promise<boolean>
+  shiftSubsequentDates: (deltaDays: number, afterProgramId?: string) => Promise<boolean>
+  deleteSubsequentProgram: (programId: string) => Promise<boolean>
+  editFutureProgram: (index: number) => void
+  returnToCurrentProgram: () => void
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -234,7 +245,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedMember: null,
   program: null,
   previousProgram: null,
+  subsequentPrograms: [],
+  showSubsequent: false,
+  editingFutureProgram: null,
+  stashedCurrentProgram: null,
   pastProgramInfo: null,
+  pastPrograms: [],
   savedEdits: [],
   pendingEdits: [],
   activeView: 'next' as ActiveView,
@@ -306,6 +322,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       program: null,
       previousProgram: null,
       pastProgramInfo: null,
+  pastPrograms: [],
       savedEdits: [],
       pendingEdits: [],
       activeView: 'next' as ActiveView,
@@ -349,7 +366,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .limit(2000),
       supabase
         .from('programming_generated')
-        .select('member_id, next_due_date, created_at, duration_weeks, coach_approved, uploaded_to_teambuildr')
+        .select('member_id, next_due_date, created_at, duration_weeks, coach_approved, uploaded_to_teambuildr, start_date, end_date')
         .order('created_at', { ascending: false })
         .limit(5000),
       supabase.from('member_programs').select('member_id, programming_coach_id, sessions_per_week, scheme_name').limit(5000),
@@ -361,7 +378,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .limit(2000),
       supabase
         .from('programming_generated')
-        .select('id, member_id, sessions_per_week, duration_weeks, scheme_name, rep_range, program_type, holiday_start_date, holiday_end_date, coach_approved, changes_summary, created_at, updated_at, run_id, assigned_to, phase_number, rules_applied, payload, coach_edited, uploaded_to_teambuildr, next_due_date')
+        .select('id, member_id, sessions_per_week, duration_weeks, scheme_name, rep_range, program_type, holiday_start_date, holiday_end_date, start_date, end_date, coach_approved, changes_summary, created_at, updated_at, run_id, assigned_to, phase_number, rules_applied, payload, coach_edited, uploaded_to_teambuildr, next_due_date')
         .eq('program_type', 'holiday')
         .gte('holiday_end_date', today)
         .order('holiday_start_date', { ascending: true })
@@ -375,9 +392,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       duration_weeks: number | null
       coach_approved: boolean
       uploaded_to_teambuildr: boolean
+      start_date: string | null
+      end_date: string | null
     }
     const pgMap = new Map<string, ProgInfo>()
-    for (const row of (pgRes.data ?? []) as { member_id: string, next_due_date: string | null, created_at: string, duration_weeks: number | null, coach_approved: boolean, uploaded_to_teambuildr: boolean }[]) {
+    for (const row of (pgRes.data ?? []) as { member_id: string, next_due_date: string | null, created_at: string, duration_weeks: number | null, coach_approved: boolean, uploaded_to_teambuildr: boolean, start_date: string | null, end_date: string | null }[]) {
       if (!pgMap.has(row.member_id)) {
         pgMap.set(row.member_id, {
           next_due_date: row.next_due_date,
@@ -385,6 +404,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           duration_weeks: row.duration_weeks,
           coach_approved: row.coach_approved ?? false,
           uploaded_to_teambuildr: row.uploaded_to_teambuildr ?? false,
+          start_date: row.start_date ?? null,
+          end_date: row.end_date ?? null,
         })
       }
     }
@@ -456,7 +477,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const active = activeMap.get(mid)
       const isActive = !!active && !active.not_renewing
       const mpInfo = mpCoachMap.get(mid)
-      const progCoach = active?.programming_coach_id || ''
+      // Prefer member_programs.programming_coach_id (matches batch runner); fall back to
+      // member_memberships.programming_coach_id for members not yet in member_programs.
+      const progCoach = mpInfo?.coach_id || active?.programming_coach_id || ''
 
       const isProgrammingCoach = !coachId || progCoach === coachId
       const isIntakeCoach = !coachId || membershipCoachMemberIds.has(mid)
@@ -475,7 +498,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       let isExpiring = false
       if (progInfo) {
         let expiryDate: Date | null = null
-        if (progInfo.next_due_date) {
+        if (progInfo.end_date) {
+          expiryDate = new Date(progInfo.end_date)
+        } else if (progInfo.next_due_date) {
           expiryDate = new Date(progInfo.next_due_date)
           expiryDate.setDate(expiryDate.getDate() - 1)
         } else if (progInfo.created_at && progInfo.duration_weeks) {
@@ -548,7 +573,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedMember: member,
       program: null,
       previousProgram: null,
+      subsequentPrograms: [],
+      showSubsequent: false,
+      editingFutureProgram: null,
+      stashedCurrentProgram: null,
       pastProgramInfo: null,
+  pastPrograms: [],
       savedEdits: [],
       pendingEdits: [],
       activeView: 'next' as ActiveView,
@@ -579,11 +609,65 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       .eq('member_id', memberId)
       .neq('program_type', 'holiday')
       .order('created_at', { ascending: false })
-      .limit(2)
+      // Fetch all to build the chain
 
     if (data && data.length > 0) {
-      const current = data[0] as GeneratedProgram
-      const previous = (data[1] as GeneratedProgram) ?? null
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      let current: GeneratedProgram | null = null
+      let previous: GeneratedProgram | null = null
+      let subsequent: GeneratedProgram[] = []
+
+      // Determine dates for each program
+      const progs = (data as GeneratedProgram[]).map(p => {
+        let sd = p.start_date ? new Date(p.start_date) : new Date(p.created_at)
+        let ed = p.end_date ? new Date(p.end_date) : new Date(sd)
+        if (!p.end_date) {
+          ed.setDate(ed.getDate() + p.duration_weeks * 7)
+        }
+        sd.setHours(0, 0, 0, 0)
+        ed.setHours(0, 0, 0, 0)
+        return { ...p, _sd: sd, _ed: ed }
+      })
+
+      // Sort chronological
+      progs.sort((a, b) => a._sd.getTime() - b._sd.getTime())
+
+      // Categorize
+      const pastProgs: typeof progs = []
+      
+      for (const p of progs) {
+        if (p._sd > today) {
+          subsequent.push(p)
+        } else if (p._sd <= today && p._ed >= today) {
+          current = p
+        } else {
+          pastProgs.push(p)
+        }
+      }
+
+      // If no current program found that covers today, use the most recent past program or the first subsequent
+      if (!current) {
+        if (pastProgs.length > 0) {
+          current = pastProgs.pop()! // Most recent past becomes current
+        } else if (subsequent.length > 0) {
+          current = subsequent.shift()! // Earliest subsequent becomes current
+        }
+      }
+
+      // Previous is the last one in pastProgs
+      if (pastProgs.length > 0) {
+        previous = pastProgs[pastProgs.length - 1]
+      }
+
+      // Clean up temp properties
+      subsequent.forEach(p => { delete (p as any)._sd; delete (p as any)._ed })
+      if (current) { delete (current as any)._sd; delete (current as any)._ed }
+      if (previous) { delete (previous as any)._sd; delete (previous as any)._ed }
+
+      if (!current) current = data[0] as GeneratedProgram
+
       let pastInfo: PastProgramInfo | null = null
 
       if (previous) {
@@ -623,7 +707,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({
         program: current,
         previousProgram: previous,
+        subsequentPrograms: subsequent,
         pastProgramInfo: pastInfo,
+        pastPrograms: pastProgs,
         selectedDay: 1,
         pendingEdits: [],
         activeView: 'next' as ActiveView,
@@ -939,9 +1025,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       .limit(1)
       .single()
 
+    let newEndDateStr = program.end_date
+
     if (mpData?.due_date) {
       const d = new Date(mpData.due_date)
       d.setDate(d.getDate() + program.duration_weeks * 7)
+      
+      // Calculate delta before snapping to Monday
+      if (program.end_date) {
+        const oldEnd = new Date(program.end_date)
+        const deltaDays = Math.round((d.getTime() - oldEnd.getTime()) / (1000 * 60 * 60 * 24))
+        if (deltaDays !== 0) {
+          const { editingFutureProgram } = get()
+          get().shiftSubsequentDates(deltaDays, editingFutureProgram ? program.id : undefined).catch(console.error)
+        }
+      }
+      newEndDateStr = d.toISOString().slice(0, 10)
+
       const dow = d.getDay()
       if (dow !== 1) {
         d.setDate(d.getDate() + (dow === 0 ? 1 : 8 - dow))
@@ -954,6 +1054,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       .update({
         coach_approved: true,
         next_due_date: nextDueDate,
+        end_date: newEndDateStr,
         updated_at: new Date().toISOString(),
       })
       .eq('id', program.id)
@@ -961,7 +1062,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!error) {
       set((s) => ({
         program: s.program
-          ? { ...s.program, coach_approved: true, next_due_date: nextDueDate }
+          ? { ...s.program, coach_approved: true, next_due_date: nextDueDate, end_date: newEndDateStr }
           : null,
       }))
     }
@@ -1015,11 +1116,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { program } = get()
     if (!program) return
 
+    const oldWeeks = program.duration_weeks
+    const deltaDays = (weeks - oldWeeks) * 7
+
     set((s) => ({ loading: { ...s.loading, saving: true } }))
     
+    let newEndDateStr = program.end_date
+    if (program.start_date) {
+      const d = new Date(program.start_date)
+      d.setDate(d.getDate() + weeks * 7)
+      newEndDateStr = d.toISOString().slice(0, 10)
+    } else if (program.created_at) {
+      const d = new Date(program.created_at)
+      d.setDate(d.getDate() + weeks * 7)
+      newEndDateStr = d.toISOString().slice(0, 10)
+    }
+
     const wasUploaded = program.uploaded_to_teambuildr
     const patch: Record<string, unknown> = {
       duration_weeks: weeks,
+      end_date: newEndDateStr,
       coach_edited: true,
       updated_at: new Date().toISOString()
     }
@@ -1038,10 +1154,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         program: s.program ? { 
           ...s.program, 
           duration_weeks: weeks,
+          end_date: newEndDateStr,
           coach_edited: true,
           uploaded_to_teambuildr: wasUploaded ? false : s.program.uploaded_to_teambuildr
         } : null,
       }))
+      
+      if (deltaDays !== 0) {
+        const { editingFutureProgram } = get()
+        get().shiftSubsequentDates(deltaDays, editingFutureProgram ? program.id : undefined).catch(console.error)
+      }
     }
     set((s) => ({ loading: { ...s.loading, saving: false } }))
   },
@@ -1620,7 +1742,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       program: prog,
       previousProgram: null,
+      subsequentPrograms: [],
       pastProgramInfo: null,
+  pastPrograms: [],
       savedEdits: [],
       pendingEdits: [],
       activeView: 'next' as ActiveView,
@@ -1636,5 +1760,244 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
     })
     get().fetchEdits(prog.id)
+  },
+
+  toggleShowSubsequent: () => set((s) => ({ showSubsequent: !s.showSubsequent })),
+
+  addSubsequentProgram: async (mode, config) => {
+    const { program, subsequentPrograms, selectedMember, selectedCoach } = get()
+    if (!program || !selectedMember) return false
+
+    set((s) => ({ loading: { ...s.loading, saving: true, regenerating: mode !== 'clone' } }))
+
+    const startDateStr = subsequentPrograms.length > 0 
+      ? subsequentPrograms[subsequentPrograms.length - 1].end_date
+      : program.end_date
+
+    // If no end_date exists on the reference program, calculate from created_at
+    let nextStart = new Date()
+    if (startDateStr) {
+      nextStart = new Date(startDateStr)
+    } else {
+      const ref = subsequentPrograms.length > 0 ? subsequentPrograms[subsequentPrograms.length - 1] : program
+      nextStart = new Date(ref.created_at)
+      nextStart.setDate(nextStart.getDate() + (ref.duration_weeks * 7))
+    }
+    
+    const nextStartStr = nextStart.toISOString().slice(0, 10)
+    let newProgram: GeneratedProgram | null = null
+
+    if (mode === 'clone') {
+      const nextEnd = new Date(nextStart)
+      nextEnd.setDate(nextEnd.getDate() + (program.duration_weeks * 7))
+
+      const runId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`
+
+      const { data, error } = await supabase
+        .from('programming_generated')
+        .insert({
+          run_id: runId,
+          member_id: selectedMember.member_id,
+          assigned_to: selectedCoach?.id ?? null,
+          sessions_per_week: program.sessions_per_week,
+          duration_weeks: program.duration_weeks,
+          scheme_name: program.scheme_name,
+          rep_range: program.rep_range,
+          phase_number: program.phase_number,
+          program_type: 'regular',
+          start_date: nextStartStr,
+          end_date: nextEnd.toISOString().slice(0, 10),
+          changes_summary: 'Cloned from previous program',
+          rules_applied: program.rules_applied,
+          payload: program.payload,
+          coach_edited: false,
+          coach_approved: false,
+          uploaded_to_teambuildr: false,
+        })
+        .select('*')
+        .single()
+      
+      if (!error && data) {
+        newProgram = data as GeneratedProgram
+      }
+    } else {
+      // mode === 'generate_next' or 'randomise'
+      try {
+        const payload = {
+          member_id: selectedMember.member_id,
+          scheme_name: config?.scheme_name ?? program.scheme_name,
+          rep_range: mode === 'generate_next' ? null : (config?.rep_range ?? null),
+          sessions_per_week: config?.sessions_per_week ?? program.sessions_per_week,
+          duration_weeks: config?.duration_weeks ?? program.duration_weeks,
+          requested_by: selectedCoach?.id ?? null,
+          program_id: program.id,
+          start_date: nextStartStr
+        }
+
+        const apiUrl = import.meta.env.VITE_REGEN_API_URL
+        const apiSecret = import.meta.env.VITE_REGEN_API_SECRET
+        const baseUrl = apiUrl ? apiUrl.split('/regenerate')[0] : 'http://localhost:8001'
+
+        const res = await fetch(`${baseUrl}/regenerate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(apiSecret && { Authorization: `Bearer ${apiSecret}` }),
+          },
+          body: JSON.stringify(payload),
+        })
+
+        if (res.ok) {
+          const respData = await res.json()
+          // Re-fetch the newly generated program
+          const { data } = await supabase
+            .from('programming_generated')
+            .select('*')
+            .eq('id', respData.program_id)
+            .single()
+          if (data) newProgram = data as GeneratedProgram
+        }
+      } catch (err) {
+        console.error("Error generating subsequent program:", err)
+      }
+    }
+
+    if (newProgram) {
+      set((s) => ({
+        subsequentPrograms: [...s.subsequentPrograms, newProgram!],
+        showSubsequent: true
+      }))
+    }
+
+    set((s) => ({ loading: { ...s.loading, saving: false, regenerating: false } }))
+    return !!newProgram
+  },
+
+  shiftSubsequentDates: async (deltaDays, afterProgramId) => {
+    const { subsequentPrograms } = get()
+    if (subsequentPrograms.length === 0 || deltaDays === 0) return true
+
+    let startIndex = 0
+    if (afterProgramId) {
+      const idx = subsequentPrograms.findIndex(p => p.id === afterProgramId)
+      if (idx !== -1) {
+        startIndex = idx + 1
+      }
+    }
+    if (startIndex >= subsequentPrograms.length) return true
+
+    set((s) => ({ loading: { ...s.loading, saving: true } }))
+
+    const updated = subsequentPrograms.map((p, i) => {
+      if (i < startIndex) return p
+
+      const sd = p.start_date ? new Date(p.start_date) : new Date(p.created_at)
+      const ed = p.end_date ? new Date(p.end_date) : new Date(sd.getTime() + p.duration_weeks * 7 * 24 * 60 * 60 * 1000)
+      
+      sd.setDate(sd.getDate() + deltaDays)
+      ed.setDate(ed.getDate() + deltaDays)
+      
+      return {
+        ...p,
+        start_date: sd.toISOString().slice(0, 10),
+        end_date: ed.toISOString().slice(0, 10)
+      }
+    })
+
+    let allOk = true
+    for (let i = startIndex; i < updated.length; i++) {
+      const p = updated[i]
+      const { error } = await supabase
+        .from('programming_generated')
+        .update({
+          start_date: p.start_date,
+          end_date: p.end_date
+        })
+        .eq('id', p.id)
+      
+      if (error) allOk = false
+    }
+
+    if (allOk) {
+      set({ subsequentPrograms: updated })
+    }
+
+    set((s) => ({ loading: { ...s.loading, saving: false } }))
+    return allOk
+  },
+
+  deleteSubsequentProgram: async (programId) => {
+    set((s) => ({ loading: { ...s.loading, saving: true } }))
+
+    const { error } = await supabase
+      .from('programming_generated')
+      .delete()
+      .eq('id', programId)
+
+    if (!error) {
+      set((s) => ({
+        subsequentPrograms: s.subsequentPrograms.filter(p => p.id !== programId),
+      }))
+    }
+
+    set((s) => ({ loading: { ...s.loading, saving: false } }))
+    return !error
+  },
+
+  editFutureProgram: (index) => {
+    const { program, subsequentPrograms } = get()
+    if (!program || index < 0 || index >= subsequentPrograms.length) return
+
+    const futureProgram = subsequentPrograms[index]
+
+    set({
+      stashedCurrentProgram: program,
+      editingFutureProgram: futureProgram,
+      program: futureProgram,
+      savedEdits: [],
+      pendingEdits: [],
+      selectedDay: futureProgram.payload?.sessions?.[0]?.day ?? 1,
+      configDraft: {
+        scheme_name: futureProgram.scheme_name ?? 'GPP',
+        rep_range: futureProgram.rep_range ?? '8-10',
+        sessions_per_week: futureProgram.sessions_per_week,
+        duration_weeks: futureProgram.duration_weeks,
+      },
+      activeView: 'next' as ActiveView,
+      lastProgramExpanded: false,
+      showSubsequent: false,
+    })
+
+    get().fetchEdits(futureProgram.id)
+  },
+
+  returnToCurrentProgram: () => {
+    const { stashedCurrentProgram, program, subsequentPrograms, editingFutureProgram } = get()
+    if (!stashedCurrentProgram) return
+
+    const updatedSubsequent = subsequentPrograms.map(p =>
+      p.id === editingFutureProgram?.id && program ? { ...program } : p
+    )
+
+    set({
+      program: stashedCurrentProgram,
+      stashedCurrentProgram: null,
+      editingFutureProgram: null,
+      subsequentPrograms: updatedSubsequent,
+      savedEdits: [],
+      pendingEdits: [],
+      selectedDay: stashedCurrentProgram.payload?.sessions?.[0]?.day ?? 1,
+      configDraft: {
+        scheme_name: stashedCurrentProgram.scheme_name ?? 'GPP',
+        rep_range: stashedCurrentProgram.rep_range ?? '8-10',
+        sessions_per_week: stashedCurrentProgram.sessions_per_week,
+        duration_weeks: stashedCurrentProgram.duration_weeks,
+      },
+      activeView: 'next' as ActiveView,
+      lastProgramExpanded: false,
+      showSubsequent: true,
+    })
+
+    get().fetchEdits(stashedCurrentProgram.id)
   },
 }))

@@ -21,6 +21,10 @@ function computeExpiresDate(
   previousProgram: GeneratedProgram | null,
   currentProgram: GeneratedProgram,
 ): Date | null {
+  if (previousProgram?.end_date) {
+    return new Date(previousProgram.end_date)
+  }
+  // Fallback if no end_date
   const ref = previousProgram?.next_due_date ?? currentProgram.created_at
   if (!ref) return null
   const d = new Date(ref)
@@ -91,7 +95,7 @@ export function ProgramHeader({
   programViewMode,
   onViewModeChange,
 }: ProgramHeaderProps) {
-  const { lastProgramExpanded, toggleLastProgram } = useEditorStore()
+  const { lastProgramExpanded, toggleLastProgram, subsequentPrograms, showSubsequent, toggleShowSubsequent, editingFutureProgram } = useEditorStore()
 
   const expiresDate = pastProgramInfo && previousProgram
     ? computeExpiresDate(previousProgram, program)
@@ -106,7 +110,7 @@ export function ProgramHeader({
             className="flex gap-0.5 p-0.5 rounded-lg"
             style={{ background: 'var(--bg3)', border: '1px solid var(--border)' }}
           >
-            {(['day', 'weekly'] as const).map((mode) => (
+            {(['day', 'weekly', 'timeline'] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => onViewModeChange(mode)}
@@ -121,7 +125,7 @@ export function ProgramHeader({
                   : {}
                 }
               >
-                {mode === 'day' ? 'Day View' : 'Weekly View'}
+                {mode === 'day' ? 'Day View' : mode === 'weekly' ? 'Weekly View' : 'Timeline'}
               </button>
             ))}
           </div>
@@ -136,11 +140,35 @@ export function ProgramHeader({
           {program.uploaded_to_teambuildr && (
             <Badge variant="default">Uploaded</Badge>
           )}
-          {program.next_due_date && (
-            <Badge variant="teal">
-              Next: {new Date(program.next_due_date).toLocaleDateString('en-AU')}
-            </Badge>
-          )}
+          {editingFutureProgram ? (
+            // When editing a future program, show its date range
+            program.start_date && (
+              <Badge variant="purple">
+                {new Date(program.start_date).toLocaleDateString('en-AU')}
+                {program.end_date ? ` – ${new Date(program.end_date).toLocaleDateString('en-AU')}` : ''}
+              </Badge>
+            )
+          ) : (() => {
+            let nextDate: Date | null = null
+            if (subsequentPrograms?.length > 0 && subsequentPrograms[0].start_date) {
+              nextDate = new Date(subsequentPrograms[0].start_date)
+            } else if (program.end_date) {
+              const d = new Date(program.end_date)
+              const dow = d.getDay()
+              if (dow !== 1) {
+                d.setDate(d.getDate() + (dow === 0 ? 1 : 8 - dow))
+              }
+              nextDate = d
+            } else if (program.next_due_date) {
+              nextDate = new Date(program.next_due_date)
+            }
+            if (!nextDate) return null
+            return (
+              <Badge variant="teal">
+                Next: {nextDate.toLocaleDateString('en-AU')}
+              </Badge>
+            )
+          })()}
           {editCount > 0 && (
             <Badge variant="amber">
               {editCount} edit{editCount !== 1 ? 's' : ''}
@@ -149,8 +177,8 @@ export function ProgramHeader({
         </div>
       </div>
 
-      {/* Last program — collapsible card (day view only) */}
-      {pastProgramInfo && programViewMode === 'day' && (
+      {/* Last program — collapsible card (day view only, hidden when editing future) */}
+      {!editingFutureProgram && pastProgramInfo && programViewMode === 'day' && (
         <button
           type="button"
           onClick={toggleLastProgram}

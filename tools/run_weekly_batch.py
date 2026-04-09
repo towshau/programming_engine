@@ -193,6 +193,14 @@ def write_generated(sb, run_id, member_id, program, phase, config, scheme_name, 
         "rules_applied": rules_applied,
         "payload": program,
     }
+    
+    # Set default start_date to today, end_date to start_date + duration
+    from datetime import date, timedelta
+    start_date = date.today()
+    end_date = start_date + timedelta(days=duration_weeks * 7)
+    row["start_date"] = start_date.strftime("%Y-%m-%d")
+    row["end_date"] = end_date.strftime("%Y-%m-%d")
+
     sb.table("programming_generated").insert(row).execute()
 
 

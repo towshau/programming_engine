@@ -316,7 +316,7 @@ Built by trigger from `member_tbhealthmax` + `member_tbresults`. Synced weekly t
 | member_name | text | Display |
 | due_date | date | Program expiry; batch runner triggers 8 days before |
 | programming_stage | text | Enum: awaiting_program, update_stage, complete, uploaded, inactive |
-| programming_coach_id | uuid | Coach assignment; **Program Editor** coach dropdown filters members by this column (not `member_memberships.programming_coach_id`). |
+| programming_coach_id | uuid | Coach assignment; **source of truth for the batch runner** (`run_weekly_batch.py` copies this into `programming_generated.assigned_to`) and the Program Editor coach filter (falls back to `member_memberships.programming_coach_id` for members not yet in `member_programs`). Written manually via Supabase/Retool — no code in this repo writes it. Note: `member_memberships` also has a `programming_coach_id` column (set by the membership management system); these two columns can drift out of sync. |
 | scheme_name | text (default 'GPP') | Progression scheme: GPP, Strength, Hypertrophy |
 | duration_weeks | integer | Program length in weeks |
 

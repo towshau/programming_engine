@@ -1,0 +1,8 @@
+feat: program timeline and future program editing
+
+- Added start_date and end_date to programming_generated table and created backfill script.
+- Implemented future program editing with inline expanded editor and purple styling.
+- Added Timeline View displaying a 6-month rolling window of past, current, future, and holiday programs.
+- Fixed duration adjustments cascading correctly to subsequent future programs.
+- Updated programming_coach_id logic for coach assignments.
+- Documented changes in ONE-PAGE-PLAN and data models.

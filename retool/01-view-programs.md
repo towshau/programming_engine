@@ -53,6 +53,10 @@ ORDER BY md.member_name;
 
 Joins `member_memberships` (most recent per member via lateral join) and `staff_database` x3 to resolve coach names. Coach filter uses handoff logic on the membership, not `g.assigned_to`.
 
+> **Note — two `programming_coach_id` columns exist:**
+> - `member_programs.programming_coach_id` — source of truth for the batch runner and Program Editor coach filter. Written manually via Supabase/Retool.
+> - `member_memberships.programming_coach_id` — set by the membership management system. This Retool query resolves coach names from this column (via `mm.programming_coach_id → staff_database`). The two columns can drift out of sync; for the most accurate programming coach, use `member_programs.programming_coach_id`.
+
 ```sql
 SELECT
   g.id,

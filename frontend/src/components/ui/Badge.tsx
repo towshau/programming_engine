@@ -2,7 +2,7 @@ import { cn } from '../../lib/utils'
 
 interface BadgeProps {
   children: React.ReactNode
-  variant?: 'default' | 'emerald' | 'blue' | 'amber' | 'red' | 'teal' | 'green' | 'gold' | 'gray'
+  variant?: 'default' | 'emerald' | 'blue' | 'amber' | 'red' | 'teal' | 'green' | 'gold' | 'gray' | 'purple'
   className?: string
 }
 
@@ -16,6 +16,7 @@ const variantStyles: Record<NonNullable<BadgeProps['variant']>, React.CSSPropert
   amber: { background: 'var(--orange-bg)', color: 'var(--orange)', border: '1px solid var(--orange-border)' },
   red: { background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red-border)' },
   teal: { background: '#ccfbf1', color: '#0d9488', border: '1px solid #99f6e4' },
+  purple: { background: 'rgba(139,92,246,0.1)', color: '#7c3aed', border: '1px solid #c4b5fd' },
 }
 
 export function Badge({ children, variant = 'default', className }: BadgeProps) {
