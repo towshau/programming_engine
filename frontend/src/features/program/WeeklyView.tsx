@@ -28,6 +28,7 @@ interface WeeklyViewProps {
   nextEdits: CoachEdit[]
   lastEdits: CoachEdit[]
   coachId: string | null
+  nextProgram?: GeneratedProgram | null
 }
 
 function groupBySeries(exercises: ProgramExercise[]) {
@@ -62,7 +63,7 @@ function EditableDayColumn({
 }: {
   session: ProgramSession
   label: string
-  accent: 'gold' | 'blue'
+  accent: 'gold' | 'blue' | 'purple'
   onDayClick: (day: number) => void
   edits: CoachEdit[]
   programId: string
@@ -75,8 +76,8 @@ function EditableDayColumn({
   isDragging?: boolean
 }) {
   const grouped = useMemo(() => groupBySeries(session.exercises), [session.exercises])
-  const borderColor = accent === 'gold' ? 'var(--color-gold-100)' : 'var(--blue-border)'
-  const headerBg = accent === 'gold' ? 'rgba(184,134,11,0.07)' : 'rgba(219,234,254,0.4)'
+  const borderColor = accent === 'gold' ? 'var(--color-gold-100)' : accent === 'purple' ? '#c4b5fd' : 'var(--blue-border)'
+  const headerBg = accent === 'gold' ? 'rgba(184,134,11,0.07)' : accent === 'purple' ? 'rgba(139,92,246,0.07)' : 'rgba(219,234,254,0.4)'
 
   return (
     <div
@@ -170,7 +171,7 @@ function SortableDayColumn({
 }: {
   session: ProgramSession
   label: string
-  accent: 'gold' | 'blue'
+  accent: 'gold' | 'blue' | 'purple'
   onDayClick: (day: number) => void
   edits: CoachEdit[]
   programId: string
@@ -221,15 +222,15 @@ function ReadOnlyDayColumn({
 }: {
   session: ProgramSession
   label: string
-  accent: 'gold' | 'blue'
+  accent: 'gold' | 'blue' | 'purple'
   onDayClick: (day: number) => void
   edits: CoachEdit[]
   programId: string
   memberId: string
 }) {
   const grouped = useMemo(() => groupBySeries(session.exercises), [session.exercises])
-  const borderColor = accent === 'gold' ? 'var(--color-gold-100)' : 'var(--blue-border)'
-  const headerBg = accent === 'gold' ? 'rgba(184,134,11,0.07)' : 'rgba(219,234,254,0.4)'
+  const borderColor = accent === 'gold' ? 'var(--color-gold-100)' : accent === 'purple' ? '#c4b5fd' : 'var(--blue-border)'
+  const headerBg = accent === 'gold' ? 'rgba(184,134,11,0.07)' : accent === 'purple' ? 'rgba(139,92,246,0.07)' : 'rgba(219,234,254,0.4)'
 
   return (
     <div
@@ -296,7 +297,7 @@ function ProgramWeekGrid({
   coachId,
 }: {
   sessions: ProgramSession[]
-  accent: 'gold' | 'blue'
+  accent: 'gold' | 'blue' | 'purple'
   programLabel: string
   onDayClick: (day: number) => void
   editable?: boolean
@@ -325,9 +326,9 @@ function ProgramWeekGrid({
     void swapDays(Number(active.id), Number(over.id))
   }
 
-  const labelColor = accent === 'gold' ? 'var(--color-gold)' : 'var(--blue)'
-  const labelBg = accent === 'gold' ? 'var(--color-gold-50)' : 'var(--blue-bg)'
-  const labelBorder = accent === 'gold' ? 'var(--color-gold-100)' : 'var(--blue-border)'
+  const labelColor = accent === 'gold' ? 'var(--color-gold)' : accent === 'purple' ? '#7c3aed' : 'var(--blue)'
+  const labelBg = accent === 'gold' ? 'var(--color-gold-50)' : accent === 'purple' ? 'rgba(139,92,246,0.1)' : 'var(--blue-bg)'
+  const labelBorder = accent === 'gold' ? 'var(--color-gold-100)' : accent === 'purple' ? '#c4b5fd' : 'var(--blue-border)'
 
   const activeSession = activeDayId !== null ? sessions.find((s) => s.day === activeDayId) ?? null : null
 
@@ -429,11 +430,14 @@ export function WeeklyView({
   nextEdits,
   lastEdits,
   coachId,
+  nextProgram,
 }: WeeklyViewProps) {
   const [showNext, setShowNext] = useState(true)
   const [showLast, setShowLast] = useState(false)
+  const [showFuture, setShowFuture] = useState(false)
 
   const hasLast = !!previousProgram && lastEditedSessions.length > 0
+  const hasFuture = !!nextProgram && (nextProgram.payload?.sessions?.length ?? 0) > 0
 
   const nextScheme = program.scheme_name ?? 'Program'
   const nextRepRange = program.rep_range ?? ''
@@ -442,6 +446,14 @@ export function WeeklyView({
   const lastScheme = previousProgram?.scheme_name ?? 'Last Program'
   const lastRepRange = previousProgram?.rep_range ?? ''
   const lastLabel = [lastScheme, lastRepRange].filter(Boolean).join(' \u00B7 ')
+
+  const futureScheme = nextProgram?.scheme_name ?? 'Future'
+  const futureRepRange = nextProgram?.rep_range ?? ''
+  const futureLabel = [futureScheme, futureRepRange].filter(Boolean).join(' \u00B7 ')
+
+  const futureSessions: ProgramSession[] = useMemo(() => {
+    return nextProgram?.payload?.sessions ?? []
+  }, [nextProgram])
 
   return (
     <div className="space-y-5">
@@ -470,13 +482,29 @@ export function WeeklyView({
           <input
             type="checkbox"
             checked={showNext}
-            disabled={showNext && !showLast}
+            disabled={showNext && !showLast && !showFuture}
             onChange={(e) => setShowNext(e.target.checked)}
             className="rounded accent-[var(--color-gold)]"
           />
           <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
             Next Program
           </span>
+        </label>
+        <label className={cn('flex items-center gap-2 cursor-pointer select-none', !hasFuture && 'opacity-40 cursor-not-allowed')}>
+          <input
+            type="checkbox"
+            checked={showFuture && hasFuture}
+            disabled={!hasFuture}
+            onChange={(e) => setShowFuture(e.target.checked)}
+            className="rounded"
+            style={{ accentColor: '#7c3aed' }}
+          />
+          <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
+            Future Program
+          </span>
+          {!hasFuture && (
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>(none)</span>
+          )}
         </label>
       </div>
 
@@ -504,6 +532,19 @@ export function WeeklyView({
           edits={nextEdits}
           programId={program.id}
           memberId={program.member_id}
+          coachId={coachId}
+        />
+      )}
+
+      {showFuture && hasFuture && nextProgram && (
+        <ProgramWeekGrid
+          sessions={futureSessions}
+          accent="purple"
+          programLabel={`Future: ${futureLabel}`}
+          onDayClick={onDayClick}
+          edits={[]}
+          programId={nextProgram.id}
+          memberId={nextProgram.member_id}
           coachId={coachId}
         />
       )}

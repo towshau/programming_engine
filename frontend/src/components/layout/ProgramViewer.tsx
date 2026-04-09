@@ -84,8 +84,6 @@ export function ProgramViewer() {
     lastProgramExpanded,
     toggleLastProgram,
     subsequentPrograms,
-    showSubsequent,
-    toggleShowSubsequent,
     addSubsequentProgram,
     deleteSubsequentProgram,
     editFutureProgram,
@@ -474,13 +472,14 @@ export function ProgramViewer() {
       {/* ── Weekly View ── */}
       {programViewMode === 'weekly' && (
         <WeeklyView
-          program={program}
+          program={stashedCurrentProgram ?? program}
           previousProgram={previousProgram ?? null}
           nextEditedSessions={nextEditedSessions}
           lastEditedSessions={lastEditedSessions}
           nextEdits={nextCombinedEdits}
           lastEdits={lastCombinedEdits}
           coachId={selectedCoach?.id ?? null}
+          nextProgram={subsequentPrograms[0] ?? null}
           onDayClick={(day) => {
             setProgramViewMode('day')
             setSelectedDay(day)
@@ -492,7 +491,7 @@ export function ProgramViewer() {
       {programViewMode === 'timeline' && (
         <TimelineView
           pastPrograms={pastPrograms}
-          currentProgram={program}
+          currentProgram={stashedCurrentProgram ?? program}
           subsequentPrograms={subsequentPrograms}
           holidayPrograms={holidayPrograms}
           memberHolds={memberHolds}
@@ -820,7 +819,7 @@ export function ProgramViewer() {
 
       </section>
 
-      {!editingFutureProgram && showSubsequent && subsequentPrograms.map((subProg, idx) => (
+      {!editingFutureProgram && subsequentPrograms.map((subProg, idx) => (
         <section
           key={subProg.id}
           className="rounded-xl border p-4 space-y-4"
@@ -871,79 +870,40 @@ export function ProgramViewer() {
         </section>
       ))}
 
-      {/* Next Phase Footer — always visible at the bottom of the day view (hidden when editing a future program) */}
+      {/* Next Phase Footer — always visible at the bottom (hidden when editing a future program) */}
       {!editingFutureProgram && (
-        <>
-          {subsequentPrograms && subsequentPrograms.length > 0 && !showSubsequent && (
-            /* Future programs already planned — show a compact info strip */
-            <section
-              className="rounded-xl border p-4 flex items-center justify-between gap-4"
-              style={{ borderColor: 'var(--border)', background: 'var(--bg3)' }}
+        <section className="rounded-xl border border-dashed p-6 text-center space-y-4" style={{ borderColor: 'var(--border)', background: 'var(--bg3)' }}>
+          <div>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Plan Next Phase</h3>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Create the next program block to continue the timeline.</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={async () => await addSubsequentProgram('generate_next', configDraft)}
+              disabled={loading.saving || loading.regenerating}
+              className="rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors disabled:opacity-50"
+              style={{ background: 'var(--color-gold)' }}
             >
-              <div className="flex items-center gap-2.5">
-                <svg className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--color-gold)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
-                    {subsequentPrograms.length} future program{subsequentPrograms.length !== 1 ? 's' : ''} planned
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    Next starts {subsequentPrograms[0].start_date
-                      ? new Date(subsequentPrograms[0].start_date).toLocaleDateString('en-AU')
-                      : '—'}
-                    {subsequentPrograms[0].end_date
-                      ? ` – Expires ${new Date(subsequentPrograms[0].end_date).toLocaleDateString('en-AU')}`
-                      : ''}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={toggleShowSubsequent}
-                className="flex-shrink-0 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors"
-                style={{ borderColor: 'var(--border)', background: 'var(--bg2)', color: 'var(--text)' }}
-              >
-                Show Future Programs
-              </button>
-            </section>
-          )}
-
-          {(!subsequentPrograms || subsequentPrograms.length === 0 || showSubsequent) && (
-            /* No future programs, OR future programs expanded — show the add buttons */
-            <section className="rounded-xl border border-dashed p-6 text-center space-y-4" style={{ borderColor: 'var(--border)', background: 'var(--bg3)' }}>
-              <div>
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Plan Next Phase</h3>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Create the next program block to continue the timeline.</p>
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                <button
-                  onClick={async () => await addSubsequentProgram('generate_next', configDraft)}
-                  disabled={loading.saving || loading.regenerating}
-                  className="rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors disabled:opacity-50"
-                  style={{ background: 'var(--color-gold)' }}
-                >
-                  {loading.regenerating ? 'Generating…' : 'Generate Next Phase'}
-                </button>
-                <button
-                  onClick={async () => await addSubsequentProgram('clone')}
-                  disabled={loading.saving || loading.regenerating}
-                  className="rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg2)', color: 'var(--text)' }}
-                >
-                  Clone Current Program
-                </button>
-                <button
-                  onClick={async () => await addSubsequentProgram('randomise', configDraft)}
-                  disabled={loading.saving || loading.regenerating}
-                  className="rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-                  style={{ borderColor: 'var(--border)', background: 'var(--bg2)', color: 'var(--text)' }}
-                >
-                  Randomise New Workout
-                </button>
-              </div>
-            </section>
-          )}
-        </>
+              {loading.regenerating ? 'Generating…' : 'Generate Next Phase'}
+            </button>
+            <button
+              onClick={async () => await addSubsequentProgram('clone')}
+              disabled={loading.saving || loading.regenerating}
+              className="rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+              style={{ borderColor: 'var(--border)', background: 'var(--bg2)', color: 'var(--text)' }}
+            >
+              Clone Current Program
+            </button>
+            <button
+              onClick={async () => await addSubsequentProgram('randomise', configDraft)}
+              disabled={loading.saving || loading.regenerating}
+              className="rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+              style={{ borderColor: 'var(--border)', background: 'var(--bg2)', color: 'var(--text)' }}
+            >
+              Randomise New Workout
+            </button>
+          </div>
+        </section>
       )}
 
       {showAddDayModal && (
