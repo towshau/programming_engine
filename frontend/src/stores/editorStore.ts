@@ -481,10 +481,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // member_memberships.programming_coach_id for members not yet in member_programs.
       const progCoach = mpInfo?.coach_id || active?.programming_coach_id || ''
 
-      const isProgrammingCoach = !coachId || progCoach === coachId
       const isIntakeCoach = !coachId || membershipCoachMemberIds.has(mid)
 
-      if (!isProgrammingCoach && !isIntakeCoach) continue
+      if (!isIntakeCoach) continue
 
       const fullName = (row.member_name as string) || ''
       const firstName = (row.first_name as string) || fullName.split(' ')[0] || ''
@@ -545,8 +544,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         holiday_programs: holidayProgMap.get(mid) ?? [],
       }
 
-      if (isProgrammingCoach) members.push(memberObj)
-      if (isIntakeCoach) intakeMembers.push(memberObj)
+      if (isIntakeCoach) {
+        members.push(memberObj)
+        intakeMembers.push(memberObj)
+      }
     }
 
     type PStatus = 'new_member' | 'needs_program' | 'has_program'
