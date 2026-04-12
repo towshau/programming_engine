@@ -1,0 +1,130 @@
+---
+description: Lockeroom Supabase schema reference — member/membership/coach rules for engine and analytics
+globs:
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.sql"
+  - "**/api/**/*.py"
+alwaysApply: false
+---
+
+# Lockeroom Database — Architecture & Business Rules
+
+This workspace integrates with the Lockeroom Supabase database. **Full reference:** `docs/lockeroom-architecture.md` (mirrored from [lockeroom_schema](https://github.com/Lockeroom-Gym/lockeroom_schema)). Below is a fast-load summary of the most critical rules.
+
+---
+
+## Database
+
+- **Provider:** Supabase (PostgreSQL)
+- **Project ID:** `dvrhazdtbsttzduaedzu`
+- **Source of truth:** `docs/lockeroom-architecture.md`
+
+---
+
+## Core Tables (quick ref)
+
+| Table | Purpose |
+|-------|---------|
+| `member_database` | Member demographics and primary coach assignment |
+| `member_memberships` | One row per membership term — central operational table |
+| `member_newsale_metadata` | Financial snapshot for new sales |
+| `member_renewal_meta` | Financial snapshot for renewals |
+| `member_not_renewing` | Churn tracking — who's leaving and why |
+| `member_holds` | Membership pauses |
+| `member_daily_sessions_attended` | Actual session attendance |
+| `member_lcns` | Late cancels and no-shows |
+| `staff_database` | All staff, coaches, and roles |
+| `work_estimations` | Per-client hour allocations per role |
+| `system_config` | Session durations and contract hour baselines |
+| `membership_types` | Membership product definitions |
+| `membership_versions` | Historical pricing and policy snapshots |
+| `member_physicals_raw` | Physical assessment data — movement screen, benchmarks, focus/avoid fields. One row per assessment. |
+| `member_health_metrics` | InBody body composition scans — weight, bf, smm, inbody_score, date_created. |
+
+---
+
+## Critical Business Rules
+
+### Active Member Count
+```sql
+SELECT COUNT(DISTINCT member_id)
+FROM member_memberships
+WHERE primary_membership_id IS NULL   -- primary memberships only
+  AND CURRENT_DATE <= end_date        -- not expired (future starts count)
+  AND journey_stage != 'no_sale'      -- exclude no-sales
+-- Do NOT filter by status
+```
+
+### New Sale vs Renewal
+- **New client** = row with earliest `start_date` for a `member_id`
+- **Renewal** = any subsequent row with a later `start_date`
+
+### Active Coach Assignment
+```
+Active coach = coach_id
+  UNLESS handoff_coach_id IS NOT NULL → use handoff_coach_id
+```
+
+### renewal_assignee vs coach_id Disambiguation
+> "How many renewals does [coach] have?" has TWO valid answers:
+> - Leading the renewal conversation → filter `renewal_assignee` (column name; day-to-day role is "Renewal Lead")
+> - Their clients up for renewal → filter `coach_id` / `handoff_coach_id`
+> **Always clarify which before querying.**
+
+### Not-Renewing Attribution
+- `member_not_renewing.coach_id` = **always the original coach** (even after handoff)
+- `handoff_coach_id` = who was actually handling them at time of churn
+- Renewal points → `handoff_coach_id` if set, else `coach_id`
+
+### Primary vs Secondary Memberships & Session Counting
+- **Secondary Membership:** Identified by `primary_membership_id IS NOT NULL` in `member_memberships`. The `primary_membership_id` points to the core membership.
+- **Session Credits:** To get the total session credits for a member, you must sum the `session_credits` from BOTH the primary membership and any connected secondary memberships.
+- **Session Types (Box / VO2):** To determine if a membership includes boxing or VO2, check the `membership_selected` column in the connected `member_newsale_metadata` or `member_renewal_meta` table (e.g., `ILIKE '%box%'` or `ILIKE '%VO2%'`).
+
+### Injuries, Goals, and Assessment Fields
+- `member_database.injuries` and `member_database.goals` = **canonical, up-to-date values** — use for profile display
+- `member_physicals_raw.injuries` / `.goals` = point-in-time snapshots from the assessment form — do not use as primary source
+- `member_physicals_raw.focus_program` and `.exercises_avoid` = assessment-specific programming context — no equivalent on `member_database`
+- **Assessment date:** use `submission_date WHERE source = 'form'` — rows with other source values are imports, not formal screenings
+- **Body composition:** latest `member_health_metrics` row by `date_created` desc. `smm` = skeletal muscle mass (displayed as "Muscle Mass"), `bf` = body fat %
+
+### Financial Data
+- Revenue/package details → join to `member_newsale_metadata` or `member_renewal_meta`
+- Do NOT use `member_memberships` alone for financial queries
+- `base_membership_value` = core membership only (excludes add-ons)
+- `price_paid` = total paid (includes add-ons + fees)
+
+### Coach Hours — Never Hardcode
+- Per-client allocations → always query `work_estimations.per_client_allocation`
+- Session durations and FTE/PTE hours → always query `system_config.duration`
+
+---
+
+## Key Views (use these, avoid manual joins)
+
+| View | Use for |
+|------|---------|
+| `view_active_members` | Pre-filtered active members with coach info |
+| `view_member_membership_full_details` | Members + memberships + versions joined |
+| `view_active_memberships` | Active memberships with financial metadata |
+| `view_member_count_per_coach` | Per-coach counts and capacity |
+| `view_member_calls_with_status` | All calls (3-month, 9-month, renewal) with status |
+| `view_coach_session_balance_sep25` | Actual vs expected hours per coach per week |
+| `view_membership_costs` | Full cost/margin breakdown per membership |
+
+---
+
+## General Rules
+
+1. Always `COUNT(DISTINCT member_id)` — never double-count
+2. Filter `primary_membership_id IS NULL` for core member counts
+3. Do NOT filter by `status` for active counts
+4. Active = `CURRENT_DATE <= end_date` (future starts count)
+5. Exclude `test_account = true` from all reporting queries
+6. Use views where available — they handle complex joins
+7. Never hardcode values from `work_estimations` or `system_config`
+
+---
+
+**Full schema:** See `docs/lockeroom-architecture.md` for complete column definitions, FK maps, and appendix rules (including `pipeline_lost`, `member_batch_attendance` as a view, churn views, and `renewal_assignee` vs `revenue_team_assignee`).

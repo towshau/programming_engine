@@ -2,6 +2,8 @@
 
 This document serves as the single source of truth for the Locker Room Programming Engine architecture. Any AI model or developer should read this first to understand how the system is built, how data flows, and where the boundaries of each component lie.
 
+Canonical repository source: [Lockeroom-Gym/coachOS](https://github.com/Lockeroom-Gym/coachOS). Keep local copies aligned to that repo.
+
 ---
 
 ## 1. System Overview & Goals

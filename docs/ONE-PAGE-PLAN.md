@@ -1,6 +1,11 @@
 # Programming engine -- one-page plan and context
 
 **Repo:** programming_engine. **Purpose:** (1) Sync exercise_library to Google Sheet (existing Node app). (2) AI programming engine: ingest past programs + apply rules + generate per-member programs -> write to Supabase.
+**Canonical source repo:** [Lockeroom-Gym/coachOS](https://github.com/Lockeroom-Gym/coachOS). Keep this workspace aligned with that repository.
+
+**Coach OS UI (profile menu branch / handoff):** [profile-menu-one-pager.md](./profile-menu-one-pager.md) — LR header menu, new routes, Forms links; branch `feature/profile-menu-experiment`.
+
+**Client Journey Timeline:** `/client-journey` page features a dual-anchor horizontal timeline (`features/journey/JourneyTimeline.tsx`) showing journey steps positioned by `days_from_start` (left anchor) or `days_from_expiry` (right anchor). Membership length toggle (3/6/12 mo) dynamically repositions expiry-based steps and hides conditional steps below the minimum threshold (`min_membership_months`). Hybrid spacing keeps nodes proportional but enforces a minimum pixel gap to avoid overlap. Node click shows a tooltip with step details. Page header is collapsible (title + inline filters) to save vertical space. Pipeline cards remain below the timeline.
 
 ---
 
@@ -14,10 +19,13 @@
 
 ---
 
-## Tables (10 total, all created and applied)
+## Tables (13 total, all created and applied)
 
 | Table | Purpose | Key columns |
 |-------|---------|-------------|
+| client_journey_templates | Defines a journey type (e.g. "Sydney New Member") | id, name, location, journey_type, active. |
+| client_journey_steps | Individual steps in a journey pipeline | id, journey_id, step_number, title, actions (jsonb), assigned_role, forms_links (jsonb), active, **days_from_start** (INT, nullable), **days_from_expiry** (INT, nullable), **min_membership_months** (INT, nullable). Timeline columns: at least one of days_from_start/days_from_expiry populated for a step to appear on the horizontal timeline. min_membership_months gates visibility by membership duration (e.g. 6 = 6mo+ only, 12 = 12mo only). Migration: `supabase/migrations/20260412130000_add_timeline_columns.sql`. |
+| client_journey_changelog | Audit trail of edits made to journeys and steps | id, journey_id, step_id, change_type, field_changed, old_value, new_value, changed_by. |
 | programming_progression_schemes | Rep-range progression by scheme (GPP / Hypertrophy / Strength) | gym, name, goal, scheme_type, from/to_rep_range, exercise_behavior, order, active. |
 | programming_exercise_exclusions | Per-member exercise exclusions | member_id, exercise_id, reason, active. |
 | programming_removal_requests | Queue for "deleted exercise" reports; senior coach review | exercise_id, reason, submitted_by, status, reviewed_by. |

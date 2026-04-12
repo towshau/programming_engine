@@ -2,6 +2,8 @@
 
 This document provides a high-level overview of the `programming_engine` repository's layout, systems, and historical context (especially past bug fixes) to speed up research and onboarding.
 
+Canonical repository source: [Lockeroom-Gym/coachOS](https://github.com/Lockeroom-Gym/coachOS). Keep local copies aligned to that repo.
+
 ## 1. Overview
 The programming engine is responsible for syncing gym data, applying coaching rules, generating per-member workout programs, and providing a frontend for coaches to review, edit, and finalize those programs.
 
