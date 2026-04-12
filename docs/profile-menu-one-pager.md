@@ -16,7 +16,7 @@
    | Onboarding      | `/onboarding`      | `OnboardingPage`            | Stub          |
    | Client Journey  | `/client-journey` | `ClientJourneyPage`         | **Implemented** (Supabase-backed pipeline & changelog) |
    | 360             | `/360`            | `ThreeSixtyPage`            | Stub          |
-   | Churn Risk      | `/churn-risk`     | `ChurnRiskPage`             | Stub          |
+   | Churn Risk      | `/churn-risk`     | `ChurnRiskPage`             | **Implemented** (Supabase churn list, stakeholder breakdown, pipeline sections) |
 3. **Dropdown behaviour:** toggle on click; close on outside click, `Escape`, route change, or after choosing an item.
 4. **Design system:** Existing Coach OS patterns — CSS variables (`--bg`, `--border`, `--color-gold`, etc.), Tailwind utility classes. No new primitive library; follow [`.cursor/rules/ui-component-library.mdc`](../.cursor/rules/ui-component-library.mdc) for future UI work (Untitled UI in `frontend/src/components/ui/`).
 
@@ -88,6 +88,16 @@ The Client Journey page (`/client-journey`) provides a visual pipeline of the st
 
 **Cursor Skill:**
 - The `.cursor/skills/update-client-journey/SKILL.md` skill updates client journey data via Cursor. It reads instructions, formats the `assigned_role` explicitly, updates `client_journey_steps` via SQL, and maintains the `client_journey_changelog`.
+
+---
+
+## Churn Risk — Overview
+
+The Churn Risk page (`/churn-risk`) reads **`member_churn_risk`** joined to **`member_memberships`** on **`member_churn_risk.membership_id`**. The UI does not pick “latest” or “furthest” membership when multiple rows exist; that membership is whatever the weekly scoring job wrote. If someone renewed but the churn row still points at an old term, **`end_date`** and the **Days** column (signed calendar offset from that `end_date`) will reflect that old term until the scorer updates the FK.
+
+**Days column:** Computed in the frontend as calendar days from today to **`member_memberships.end_date`** — positive = days until end, negative = days overdue (e.g. `-3d`).
+
+**In-app help:** On the Churn Risk page, use **How risk is evaluated** and **Model Explanation** for factor breakdown and the weekly scoring / n8n / self-improvement pipeline (see `frontend/src/features/churn/churnModelExplained.ts`).
 
 ---
 
