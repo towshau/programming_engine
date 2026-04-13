@@ -16,7 +16,10 @@ type PositionedNode = {
   step: ClientJourneyStep
   absoluteDay: number
   anchor: 'start' | 'expiry1' | 'expiry2'
+  /** Secondary line (e.g. timing); empty when suppressed */
   dayLabel: string
+  /** Title above the track, day label below — avoids cramped 0d / EXPIRY stacking */
+  labelLayout: 'alternate' | 'split'
   isConditional: boolean
   xPx: number
   color: string
@@ -44,11 +47,25 @@ function buildAndPositionForLocation(
       const raw = fromStart ? s.days_from_start! : totalDays - s.days_from_expiry!
       const absoluteDay = Math.max(0, Math.min(totalDays, raw))
 
+      const atExpiryZero =
+        !fromStart && s.days_from_expiry != null && s.days_from_expiry === 0
+      let dayLabel: string
+      let labelLayout: PositionedNode['labelLayout'] = 'alternate'
+      if (fromStart) {
+        dayLabel = s.days_from_start === 0 ? 'Day 0' : `Day ${s.days_from_start}`
+      } else if (atExpiryZero) {
+        dayLabel = 'EXPIRY'
+        labelLayout = 'split'
+      } else {
+        dayLabel = `${s.days_from_expiry}d pre`
+      }
+
       nodes.push({
         step: s,
         absoluteDay,
         anchor: fromStart ? 'start' : 'expiry1',
-        dayLabel: fromStart ? (s.days_from_start === 0 ? 'Day 0' : `Day ${s.days_from_start}`) : `${s.days_from_expiry}d pre`,
+        dayLabel,
+        labelLayout,
         isConditional: (s.min_membership_months ?? 0) > membershipLength,
         xPx: 0,
         color: 'var(--blue)',
@@ -63,11 +80,29 @@ function buildAndPositionForLocation(
       const raw = fromStart ? totalDays + s.days_from_start! : totalDays * 2 - s.days_from_expiry!
       const absoluteDay = Math.max(totalDays, Math.min(totalDays * 2, raw))
 
+      const atRenewalStartZero = fromStart && s.days_from_start === 0
+      const atRenewalExpiryZero =
+        !fromStart && s.days_from_expiry != null && s.days_from_expiry === 0
+      let dayLabel: string
+      let labelLayout: PositionedNode['labelLayout'] = 'alternate'
+      if (atRenewalStartZero) {
+        dayLabel = 'EXPIRY'
+        labelLayout = 'split'
+      } else if (atRenewalExpiryZero) {
+        dayLabel = 'EXPIRY'
+        labelLayout = 'split'
+      } else if (fromStart) {
+        dayLabel = `Ren. Day ${s.days_from_start}`
+      } else {
+        dayLabel = `${s.days_from_expiry}d pre`
+      }
+
       nodes.push({
         step: s,
         absoluteDay,
         anchor: fromStart ? 'expiry1' : 'expiry2',
-        dayLabel: fromStart ? (s.days_from_start === 0 ? 'Expiry' : `Ren. Day ${s.days_from_start}`) : `${s.days_from_expiry}d pre`,
+        dayLabel,
+        labelLayout,
         isConditional: (s.min_membership_months ?? 0) > membershipLength,
         xPx: 0,
         color: 'var(--purple)',
@@ -99,8 +134,9 @@ function buildAndPositionForLocation(
     expiry2: TRACK_PAD + usable
   }
 
-  // Alternate text
+  // Alternate title placement above/below track (split nodes keep title above, timing below)
   nodes.forEach((n, i) => {
+    if (n.labelLayout === 'split') return
     n.textPosition = i % 2 === 0 ? 'below' : 'above'
   })
 
@@ -315,7 +351,6 @@ function LocationTimelineRow({
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
-  const [scrollLeft, setScrollLeft] = useState(0)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -333,6 +368,10 @@ function LocationTimelineRow({
 
   const activeNode = nodes.find(n => n.step.id === activeNodeId) ?? null
 
+  /** Global anchor labels share the same x as nodes; split nodes already show title + EXPIRY — hide to avoid "Renewal"/"Expiry" stacking on the dot */
+  const hideExpiry1Anchor = nodes.some((n) => n.labelLayout === 'split' && n.anchor === 'expiry1')
+  const hideExpiry2Anchor = nodes.some((n) => n.labelLayout === 'split' && n.anchor === 'expiry2')
+
   return (
     <div className={cn("mb-6 last:mb-0 relative transition-all duration-200", activeNode ? "z-50" : "z-10")}>
       <div
@@ -347,7 +386,6 @@ function LocationTimelineRow({
           ref={containerRef} 
           className="overflow-x-auto pb-4" 
           style={{ scrollbarWidth: 'thin' }}
-          onScroll={(e) => setScrollLeft(e.currentTarget.scrollLeft)}
         >
           <div className="relative" style={{ height: 130, width: trackInnerWidth }}>
           
@@ -358,18 +396,22 @@ function LocationTimelineRow({
           >
             Start
           </div>
-          <div
-            className="absolute text-[9px] font-bold uppercase tracking-wider"
-            style={{ left: anchorXs.expiry1, top: TRACK_Y - 20, transform: 'translateX(-50%)', color: 'var(--blue)' }}
-          >
-            Expiry
-          </div>
-          <div
-            className="absolute text-[9px] font-bold uppercase tracking-wider"
-            style={{ left: anchorXs.expiry2, top: TRACK_Y - 20, transform: 'translateX(-50%)', color: 'var(--purple)' }}
-          >
-            Renewal Expiry
-          </div>
+          {!hideExpiry1Anchor && (
+            <div
+              className="absolute text-[9px] font-bold uppercase tracking-wider"
+              style={{ left: anchorXs.expiry1, top: TRACK_Y - 20, transform: 'translateX(-50%)', color: 'var(--blue)' }}
+            >
+              Expiry
+            </div>
+          )}
+          {!hideExpiry2Anchor && (
+            <div
+              className="absolute text-[9px] font-bold uppercase tracking-wider whitespace-nowrap"
+              style={{ left: anchorXs.expiry2, top: TRACK_Y - 20, transform: 'translateX(-50%)', color: 'var(--purple)' }}
+            >
+              Renewal Expiry
+            </div>
+          )}
 
           {/* Track background line */}
           <div
@@ -420,7 +462,6 @@ function LocationTimelineRow({
                   borderColor: node.isConditional ? fillColor : fillColor,
                   opacity: node.isConditional ? 0.45 : 1,
                   transform: isActive ? 'scale(1.3)' : 'scale(1)',
-                  ringColor: fillColor,
                   zIndex: isActive ? 60 : 10,
                 }}
                 title={node.step.title}
@@ -429,54 +470,99 @@ function LocationTimelineRow({
           })}
 
           {/* Labels above/below nodes */}
-          {nodes.map(node => (
-            <div
-              key={`lbl-${node.step.id}`}
-              className="absolute text-center pointer-events-none"
-              style={{
-                left: node.xPx,
-                top: node.textPosition === 'below' ? TRACK_Y + NODE_RADIUS + 8 : undefined,
-                bottom: node.textPosition === 'above' ? 130 - (TRACK_Y - NODE_RADIUS - 8) : undefined,
-                transform: 'translateX(-50%)',
-                opacity: node.isConditional ? 0.45 : 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: node.textPosition === 'below' ? 'flex-start' : 'flex-end',
-              }}
-            >
-              <div
-                className="text-[10px] font-medium leading-tight whitespace-normal break-words max-w-[96px]"
-                style={{ color: 'var(--text)' }}
-                title={node.step.title}
-              >
-                {node.step.title}
-              </div>
-              <div className="text-[9px] leading-tight" style={{ color: 'var(--text-muted)' }}>
-                {node.dayLabel}
-              </div>
-              {node.isConditional && node.step.min_membership_months && (
+          {nodes.map(node =>
+            node.labelLayout === 'split' ? (
+              <div key={`lbl-${node.step.id}`} className="pointer-events-none">
                 <div
-                  className="text-[8px] font-semibold mt-0.5 rounded px-1 inline-block"
-                  style={{ color: 'var(--orange)', background: 'var(--orange-bg)' }}
+                  className="absolute text-center"
+                  style={{
+                    left: node.xPx,
+                    top: TRACK_Y - NODE_RADIUS - 36,
+                    transform: 'translateX(-50%)',
+                    opacity: node.isConditional ? 0.45 : 1,
+                  }}
                 >
-                  {node.step.min_membership_months}mo+
+                  <div
+                    className="text-[10px] font-medium leading-tight whitespace-normal break-words max-w-[120px]"
+                    style={{ color: 'var(--text)' }}
+                    title={node.step.title}
+                  >
+                    {node.step.title}
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+                <div
+                  className="absolute text-center text-[9px] font-bold uppercase tracking-wide"
+                  style={{
+                    left: node.xPx,
+                    top: TRACK_Y + NODE_RADIUS + 10,
+                    transform: 'translateX(-50%)',
+                    color: node.color,
+                    opacity: node.isConditional ? 0.45 : 1,
+                  }}
+                >
+                  {node.dayLabel}
+                </div>
+                {node.isConditional && node.step.min_membership_months ? (
+                  <div
+                    className="absolute text-[8px] font-semibold rounded px-1"
+                    style={{
+                      left: node.xPx,
+                      top: TRACK_Y + NODE_RADIUS + 26,
+                      transform: 'translateX(-50%)',
+                      color: 'var(--orange)',
+                      background: 'var(--orange-bg)',
+                    }}
+                  >
+                    {node.step.min_membership_months}mo+
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div
+                key={`lbl-${node.step.id}`}
+                className="absolute text-center pointer-events-none"
+                style={{
+                  left: node.xPx,
+                  top: node.textPosition === 'below' ? TRACK_Y + NODE_RADIUS + 8 : undefined,
+                  bottom: node.textPosition === 'above' ? 130 - (TRACK_Y - NODE_RADIUS - 8) : undefined,
+                  transform: 'translateX(-50%)',
+                  opacity: node.isConditional ? 0.45 : 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: node.textPosition === 'below' ? 'flex-start' : 'flex-end',
+                }}
+              >
+                <div
+                  className="text-[10px] font-medium leading-tight whitespace-normal break-words max-w-[96px]"
+                  style={{ color: 'var(--text)' }}
+                  title={node.step.title}
+                >
+                  {node.step.title}
+                </div>
+                {node.dayLabel ? (
+                  <div className="text-[9px] leading-tight" style={{ color: 'var(--text-muted)' }}>
+                    {node.dayLabel}
+                  </div>
+                ) : null}
+                {node.isConditional && node.step.min_membership_months && (
+                  <div
+                    className="text-[8px] font-semibold mt-0.5 rounded px-1 inline-block"
+                    style={{ color: 'var(--orange)', background: 'var(--orange-bg)' }}
+                  >
+                    {node.step.min_membership_months}mo+
+                  </div>
+                )}
+              </div>
+            ),
+          )}
 
         </div>
       </div>
 
       {/* Tooltip rendered outside overflow-x-auto so it doesn't get clipped */}
       {activeNode && (
-        <NodeTooltip
-          node={activeNode}
-          containerWidth={containerWidth}
-          scrollLeft={scrollLeft}
-          onClose={() => setActiveNodeId(null)}
-        />
+        <NodeTooltip node={activeNode} onClose={() => setActiveNodeId(null)} />
       )}
       
       </div>

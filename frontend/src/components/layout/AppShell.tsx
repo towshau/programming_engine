@@ -1,5 +1,6 @@
 import { Outlet, useLocation, useNavigate, NavLink } from 'react-router-dom'
 import { useEditorStore } from '../../stores/editorStore'
+import { useAuth } from '../../lib/auth'
 import { formatDate } from '../../lib/utils'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../lib/utils'
@@ -22,6 +23,7 @@ const PROFILE_MENU_ITEMS = [
 
 export function AppShell() {
   const { coaches, selectedCoach, selectCoach, fetchCoaches, fetchMembers, loading } = useEditorStore()
+  const { user, signOut } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
@@ -157,9 +159,6 @@ export function AppShell() {
               <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
                 {formatDate()}
               </div>
-              <div className="text-[10px]" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>
-                Andrew Ponce
-              </div>
             </div>
 
             <div className="relative" ref={profileMenuRef}>
@@ -176,7 +175,11 @@ export function AppShell() {
                   boxShadow: profileMenuOpen ? '0 0 0 2px rgba(184, 134, 11, 0.25)' : 'none',
                 }}
               >
-                LR
+                {(user?.user_metadata?.full_name as string | undefined)
+                  ?.split(/\s+/)
+                  .slice(0, 2)
+                  .map((n) => n[0]?.toUpperCase())
+                  .join('') || 'LR'}
               </button>
 
               {profileMenuOpen && (
@@ -208,6 +211,24 @@ export function AppShell() {
                       </button>
                     )
                   })}
+
+                  <div
+                    className="mx-2 my-1.5"
+                    style={{ height: 1, background: 'var(--border)' }}
+                  />
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setProfileMenuOpen(false)
+                      void signOut()
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm transition-colors"
+                    style={{ color: 'var(--red)' }}
+                  >
+                    Sign Out
+                  </button>
                 </div>
               )}
             </div>

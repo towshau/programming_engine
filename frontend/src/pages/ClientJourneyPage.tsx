@@ -13,8 +13,6 @@ export function ClientJourneyPage() {
     templates,
     selectedLocation,
     selectedType,
-    headerCollapsed,
-    toggleHeader,
   } = useJourneyStore()
 
   useEffect(() => {

@@ -83,7 +83,7 @@ export function useChurnRisk() {
               ? (staffMap.get(mm.renewal_assignee) ?? 'Unassigned')
               : 'Unassigned'
 
-            const rf = r.risk_factors as ChurnRiskMember['risk_factors']
+            const rf = r.risk_factors as unknown as ChurnRiskMember['risk_factors']
             const daysToRenewal = calendarDaysToEndDate(mm.end_date)
 
             return {
