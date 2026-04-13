@@ -39,7 +39,7 @@ const Spinner = ({ className }: { className?: string }) => (
 )
 
 export function LoginPage() {
-  const { session, loading: authLoading, signIn, signInWithGoogle } = useAuth()
+  const { session, loading: authLoading, bypassAuth, signIn, signInWithGoogle } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -85,7 +85,7 @@ export function LoginPage() {
     )
   }
 
-  if (session) return <Navigate to="/" replace />
+  if (bypassAuth || session) return <Navigate to="/" replace />
 
   const busy = submitting || googleLoading
 

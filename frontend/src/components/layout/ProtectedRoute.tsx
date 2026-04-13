@@ -2,7 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
 
 export function ProtectedRoute() {
-  const { session, loading } = useAuth()
+  const { session, loading, bypassAuth } = useAuth()
 
   if (loading) {
     return (
@@ -43,6 +43,8 @@ export function ProtectedRoute() {
       </div>
     )
   }
+
+  if (bypassAuth) return <Outlet />
 
   if (!session) return <Navigate to="/login" replace />
 

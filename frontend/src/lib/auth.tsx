@@ -13,12 +13,14 @@ interface AuthState {
   session: Session | null
   user: User | null
   loading: boolean
+  bypassAuth: boolean
   signIn: (email: string, password: string) => Promise<string | null>
   signInWithGoogle: () => Promise<string | null>
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
+const BYPASS_AUTH = import.meta.env.DEV && import.meta.env.VITE_BYPASS_AUTH === 'true'
 
 async function syncUserWithDatabase(user: User) {
   try {
@@ -68,9 +70,14 @@ async function syncUserWithDatabase(user: User) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!BYPASS_AUTH)
 
   useEffect(() => {
+    if (BYPASS_AUTH) {
+      setLoading(false)
+      return
+    }
+
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s)
       setLoading(false)
@@ -89,6 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(
     async (email: string, password: string): Promise<string | null> => {
+      if (BYPASS_AUTH) return null
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -99,6 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signInWithGoogle = useCallback(async (): Promise<string | null> => {
+    if (BYPASS_AUTH) return null
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/` },
@@ -107,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
+    if (BYPASS_AUTH) return
     await supabase.auth.signOut()
   }, [])
 
@@ -116,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         user: session?.user ?? null,
         loading,
+        bypassAuth: BYPASS_AUTH,
         signIn,
         signInWithGoogle,
         signOut,
