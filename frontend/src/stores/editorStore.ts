@@ -392,6 +392,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .limit(2000),
     ])
 
+    if (notesRes.error) {
+      console.warn('fetchMembers: member_programming_notes failed', notesRes.error.message)
+    }
+
     // Keep track of the most recent program for each member to check expiration
     interface ProgInfo {
       next_due_date: string | null
