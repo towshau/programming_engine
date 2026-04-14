@@ -42,7 +42,7 @@ from normalize_one_member import (
     fetch_results_for_member,
     normalize,
 )
-    from detect_phase import detect_phase_for_member, get_next_phase_from_prescribed
+from detect_phase import detect_phase_for_member, get_next_phase_from_prescribed
 from load_rules import load_config
 from generate_program import (
     generate_next_program,

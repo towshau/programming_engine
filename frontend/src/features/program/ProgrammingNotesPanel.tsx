@@ -18,6 +18,18 @@ function formatDateAU(d: string) {
   return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+/** 1 = urgent (Injury / Pain), 2 = medium (everything else). */
+function notePriority(modification: string): number {
+  return modification === 'Injury / Pain' ? 1 : 2
+}
+
+function priorityPillStyle(priority: number): CSSProperties {
+  if (priority === 1) {
+    return { background: 'var(--red-bg, #fef2f2)', color: 'var(--red)', border: '1px solid rgba(220,38,38,0.25)' }
+  }
+  return { background: 'var(--bg3)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
+}
+
 export function ProgrammingNotesPanel({ memberId }: { memberId: string }) {
   const { selectedCoach, fetchMembers } = useEditorStore()
   const [expanded, setExpanded] = useState(false)
@@ -41,6 +53,9 @@ export function ProgrammingNotesPanel({ memberId }: { memberId: string }) {
       const rows = (data ?? []) as ProgrammingNote[]
       const sorted = [...rows].sort((a, b) => {
         if (a.implemented !== b.implemented) return a.implemented ? 1 : -1
+        const pa = notePriority(String(a.modification))
+        const pb = notePriority(String(b.modification))
+        if (pa !== pb) return pa - pb
         return new Date(b.submission_date).getTime() - new Date(a.submission_date).getTime()
       })
       setNotes(sorted)
@@ -127,14 +142,24 @@ export function ProgrammingNotesPanel({ memberId }: { memberId: string }) {
               style={{ borderColor: 'var(--border)' }}
             >
               <div className="flex flex-wrap items-center gap-2 justify-between">
-                <span
-                  className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                  style={modificationBadgeStyle(String(n.modification))}
-                >
-                  {n.modification}
-                </span>
-                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                  {formatDateAU(n.submission_date)} · {n.staff_name}
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                  <span
+                    className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                    style={modificationBadgeStyle(String(n.modification))}
+                  >
+                    {n.modification}
+                  </span>
+                  <span
+                    className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full shrink-0"
+                    style={priorityPillStyle(notePriority(String(n.modification)))}
+                  >
+                    {notePriority(String(n.modification)) === 1 ? 'Urgent' : 'Medium'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-right max-w-[55%]" style={{ color: 'var(--text-muted)' }}>
+                  {n.staff_name?.trim()
+                    ? `Submitted by ${n.staff_name.trim()} on ${formatDateAU(n.submission_date)}`
+                    : `Submitted on ${formatDateAU(n.submission_date)}`}
                 </span>
               </div>
               {n.details && (

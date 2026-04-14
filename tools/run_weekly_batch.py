@@ -7,6 +7,8 @@ Cohort: active, non-test members where:
   - (due_date <= today + 8 days AND programming_stage IN (update_stage, complete))
   - OR programming_stage = 'awaiting_program'
   - AND no programming_generated row for this member in the last 7 days
+  - AND no active (end_date >= today) programming_generated row that is coach_approved
+    or uploaded_to_teambuildr (avoids displacing finalized programs in the dashboard)
 
 Writes to programming_generated only. Does NOT update member_programs
 (stage, due_date) -- coaches handle that manually for now.
@@ -44,7 +46,7 @@ from normalize_one_member import (
     fetch_results_for_member,
     normalize,
 )
-    from detect_phase import detect_phase_for_member, get_next_phase_from_prescribed
+from detect_phase import detect_phase_for_member, get_next_phase_from_prescribed
 from load_rules import load_config
 from generate_program import (
     generate_next_program,
@@ -115,6 +117,23 @@ def fetch_recently_generated(sb):
         sb.table("programming_generated")
         .select("member_id")
         .gte("created_at", cutoff)
+        .execute()
+    )
+    return {row["member_id"] for row in (r.data or [])}
+
+
+def fetch_members_with_active_approved_or_uploaded(sb):
+    """Member IDs with a non-expired program row that is finalized or marked uploaded.
+
+    Prevents the weekly batch from inserting a new row that overlaps the coach-approved
+    timeline and appears to replace the current program in the Program Editor.
+    """
+    today_str = datetime.now().date().isoformat()
+    r = (
+        sb.table("programming_generated")
+        .select("member_id")
+        .or_("coach_approved.eq.true,uploaded_to_teambuildr.eq.true")
+        .gte("end_date", today_str)
         .execute()
     )
     return {row["member_id"] for row in (r.data or [])}
@@ -233,11 +252,13 @@ def main():
 
     active_ids = fetch_active_member_ids(sb)
     recently_generated = fetch_recently_generated(sb)
+    active_approved_or_uploaded = fetch_members_with_active_approved_or_uploaded(sb)
 
     # Filter
     eligible = []
     skipped_inactive = 0
     skipped_recent = 0
+    skipped_active_finalized = 0
     for m in cohort:
         mid = m["member_id"]
         if active_ids is not None and mid not in active_ids:
@@ -245,6 +266,9 @@ def main():
             continue
         if mid in recently_generated and not args.member_id:
             skipped_recent += 1
+            continue
+        if mid in active_approved_or_uploaded and not args.member_id:
+            skipped_active_finalized += 1
             continue
         eligible.append(m)
 
@@ -254,6 +278,7 @@ def main():
     print(f"\nCohort: {len(cohort)} candidates")
     print(f"  Skipped (not active): {skipped_inactive}")
     print(f"  Skipped (generated <{RECENT_WINDOW_DAYS}d ago): {skipped_recent}")
+    print(f"  Skipped (active approved/uploaded program): {skipped_active_finalized}")
     print(f"  Eligible: {len(eligible)}")
     if args.dry_run:
         print("  MODE: DRY RUN (no writes)")
@@ -300,7 +325,10 @@ def main():
     # Summary
     print()
     print("=" * 60)
-    print(f"SUMMARY: {generated} generated, {failed} failed, {skipped_recent} skipped (recent)")
+    print(
+        f"SUMMARY: {generated} generated, {failed} failed, "
+        f"{skipped_recent} skipped (recent), {skipped_active_finalized} skipped (finalized/uploaded active)"
+    )
     if args.dry_run:
         print("DRY RUN — nothing written to database.")
     print("=" * 60)

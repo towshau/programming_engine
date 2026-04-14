@@ -33,6 +33,98 @@ export const PROGRAMMING_COACH_ROLES = [
 
 export const SELECTED_COACH_STORAGE_KEY = 'lr-selected-coach-id'
 
+/** Raw `member_programs` row (may be multiple per member_id). */
+interface MemberProgramRowRaw {
+  member_id: string
+  membership_id?: string | null
+  programming_coach_id?: string | null
+  scheme_name?: string | null
+  due_date?: string | null
+  programming_stage?: string | null
+  id?: string | null
+  updated_at?: string | null
+}
+
+interface MemberProgramResolved {
+  coach_id: string
+  scheme_name: string | null
+}
+
+function memberProgramTimestamp(iso: string | null | undefined): number {
+  if (!iso) return 0
+  const t = Date.parse(iso)
+  return Number.isNaN(t) ? 0 : t
+}
+
+function isInactiveProgramStage(stage: string | null | undefined): boolean {
+  return (stage || '').toLowerCase() === 'inactive'
+}
+
+/** When several `member_programs` rows share a member_id, pick one deterministically. */
+function pickBetterMemberProgramRow(a: MemberProgramRowRaw, b: MemberProgramRowRaw): MemberProgramRowRaw {
+  const aIn = isInactiveProgramStage(a.programming_stage)
+  const bIn = isInactiveProgramStage(b.programming_stage)
+  if (aIn !== bIn) return aIn ? b : a
+
+  const ua = memberProgramTimestamp(a.updated_at)
+  const ub = memberProgramTimestamp(b.updated_at)
+  if (ua !== ub) return ua > ub ? a : b
+
+  const da = a.due_date || ''
+  const db = b.due_date || ''
+  if (da !== db) return da > db ? a : b
+
+  const ida = a.id || ''
+  const idb = b.id || ''
+  return ida >= idb ? a : b
+}
+
+function reduceMemberProgramRows(rows: MemberProgramRowRaw[]): MemberProgramRowRaw | null {
+  if (rows.length === 0) return null
+  let best = rows[0]!
+  for (let i = 1; i < rows.length; i++) {
+    best = pickBetterMemberProgramRow(rows[i]!, best)
+  }
+  return best
+}
+
+/**
+ * One resolved `member_programs` row per member: prefer rows whose `membership_id`
+ * matches the member's primary active membership (latest `start_date` in `fetchMembers`),
+ * then apply `pickBetterMemberProgramRow` within that pool (or across all rows if no match).
+ */
+function buildMemberProgramCoachMap(
+  rows: MemberProgramRowRaw[],
+  primaryMembershipIdByMember: Map<string, string>,
+): Map<string, MemberProgramResolved> {
+  const grouped = new Map<string, MemberProgramRowRaw[]>()
+  for (const row of rows) {
+    const mid = row.member_id
+    if (!mid) continue
+    const arr = grouped.get(mid) ?? []
+    arr.push(row)
+    grouped.set(mid, arr)
+  }
+  const out = new Map<string, MemberProgramResolved>()
+  for (const [mid, arr] of grouped) {
+    const primaryMembershipId = primaryMembershipIdByMember.get(mid)
+    let pool = arr
+    if (primaryMembershipId) {
+      const matched = arr.filter(
+        (r) => r.membership_id && String(r.membership_id) === primaryMembershipId,
+      )
+      if (matched.length > 0) pool = matched
+    }
+    const row = reduceMemberProgramRows(pool)
+    if (!row) continue
+    out.set(mid, {
+      coach_id: (row.programming_coach_id as string) || '',
+      scheme_name: (row.scheme_name as string) ?? null,
+    })
+  }
+  return out
+}
+
 /**
  * Detect when an incoming edit reverses a chain of pending edits on the same
  * exercise/field back to its original value.  Returns the indices to remove,
@@ -358,7 +450,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .limit(2000),
       supabase
         .from('member_memberships')
-        .select('member_id, gym, start_date, end_date, journey_stage, status, membership_stage, pipeline_lost, programming_coach_id, coach_id, handoff_coach_id')
+        .select(
+          'id, member_id, gym, start_date, end_date, journey_stage, status, membership_stage, pipeline_lost, programming_coach_id, coach_id, handoff_coach_id',
+        )
         .gt('end_date', today)
         .not('journey_stage', 'eq', 'no_sale')
         .not('journey_stage', 'eq', 'not_renewing')
@@ -367,10 +461,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .limit(2000),
       supabase
         .from('programming_generated')
-        .select('member_id, next_due_date, created_at, duration_weeks, coach_approved, uploaded_to_teambuildr, start_date, end_date')
+        .select(
+          'member_id, next_due_date, created_at, duration_weeks, sessions_per_week, coach_approved, uploaded_to_teambuildr, start_date, end_date',
+        )
         .order('created_at', { ascending: false })
         .limit(5000),
-      supabase.from('member_programs').select('member_id, programming_coach_id, sessions_per_week, scheme_name').limit(5000),
+      supabase
+        .from('member_programs')
+        .select(
+          'member_id, membership_id, programming_coach_id, scheme_name, due_date, programming_stage, id, updated_at',
+        )
+        .limit(10000),
       supabase
         .from('member_holds')
         .select('id, member_id, membership_id, hold_start, hold_end, hold_notes, travel_programming_notes')
@@ -395,46 +496,45 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (notesRes.error) {
       console.warn('fetchMembers: member_programming_notes failed', notesRes.error.message)
     }
+    if (mpRes.error) {
+      console.warn('fetchMembers: member_programs failed', mpRes.error.message)
+    }
 
     // Keep track of the most recent program for each member to check expiration
     interface ProgInfo {
       next_due_date: string | null
       created_at: string
       duration_weeks: number | null
+      sessions_per_week: number | null
       coach_approved: boolean
       uploaded_to_teambuildr: boolean
       start_date: string | null
       end_date: string | null
     }
     const pgMap = new Map<string, ProgInfo>()
-    for (const row of (pgRes.data ?? []) as { member_id: string, next_due_date: string | null, created_at: string, duration_weeks: number | null, coach_approved: boolean, uploaded_to_teambuildr: boolean, start_date: string | null, end_date: string | null }[]) {
+    for (const row of (pgRes.data ?? []) as {
+      member_id: string
+      next_due_date: string | null
+      created_at: string
+      duration_weeks: number | null
+      sessions_per_week: number | null
+      coach_approved: boolean
+      uploaded_to_teambuildr: boolean
+      start_date: string | null
+      end_date: string | null
+    }[]) {
       if (!pgMap.has(row.member_id)) {
         pgMap.set(row.member_id, {
           next_due_date: row.next_due_date,
           created_at: row.created_at,
           duration_weeks: row.duration_weeks,
+          sessions_per_week: row.sessions_per_week ?? null,
           coach_approved: row.coach_approved ?? false,
           uploaded_to_teambuildr: row.uploaded_to_teambuildr ?? false,
           start_date: row.start_date ?? null,
           end_date: row.end_date ?? null,
         })
       }
-    }
-
-    /** Source of truth for coach assignment in Program Editor (aligns with run_weekly_batch, Retool). */
-    interface MpInfo {
-      coach_id: string
-      sessions_per_week: number | null
-      scheme_name: string | null
-    }
-    const mpCoachMap = new Map<string, MpInfo>()
-    for (const row of (mpRes.data ?? []) as Record<string, unknown>[]) {
-      const mid = row.member_id as string
-      if (mid) mpCoachMap.set(mid, {
-        coach_id: (row.programming_coach_id as string) || '',
-        sessions_per_week: (row.sessions_per_week as number) ?? null,
-        scheme_name: (row.scheme_name as string) ?? null,
-      })
     }
 
     // Build holds map: member_id → MemberHold[]
@@ -461,14 +561,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (existing) existing.push(row)
       else programmingNotesMap.set(mid, [row])
     }
+    const notePriority = (mod: string) => (mod === 'Injury / Pain' ? 1 : 2)
     for (const arr of programmingNotesMap.values()) {
-      arr.sort(
-        (a, b) =>
-          new Date(b.submission_date).getTime() - new Date(a.submission_date).getTime(),
-      )
+      arr.sort((a, b) => {
+        const pa = notePriority(String(a.modification))
+        const pb = notePriority(String(b.modification))
+        if (pa !== pb) return pa - pb
+        return new Date(b.submission_date).getTime() - new Date(a.submission_date).getTime()
+      })
     }
 
     interface ActiveInfo {
+      /** `member_memberships.id` for the primary row (latest start_date). */
+      membership_id: string
       gym: string
       programming_coach_id: string
       start_date: string
@@ -485,6 +590,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const notRenewing = !!(row.pipeline_lost)
       if (!existing || startDate > existing.start_date) {
         activeMap.set(mid, {
+          membership_id: (row.id as string) || '',
           gym: (row.gym as string) || '',
           programming_coach_id: (row.programming_coach_id as string) || '',
           start_date: startDate,
@@ -495,6 +601,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const effectiveCoach = ((row.handoff_coach_id as string) || (row.coach_id as string) || '')
       if (!coachId || effectiveCoach === coachId) membershipCoachMemberIds.add(mid)
     }
+
+    const primaryMembershipIdByMember = new Map<string, string>()
+    for (const [mid, info] of activeMap) {
+      if (info.membership_id) primaryMembershipIdByMember.set(mid, info.membership_id)
+    }
+
+    /** One resolved row per member from `member_programs` (membership match + duplicate handling). */
+    const mpCoachMap = buildMemberProgramCoachMap(
+      (mpRes.data ?? []) as MemberProgramRowRaw[],
+      primaryMembershipIdByMember,
+    )
 
     const members: MemberWithCoach[] = []
     const intakeMembers: MemberWithCoach[] = []
@@ -563,7 +680,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         membership_status: isActive ? 'active' : 'inactive',
         program_status: (!hasProgram || isExpiring) ? 'needs_program' : isNew ? 'new_member' : 'has_program',
         is_new: isNew,
-        sessions_per_week: mpInfo?.sessions_per_week ?? null,
+        sessions_per_week: progInfo?.sessions_per_week ?? null,
         scheme_name: mpInfo?.scheme_name ?? null,
         draft_status: draftStatus,
         holds: holdsMap.get(mid) ?? [],
