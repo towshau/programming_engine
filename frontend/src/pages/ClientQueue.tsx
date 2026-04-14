@@ -5,7 +5,22 @@ import { cn, getInitials } from '../lib/utils'
 import type { MemberWithCoach, ProgramDraftStatus, MemberHold, GeneratedProgram } from '../types'
 import { MemberDetailModal } from '../features/queue/MemberDetailModal'
 
+function NotesQueueBadge({ count }: { count: number }) {
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap"
+      style={{ background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red-border)' }}
+    >
+      {count} note{count !== 1 ? 's' : ''}
+    </span>
+  )
+}
+
 type QueueTab = 'awaiting' | 'phasedue' | 'active' | 'updates' | 'holiday'
+
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 const AVATAR_COLORS = [
   '#0891b2', '#7c3aed', '#059669', '#be185d', '#0284c7',
@@ -95,12 +110,18 @@ function MemberRow({
 }) {
   const initials = getInitials(member.first_name, member.last_name)
   const bgColor = avatarColor(member.member_id)
-  const meta = [
-    member.sessions_per_week ? `${member.sessions_per_week}×/week` : null,
-    member.scheme_name,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const latestNote = member.programming_notes?.[0]
+  const meta =
+    tab === 'updates' && latestNote
+      ? [latestNote.modification as string, latestNote.submission_date ? formatDate(latestNote.submission_date) : null]
+          .filter(Boolean)
+          .join(' · ')
+      : [
+          member.sessions_per_week ? `${member.sessions_per_week}×/week` : null,
+          member.scheme_name,
+        ]
+          .filter(Boolean)
+          .join(' · ')
 
   return (
     <button
@@ -136,6 +157,9 @@ function MemberRow({
         {tab === 'awaiting' && <DraftStatusBadge status={member.draft_status} />}
         {tab === 'phasedue' && <PhaseBadge isOverdue={false} />}
         {tab === 'active' && <ActiveBadge member={member} />}
+        {tab === 'updates' && (member.programming_notes?.length ?? 0) > 0 && (
+          <NotesQueueBadge count={member.programming_notes!.length} />
+        )}
         <svg
           className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ color: 'var(--text-muted)' }}
@@ -146,10 +170,6 @@ function MemberRow({
       </div>
     </button>
   )
-}
-
-function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function HoldEntry({ hold }: { hold: MemberHold }) {
@@ -321,8 +341,8 @@ const TAB_CONFIG: { key: QueueTab; label: string; emptyMessage: string }[] = [
   },
   {
     key: 'updates',
-    label: 'Program Updates (Coming Soon)',
-    emptyMessage: 'No program updates.',
+    label: 'Program Updates',
+    emptyMessage: 'No unactioned programming notes for your clients.',
   },
   {
     key: 'holiday',
@@ -349,8 +369,13 @@ export function ClientQueue() {
         (m) => m.membership_status === 'active' && m.program_status === 'needs_program' && !m.is_new
       ),
       active: activeMembersWithProgram.filter((m) => m.program_status === 'has_program'),
-      /** Placeholder: rules TBD — keep empty until product defines cohort. */
-      updates: [] as MemberWithCoach[],
+      updates: members
+        .filter((m) => (m.programming_notes?.length ?? 0) > 0)
+        .sort((a, b) => {
+          const da = a.programming_notes?.[0]?.submission_date ?? ''
+          const db = b.programming_notes?.[0]?.submission_date ?? ''
+          return db.localeCompare(da)
+        }),
       holiday: members.filter(
         (m) => (m.holds?.length ?? 0) > 0 || (m.holiday_programs?.length ?? 0) > 0
       ),
@@ -415,7 +440,7 @@ export function ClientQueue() {
                   : 'bg-white text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--text-muted)]'
               )}
             >
-              <span className={tab.key === 'updates' ? 'leading-snug' : 'truncate w-full'}>{tab.label}</span>
+              <span className="truncate w-full">{tab.label}</span>
               {counts[tab.key] > 0 && (
                 <span
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none"
@@ -500,7 +525,7 @@ function InfoBanner({ tab, count }: { tab: QueueTab; count: number }) {
           Program Updates — {count} remaining
         </p>
         <p className="text-xs" style={{ color: '#b91c1c' }}>
-          Members requiring program updates (rules to be configured). This tab is a placeholder until cohort logic is defined.
+          Members with unactioned rows in <strong>member_programming_notes</strong> (coach-scoped like other queues). Open a member to review notes in the Program Editor and mark them implemented.
         </p>
       </div>
     )

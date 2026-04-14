@@ -6,6 +6,7 @@ import { applyEdits } from '../../lib/applyEdits'
 import { DayPicker } from '../ui/DayPicker'
 import { Badge } from '../ui/Badge'
 import { ProgramHeader } from '../../features/program/ProgramHeader'
+import { ProgrammingNotesPanel } from '../../features/program/ProgrammingNotesPanel'
 import { ComplianceHeatmap } from '../../features/program/ComplianceHeatmap'
 import { ExerciseCategoryGroup } from '../../features/program/ExerciseCategoryGroup'
 import { AddExerciseButton } from '../../features/program/AddExerciseButton'
@@ -249,7 +250,10 @@ export function ProgramViewer() {
 
   if (!program) {
     return (
-      <main className="flex-1 flex items-center justify-center p-8">
+      <main className="flex-1 flex flex-col items-center justify-center p-8 space-y-4" style={{ background: 'var(--bg)' }}>
+        <div className="w-full max-w-xl">
+          <ProgrammingNotesPanel memberId={selectedMember.member_id} />
+        </div>
         <div
           className="w-full max-w-xl rounded-xl border p-5 space-y-4 bg-white"
           style={{ borderColor: 'var(--border)' }}
@@ -390,6 +394,8 @@ export function ProgramViewer() {
         programViewMode={programViewMode}
         onViewModeChange={handleViewModeChange}
       />
+
+      <ProgrammingNotesPanel memberId={selectedMember.member_id} />
 
       {/* When editing a future program, show the real current program as a collapsed read-only summary above */}
       {editingFutureProgram && stashedCurrentProgram && (

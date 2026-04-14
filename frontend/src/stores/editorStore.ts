@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import type {
   Coach,
   MemberWithCoach,
+  ProgrammingNote,
   GeneratedProgram,
   MemberHold,
   CoachEdit,
@@ -349,7 +350,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const cutoffStr = cutoff.toISOString().slice(0, 10)
     const today = new Date().toISOString().slice(0, 10)
 
-    const [allMembersRes, activeMembershipRes, pgRes, mpRes, holdsRes, holidayProgRes] = await Promise.all([
+    const [allMembersRes, activeMembershipRes, pgRes, mpRes, holdsRes, holidayProgRes, notesRes] = await Promise.all([
       supabase
         .from('member_database')
         .select('id, first_name, last_name, member_name')
@@ -382,6 +383,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .eq('program_type', 'holiday')
         .gte('holiday_end_date', today)
         .order('holiday_start_date', { ascending: true })
+        .limit(2000),
+      supabase
+        .from('member_programming_notes')
+        .select('id, member_id, modification, details, submission_date, staff_name, implemented')
+        .eq('implemented', false)
+        .order('submission_date', { ascending: false })
         .limit(2000),
     ])
 
@@ -440,6 +447,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const existing = holidayProgMap.get(row.member_id)
       if (existing) existing.push(row)
       else holidayProgMap.set(row.member_id, [row])
+    }
+
+    // Unimplemented programming notes per member (Program Updates tab)
+    const programmingNotesMap = new Map<string, ProgrammingNote[]>()
+    for (const row of (notesRes.data ?? []) as ProgrammingNote[]) {
+      const mid = row.member_id
+      const existing = programmingNotesMap.get(mid)
+      if (existing) existing.push(row)
+      else programmingNotesMap.set(mid, [row])
+    }
+    for (const arr of programmingNotesMap.values()) {
+      arr.sort(
+        (a, b) =>
+          new Date(b.submission_date).getTime() - new Date(a.submission_date).getTime(),
+      )
     }
 
     interface ActiveInfo {
@@ -542,6 +564,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         draft_status: draftStatus,
         holds: holdsMap.get(mid) ?? [],
         holiday_programs: holidayProgMap.get(mid) ?? [],
+        programming_notes: programmingNotesMap.get(mid) ?? [],
       }
 
       if (isIntakeCoach) {
@@ -1019,36 +1042,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => ({ loading: { ...s.loading, saving: true } }))
 
     let nextDueDate: string | null = null
-    const { data: mpData } = await supabase
-      .from('member_programs')
-      .select('due_date')
-      .eq('member_id', program.member_id)
-      .limit(1)
-      .single()
+    // end_date = program start + duration (aligned with saveDurationWeeks / batch writers).
+    const startRef = program.start_date
+      ? new Date(program.start_date)
+      : new Date(program.created_at)
+    const d = new Date(startRef)
+    d.setDate(d.getDate() + program.duration_weeks * 7)
 
-    let newEndDateStr = program.end_date
-
-    if (mpData?.due_date) {
-      const d = new Date(mpData.due_date)
-      d.setDate(d.getDate() + program.duration_weeks * 7)
-      
-      // Calculate delta before snapping to Monday
-      if (program.end_date) {
-        const oldEnd = new Date(program.end_date)
-        const deltaDays = Math.round((d.getTime() - oldEnd.getTime()) / (1000 * 60 * 60 * 24))
-        if (deltaDays !== 0) {
-          const { editingFutureProgram } = get()
-          get().shiftSubsequentDates(deltaDays, editingFutureProgram ? program.id : undefined).catch(console.error)
-        }
+    // Calculate delta before snapping to Monday
+    if (program.end_date) {
+      const oldEnd = new Date(program.end_date)
+      const deltaDays = Math.round((d.getTime() - oldEnd.getTime()) / (1000 * 60 * 60 * 24))
+      if (deltaDays !== 0) {
+        const { editingFutureProgram } = get()
+        get().shiftSubsequentDates(deltaDays, editingFutureProgram ? program.id : undefined).catch(console.error)
       }
-      newEndDateStr = d.toISOString().slice(0, 10)
-
-      const dow = d.getDay()
-      if (dow !== 1) {
-        d.setDate(d.getDate() + (dow === 0 ? 1 : 8 - dow))
-      }
-      nextDueDate = d.toISOString().slice(0, 10)
     }
+    const newEndDateStr = d.toISOString().slice(0, 10)
+
+    const dow = d.getDay()
+    if (dow !== 1) {
+      d.setDate(d.getDate() + (dow === 0 ? 1 : 8 - dow))
+    }
+    nextDueDate = d.toISOString().slice(0, 10)
 
     const { error } = await supabase
       .from('programming_generated')

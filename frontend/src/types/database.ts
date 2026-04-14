@@ -17,6 +17,19 @@ export type MembershipStatus = 'active' | 'pending' | 'indefinite_hold' | 'inact
 
 export type ProgramDraftStatus = 'awaiting_draft' | 'draft_ready' | 'approved' | 'uploaded'
 
+/** Matches Supabase enum `programming_note_modification`. */
+export type ProgrammingNoteModification = 'Injury / Pain' | 'Physio Advice' | 'Other'
+
+export interface ProgrammingNote {
+  id: string
+  member_id: string
+  modification: ProgrammingNoteModification | string
+  details: string | null
+  submission_date: string
+  staff_name: string
+  implemented: boolean
+}
+
 export interface MemberWithCoach {
   member_id: string
   member_name: string
@@ -32,6 +45,8 @@ export interface MemberWithCoach {
   draft_status: ProgramDraftStatus
   holds?: import('./program').MemberHold[]
   holiday_programs?: import('./program').GeneratedProgram[]
+  /** Unimplemented programming notes only (for Program Updates queue). */
+  programming_notes?: ProgrammingNote[]
 }
 
 export interface ExerciseLibraryItem {
