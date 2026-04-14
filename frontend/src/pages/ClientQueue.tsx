@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useEditorStore } from '../stores/editorStore'
 import { cn, getInitials } from '../lib/utils'
 import type { MemberWithCoach, ProgramDraftStatus, MemberHold, GeneratedProgram } from '../types'
+import { MemberDetailModal } from '../features/queue/MemberDetailModal'
 
-type QueueTab = 'awaiting' | 'phasedue' | 'active' | 'holiday'
+type QueueTab = 'awaiting' | 'phasedue' | 'active' | 'updates' | 'holiday'
 
 const AVATAR_COLORS = [
   '#0891b2', '#7c3aed', '#059669', '#be185d', '#0284c7',
@@ -312,6 +313,11 @@ const TAB_CONFIG: { key: QueueTab; label: string; emptyMessage: string }[] = [
     emptyMessage: 'No active programs found.',
   },
   {
+    key: 'updates',
+    label: 'Program Updates',
+    emptyMessage: 'No program updates.',
+  },
+  {
     key: 'holiday',
     label: 'Holiday Programs & Holds',
     emptyMessage: 'No members with upcoming holds or holiday programs.',
@@ -322,6 +328,7 @@ export function ClientQueue() {
   const navigate = useNavigate()
   const { members, loading, selectedCoach, selectMember } = useEditorStore()
   const [activeTab, setActiveTab] = React.useState<QueueTab>('awaiting')
+  const [modalMemberId, setModalMemberId] = useState<string | null>(null)
 
   const tabMembers = useMemo(() => {
     const activeMembersWithProgram = members.filter(
@@ -333,6 +340,8 @@ export function ClientQueue() {
         (m) => m.membership_status === 'active' && m.program_status === 'needs_program' && !m.is_new
       ),
       active: activeMembersWithProgram.filter((m) => m.program_status === 'has_program'),
+      /** Placeholder: rules TBD — keep empty until product defines cohort. */
+      updates: [] as MemberWithCoach[],
       holiday: members.filter(
         (m) => (m.holds?.length ?? 0) > 0 || (m.holiday_programs?.length ?? 0) > 0
       ),
@@ -344,22 +353,34 @@ export function ClientQueue() {
       awaiting: tabMembers.awaiting.length,
       phasedue: tabMembers.phasedue.length,
       active: tabMembers.active.length,
+      updates: tabMembers.updates.length,
       holiday: tabMembers.holiday.length,
     }),
     [tabMembers]
   )
+
+  const modalMember = modalMemberId
+    ? members.find((m) => m.member_id === modalMemberId)
+    : null
 
   const currentTab = TAB_CONFIG.find((t) => t.key === activeTab)!
   const currentMembers = tabMembers[activeTab]
 
   const tabBadgeStyle = (key: QueueTab) => {
     if (key === 'awaiting') return { background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red-border)' }
+    if (key === 'updates') return { background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red-border)' }
     if (key === 'phasedue') return { background: 'var(--color-gold-50)', color: 'var(--color-gold)', border: '1px solid var(--color-gold-100)' }
     if (key === 'holiday') return { background: 'var(--blue-bg)', color: 'var(--blue)', border: '1px solid var(--blue-border)' }
     return { background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid var(--green-border)' }
   }
 
   const isLoading = loading.members
+
+  const tabCountSuffix = (key: QueueTab) => {
+    if (key === 'active') return 'approved'
+    if (key === 'holiday') return 'remaining'
+    return 'remaining'
+  }
 
   return (
     <div className="p-7">
@@ -371,7 +392,7 @@ export function ClientQueue() {
       )}
 
       {/* Tab strip — 4 equal columns spanning full width */}
-      <div className="grid grid-cols-4 gap-2 mb-5">
+      <div className="grid grid-cols-5 gap-2 mb-5">
         {TAB_CONFIG.map((tab) => {
           const isActive = activeTab === tab.key
           return (
@@ -394,7 +415,7 @@ export function ClientQueue() {
                     : tabBadgeStyle(tab.key)
                   }
                 >
-                  {counts[tab.key]} {tab.key === 'active' ? 'approved' : 'remaining'}
+                  {counts[tab.key]} {tabCountSuffix(tab.key)}
                 </span>
               )}
             </button>
@@ -440,16 +461,41 @@ export function ClientQueue() {
               key={m.member_id}
               member={m}
               tab={activeTab}
-              onClick={() => navigate(`/program/${m.member_id}`)}
+              onClick={() => setModalMemberId(m.member_id)}
             />
           ))
         )}
       </div>
+
+      {modalMemberId && modalMember && (
+        <MemberDetailModal
+          memberId={modalMemberId}
+          memberName={`${modalMember.first_name} ${modalMember.last_name}`}
+          gymLabel={modalMember.gym}
+          onClose={() => setModalMemberId(null)}
+          onOpenEditor={() => navigate(`/program/${modalMemberId}`)}
+        />
+      )}
     </div>
   )
 }
 
 function InfoBanner({ tab, count }: { tab: QueueTab; count: number }) {
+  if (tab === 'updates') {
+    return (
+      <div
+        className="rounded-lg px-4 py-3 mb-5 border"
+        style={{ background: 'var(--red-bg)', borderColor: 'var(--red-border)' }}
+      >
+        <p className="text-xs font-bold uppercase tracking-wide mb-0.5" style={{ color: 'var(--red)' }}>
+          Program Updates — {count} remaining
+        </p>
+        <p className="text-xs" style={{ color: '#b91c1c' }}>
+          Members requiring program updates (rules to be configured). This tab is a placeholder until cohort logic is defined.
+        </p>
+      </div>
+    )
+  }
   if (tab === 'awaiting') {
     return (
       <div
