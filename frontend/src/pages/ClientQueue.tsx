@@ -321,7 +321,7 @@ const TAB_CONFIG: { key: QueueTab; label: string; emptyMessage: string }[] = [
   },
   {
     key: 'updates',
-    label: 'Program Updates',
+    label: 'Program Updates (Coming Soon)',
     emptyMessage: 'No program updates.',
   },
   {
