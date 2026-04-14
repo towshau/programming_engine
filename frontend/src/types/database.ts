@@ -45,7 +45,7 @@ export interface MemberWithCoach {
   draft_status: ProgramDraftStatus
   holds?: import('./program').MemberHold[]
   holiday_programs?: import('./program').GeneratedProgram[]
-  /** Unimplemented programming notes only (for Program Updates queue). */
+  /** Programming notes (unactioned first in array; includes implemented for history/grey rows). */
   programming_notes?: ProgrammingNote[]
 }
 

@@ -16,6 +16,7 @@ import type {
   ExerciseBestsMap,
 } from '../types'
 import { supabase } from '../lib/supabase'
+import { sortProgrammingNotesForQueue } from '../lib/programmingNotes'
 import { applyEdits } from '../lib/applyEdits'
 import { validateSessionsReps, type RepsValidationError } from '../lib/reps'
 import { buildTemplateProgram, buildSingleSession } from '../lib/templateBuilder'
@@ -488,9 +489,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       supabase
         .from('member_programming_notes')
         .select('id, member_id, modification, details, submission_date, staff_name, implemented')
-        .eq('implemented', false)
         .order('submission_date', { ascending: false })
-        .limit(2000),
+        .limit(8000),
     ])
 
     if (notesRes.error) {
@@ -553,7 +553,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       else holidayProgMap.set(row.member_id, [row])
     }
 
-    // Unimplemented programming notes per member (Program Updates tab)
+    // Programming notes per member (Program Updates tab + editor panel); includes implemented rows.
     const programmingNotesMap = new Map<string, ProgrammingNote[]>()
     for (const row of (notesRes.data ?? []) as ProgrammingNote[]) {
       const mid = row.member_id
@@ -561,14 +561,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (existing) existing.push(row)
       else programmingNotesMap.set(mid, [row])
     }
-    const notePriority = (mod: string) => (mod === 'Injury / Pain' ? 1 : 2)
-    for (const arr of programmingNotesMap.values()) {
-      arr.sort((a, b) => {
-        const pa = notePriority(String(a.modification))
-        const pb = notePriority(String(b.modification))
-        if (pa !== pb) return pa - pb
-        return new Date(b.submission_date).getTime() - new Date(a.submission_date).getTime()
-      })
+    for (const [noteMid, arr] of [...programmingNotesMap.entries()]) {
+      programmingNotesMap.set(noteMid, sortProgrammingNotesForQueue(arr))
     }
 
     interface ActiveInfo {

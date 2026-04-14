@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'r
 import { supabase } from '../../lib/supabase'
 import { useEditorStore } from '../../stores/editorStore'
 import type { ProgrammingNote } from '../../types'
+import {
+  programmingNotePriority,
+  sortProgrammingNotesForQueue,
+} from '../../lib/programmingNotes'
 import { cn } from '../../lib/utils'
+
+const NOTES_PAGE_SIZE = 20
 
 function modificationBadgeStyle(mod: string): CSSProperties {
   if (mod === 'Injury / Pain') {
@@ -18,11 +24,6 @@ function formatDateAU(d: string) {
   return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-/** 1 = urgent (Injury / Pain), 2 = medium (everything else). */
-function notePriority(modification: string): number {
-  return modification === 'Injury / Pain' ? 1 : 2
-}
-
 function priorityPillStyle(priority: number): CSSProperties {
   if (priority === 1) {
     return { background: 'var(--red-bg, #fef2f2)', color: 'var(--red)', border: '1px solid rgba(220,38,38,0.25)' }
@@ -35,6 +36,7 @@ export function ProgrammingNotesPanel({ memberId }: { memberId: string }) {
   const [expanded, setExpanded] = useState(false)
   const [notes, setNotes] = useState<ProgrammingNote[]>([])
   const [loading, setLoading] = useState(true)
+  const [notesPage, setNotesPage] = useState(1)
 
   const loadNotes = useCallback(async () => {
     setLoading(true)
@@ -51,14 +53,7 @@ export function ProgrammingNotesPanel({ memberId }: { memberId: string }) {
         return
       }
       const rows = (data ?? []) as ProgrammingNote[]
-      const sorted = [...rows].sort((a, b) => {
-        if (a.implemented !== b.implemented) return a.implemented ? 1 : -1
-        const pa = notePriority(String(a.modification))
-        const pb = notePriority(String(b.modification))
-        if (pa !== pb) return pa - pb
-        return new Date(b.submission_date).getTime() - new Date(a.submission_date).getTime()
-      })
-      setNotes(sorted)
+      setNotes(sortProgrammingNotesForQueue(rows))
     } finally {
       setLoading(false)
     }
@@ -68,7 +63,20 @@ export function ProgrammingNotesPanel({ memberId }: { memberId: string }) {
     void loadNotes()
   }, [loadNotes])
 
+  useEffect(() => {
+    setNotesPage(1)
+  }, [memberId])
+
   const unactionedCount = useMemo(() => notes.filter((n) => !n.implemented).length, [notes])
+
+  const notesPagination = useMemo(() => {
+    const total = notes.length
+    const totalPages = Math.max(1, Math.ceil(total / NOTES_PAGE_SIZE))
+    const safePage = Math.min(notesPage, totalPages)
+    const start = (safePage - 1) * NOTES_PAGE_SIZE
+    const slice = notes.slice(start, start + NOTES_PAGE_SIZE)
+    return { total, totalPages, safePage, slice, start }
+  }, [notes, notesPage])
 
   const markImplemented = async (noteId: string) => {
     const { error } = await supabase
@@ -131,62 +139,106 @@ export function ProgrammingNotesPanel({ memberId }: { memberId: string }) {
       </button>
 
       {expanded && (
-        <div className="border-t px-3 py-3 space-y-3" style={{ borderColor: 'var(--color-gold-100)', background: 'var(--bg2)' }}>
-          {notes.map((n) => (
-            <div
-              key={n.id}
-              className={cn(
-                'rounded-lg border p-3 space-y-2',
-                n.implemented && 'opacity-60',
-              )}
-              style={{ borderColor: 'var(--border)' }}
-            >
-              <div className="flex flex-wrap items-center gap-2 justify-between">
-                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                  <span
-                    className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                    style={modificationBadgeStyle(String(n.modification))}
-                  >
-                    {n.modification}
-                  </span>
-                  <span
-                    className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full shrink-0"
-                    style={priorityPillStyle(notePriority(String(n.modification)))}
-                  >
-                    {notePriority(String(n.modification)) === 1 ? 'Urgent' : 'Medium'}
+        <div
+          className="border-t px-3 py-3 space-y-3"
+          style={{ borderColor: 'var(--color-gold-100)', background: 'var(--bg2)' }}
+        >
+          {notesPagination.slice.map((n) => {
+            const pri = programmingNotePriority(String(n.modification))
+            return (
+              <div
+                key={n.id}
+                className={cn(
+                  'rounded-lg border p-3 space-y-2 transition-opacity',
+                  n.implemented && 'opacity-50 grayscale-[0.35]',
+                )}
+                style={{
+                  borderColor: 'var(--border)',
+                  background: n.implemented ? 'var(--bg3)' : undefined,
+                }}
+              >
+                <div className="flex flex-wrap items-center gap-2 justify-between">
+                  <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                    <span
+                      className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                      style={modificationBadgeStyle(String(n.modification))}
+                    >
+                      {n.modification}
+                    </span>
+                    <span
+                      className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full shrink-0"
+                      style={priorityPillStyle(pri)}
+                    >
+                      {pri === 1 ? 'Urgent' : 'Medium'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-right max-w-[55%]" style={{ color: 'var(--text-muted)' }}>
+                    {n.staff_name?.trim()
+                      ? `Submitted by ${n.staff_name.trim()} on ${formatDateAU(n.submission_date)}`
+                      : `Submitted on ${formatDateAU(n.submission_date)}`}
                   </span>
                 </div>
-                <span className="text-[10px] text-right max-w-[55%]" style={{ color: 'var(--text-muted)' }}>
-                  {n.staff_name?.trim()
-                    ? `Submitted by ${n.staff_name.trim()} on ${formatDateAU(n.submission_date)}`
-                    : `Submitted on ${formatDateAU(n.submission_date)}`}
-                </span>
+                {n.details && (
+                  <p className="text-sm" style={{ color: n.implemented ? 'var(--text-muted)' : 'var(--text)' }}>
+                    {n.details}
+                  </p>
+                )}
+                {!n.implemented && (
+                  <label
+                    className="flex items-center gap-2 cursor-pointer text-xs font-medium"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <input
+                      type="checkbox"
+                      className="rounded border-[var(--border)]"
+                      onChange={() => void markImplemented(n.id)}
+                    />
+                    Mark as implemented
+                  </label>
+                )}
+                {n.implemented && (
+                  <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                    Implemented — kept for history
+                  </p>
+                )}
               </div>
-              {n.details && (
-                <p
-                  className={cn('text-sm', n.implemented && 'line-through')}
-                  style={{ color: 'var(--text)' }}
+            )
+          })}
+
+          {notesPagination.totalPages > 1 && (
+            <div
+              className="flex items-center justify-between gap-2 pt-1 text-[11px]"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <span>
+                {notesPagination.start + 1}–
+                {Math.min(notesPagination.start + NOTES_PAGE_SIZE, notesPagination.total)} of {notesPagination.total}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={notesPagination.safePage <= 1}
+                  onClick={() => setNotesPage((p) => Math.max(1, p - 1))}
+                  className="px-2 py-1 rounded border text-[11px] font-medium disabled:opacity-40"
+                  style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
                 >
-                  {n.details}
-                </p>
-              )}
-              {!n.implemented && (
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium" style={{ color: 'var(--text)' }}>
-                  <input
-                    type="checkbox"
-                    className="rounded border-[var(--border)]"
-                    onChange={() => void markImplemented(n.id)}
-                  />
-                  Mark as implemented
-                </label>
-              )}
-              {n.implemented && (
-                <p className="text-[10px] font-medium" style={{ color: 'var(--green)' }}>
-                  Implemented
-                </p>
-              )}
+                  Prev
+                </button>
+                <span className="tabular-nums" style={{ color: 'var(--text)' }}>
+                  {notesPagination.safePage}/{notesPagination.totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={notesPagination.safePage >= notesPagination.totalPages}
+                  onClick={() => setNotesPage((p) => Math.min(notesPagination.totalPages, p + 1))}
+                  className="px-2 py-1 rounded border text-[11px] font-medium disabled:opacity-40"
+                  style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+                >
+                  Next
+                </button>
+              </div>
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>
