@@ -415,7 +415,7 @@ export function ClientQueue() {
                   : 'bg-white text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--text-muted)]'
               )}
             >
-              <span className="truncate w-full">{tab.label}</span>
+              <span className={tab.key === 'updates' ? 'leading-snug' : 'truncate w-full'}>{tab.label}</span>
               {counts[tab.key] > 0 && (
                 <span
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none"
