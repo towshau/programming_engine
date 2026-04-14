@@ -38,6 +38,13 @@ const DRAFT_STATUS_CONFIG: Record<ProgramDraftStatus, { label: string; style: Re
   },
 }
 
+const DRAFT_STATUS_ORDER: Record<ProgramDraftStatus, number> = {
+  awaiting_draft: 0,
+  draft_ready: 1,
+  approved: 2,
+  uploaded: 3,
+}
+
 function DraftStatusBadge({ status }: { status: ProgramDraftStatus }) {
   const config = DRAFT_STATUS_CONFIG[status]
   return (
@@ -335,7 +342,9 @@ export function ClientQueue() {
       (m) => m.membership_status === 'active' && m.program_status !== 'needs_program'
     )
     return {
-      awaiting: members.filter((m) => m.is_new),
+      awaiting: members
+        .filter((m) => m.is_new)
+        .sort((a, b) => DRAFT_STATUS_ORDER[a.draft_status] - DRAFT_STATUS_ORDER[b.draft_status]),
       phasedue: members.filter(
         (m) => m.membership_status === 'active' && m.program_status === 'needs_program' && !m.is_new
       ),
