@@ -313,12 +313,15 @@ Built by trigger from `member_tbhealthmax` + `member_tbresults`. Synced weekly t
 | Column | Type | Use |
 |--------|------|-----|
 | member_id | uuid | FK to member_database.id |
+| membership_id | uuid (nullable) | FK to `member_memberships.id` when the program row is tied to a specific membership; **Program Editor** resolves duplicate `member_id` rows by preferring the row whose `membership_id` matches the member’s primary active membership (latest `start_date` among cohort memberships), then non-`inactive` stage, `updated_at`, `due_date`, `id`. |
 | member_name | text | Display |
 | due_date | date | Program expiry; batch runner triggers 8 days before |
 | programming_stage | text | Enum: awaiting_program, update_stage, complete, uploaded, inactive |
-| programming_coach_id | uuid | Coach assignment; **source of truth for the batch runner** (`run_weekly_batch.py` copies this into `programming_generated.assigned_to`) and the Program Editor coach filter (falls back to `member_memberships.programming_coach_id` for members not yet in `member_programs`). Written manually via Supabase/Retool — no code in this repo writes it. Note: `member_memberships` also has a `programming_coach_id` column (set by the membership management system); these two columns can drift out of sync. |
+| programming_coach_id | uuid | Coach assignment; **source of truth for the batch runner** (`run_weekly_batch.py` copies this into `programming_generated.assigned_to`) and the Program Editor PC label/filter (falls back to `member_memberships.programming_coach_id` when the member has no `member_programs` row). Written manually via Supabase/Retool — no code in this repo writes it. Note: `member_memberships` also has a `programming_coach_id` column (set by the membership management system); these two columns can drift out of sync. |
 | scheme_name | text (default 'GPP') | Progression scheme: GPP, Strength, Hypertrophy |
-| duration_weeks | integer | Program length in weeks |
+| created_at, updated_at | timestamptz | Audit; used when resolving duplicate rows per member in the frontend. |
+| id | uuid | Row PK; tie-break when resolving duplicates. |
+| duration_weeks | integer | Program length in weeks (if present in your project; not all deployments store this on `member_programs`) |
 
 **Batch cohort query:** Members where `(due_date <= today + 8 AND programming_stage IN (update_stage, complete))` OR `programming_stage = 'awaiting_program'`. Skip if `programming_generated` row exists from last 7 days.
 

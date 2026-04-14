@@ -44,6 +44,7 @@ function ChevronRightIcon() {
 export function MemberSidebar({ onSelectMember, source = 'programming' }: MemberSidebarProps = {}) {
   const {
     selectedCoach,
+    coaches,
     members,
     intakeMembers,
     selectedMember,
@@ -56,6 +57,8 @@ export function MemberSidebar({ onSelectMember, source = 'programming' }: Member
   const [collapsed, setCollapsed] = useState(false)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  /** Programming coach filter (Program Editor sidebar only). */
+  const [pcFilter, setPcFilter] = useState<string>('all')
   const debouncedQuery = useDebounce(query, 300)
 
   function handleSelect(member: MemberWithCoach) {
@@ -68,6 +71,10 @@ export function MemberSidebar({ onSelectMember, source = 'programming' }: Member
 
   const filtered = useMemo(() => {
     let list = memberList
+
+    if (source === 'programming' && pcFilter !== 'all') {
+      list = list.filter((m) => m.programming_coach_id === pcFilter)
+    }
 
     if (statusFilter !== 'all') {
       list = list.filter((m) => {
@@ -97,7 +104,7 @@ export function MemberSidebar({ onSelectMember, source = 'programming' }: Member
     }
 
     return list
-  }, [memberList, debouncedQuery, statusFilter])
+  }, [memberList, debouncedQuery, statusFilter, source, pcFilter])
 
   const counts = useMemo(() => {
     const active = memberList.filter((m) => m.membership_status === 'active')
@@ -174,6 +181,31 @@ export function MemberSidebar({ onSelectMember, source = 'programming' }: Member
               <ChevronLeftIcon />
             </button>
           </div>
+          {source === 'programming' && (
+            <div className="mt-2">
+              <label className="sr-only" htmlFor="member-sidebar-pc-filter">
+                Filter by programming coach
+              </label>
+              <select
+                id="member-sidebar-pc-filter"
+                value={pcFilter}
+                onChange={(e) => setPcFilter(e.target.value)}
+                className="w-full rounded-md border px-2 py-1.5 text-xs font-medium outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+                style={{
+                  borderColor: 'var(--border)',
+                  background: 'var(--bg2)',
+                  color: 'var(--text)',
+                }}
+              >
+                <option value="all">All programming coaches</option>
+                {coaches.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.first_name} {c.last_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="mt-2 flex flex-wrap gap-1">
             {filters.map((f) => (
               <button
@@ -214,6 +246,10 @@ export function MemberSidebar({ onSelectMember, source = 'programming' }: Member
             filtered.map((member) => {
               const isInactive = member.membership_status !== 'active'
               const isSelected = selectedMember?.member_id === member.member_id
+              const pcCoach =
+                source === 'programming'
+                  ? coaches.find((c) => c.id === member.programming_coach_id)
+                  : undefined
               return (
                 <button
                   key={member.member_id}
@@ -258,6 +294,24 @@ export function MemberSidebar({ onSelectMember, source = 'programming' }: Member
                       <Badge variant="default" className="mt-0.5">
                         {member.gym}
                       </Badge>
+                    )}
+                    {source === 'programming' && (
+                      <span
+                        className="mt-0.5 block truncate text-[10px] leading-snug"
+                        style={{ color: 'var(--text-muted)' }}
+                        title={
+                          pcCoach
+                            ? `Programming coach: ${pcCoach.first_name} ${pcCoach.last_name}`
+                            : 'No programming coach assigned'
+                        }
+                      >
+                        PC:{' '}
+                        {pcCoach
+                          ? `${pcCoach.first_name} ${pcCoach.last_name}`
+                          : member.programming_coach_id
+                            ? 'Unknown coach'
+                            : 'Unassigned'}
+                      </span>
                     )}
                   </div>
                 </button>

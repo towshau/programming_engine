@@ -1,10 +1,61 @@
-import React, { useMemo } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useEditorStore } from '../stores/editorStore'
 import { cn, getInitials } from '../lib/utils'
-import type { MemberWithCoach, ProgramDraftStatus, MemberHold, GeneratedProgram } from '../types'
+import {
+  programmingNotePriority,
+  programmingNotePriorityLabel,
+} from '../lib/programmingNotes'
+import type { MemberWithCoach, ProgramDraftStatus, MemberHold, GeneratedProgram, ProgrammingNote } from '../types'
+import { MemberDetailModal } from '../features/queue/MemberDetailModal'
 
-type QueueTab = 'awaiting' | 'phasedue' | 'active' | 'holiday'
+const UPDATES_PAGE_SIZE = 20
+
+function latestNoteSubmissionDate(notes: ProgrammingNote[] | undefined): string {
+  if (!notes?.length) return ''
+  let best = notes[0]!.submission_date
+  for (const n of notes) {
+    if (n.submission_date > best) best = n.submission_date
+  }
+  return best
+}
+
+function compareMembersForUpdatesQueue(a: MemberWithCoach, b: MemberWithCoach): number {
+  const na = a.programming_notes ?? []
+  const nb = b.programming_notes ?? []
+  const ua = na.filter((n) => !n.implemented)
+  const ub = nb.filter((n) => !n.implemented)
+  const aUrgent = ua.some((n) => programmingNotePriority(String(n.modification)) === 1)
+  const bUrgent = ub.some((n) => programmingNotePriority(String(n.modification)) === 1)
+  const aHas = ua.length > 0
+  const bHas = ub.length > 0
+  const rank = (hasUnactioned: boolean, urgent: boolean) => {
+    if (hasUnactioned && urgent) return 0
+    if (hasUnactioned) return 1
+    return 2
+  }
+  const ra = rank(aHas, aUrgent)
+  const rb = rank(bHas, bUrgent)
+  if (ra !== rb) return ra - rb
+  return latestNoteSubmissionDate(nb).localeCompare(latestNoteSubmissionDate(na))
+}
+
+function NotesQueueBadge({ count }: { count: number }) {
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap"
+      style={{ background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red-border)' }}
+    >
+      {count} note{count !== 1 ? 's' : ''}
+    </span>
+  )
+}
+
+type QueueTab = 'awaiting' | 'phasedue' | 'active' | 'updates' | 'holiday'
+
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 const AVATAR_COLORS = [
   '#0891b2', '#7c3aed', '#059669', '#be185d', '#0284c7',
@@ -18,7 +69,7 @@ function avatarColor(name: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-const DRAFT_STATUS_CONFIG: Record<ProgramDraftStatus, { label: string; style: React.CSSProperties }> = {
+const DRAFT_STATUS_CONFIG: Record<ProgramDraftStatus, { label: string; style: CSSProperties }> = {
   awaiting_draft: {
     label: 'Awaiting Draft',
     style: { background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red-border)' },
@@ -35,6 +86,13 @@ const DRAFT_STATUS_CONFIG: Record<ProgramDraftStatus, { label: string; style: Re
     label: 'Uploaded',
     style: { background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid var(--green-border)' },
   },
+}
+
+const DRAFT_STATUS_ORDER: Record<ProgramDraftStatus, number> = {
+  awaiting_draft: 0,
+  draft_ready: 1,
+  approved: 2,
+  uploaded: 3,
 }
 
 function DraftStatusBadge({ status }: { status: ProgramDraftStatus }) {
@@ -87,17 +145,34 @@ function MemberRow({
 }) {
   const initials = getInitials(member.first_name, member.last_name)
   const bgColor = avatarColor(member.member_id)
-  const meta = [
-    member.sessions_per_week ? `${member.sessions_per_week}×/week` : null,
-    member.scheme_name,
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  const notes = member.programming_notes ?? []
+  const unactionedNotes = notes.filter((n) => !n.implemented)
+  const headlineNote = unactionedNotes[0] ?? notes[0]
+  const meta =
+    tab === 'updates' && headlineNote
+      ? [
+          programmingNotePriorityLabel(String(headlineNote.modification)),
+          headlineNote.modification as string,
+          headlineNote.submission_date ? formatDate(headlineNote.submission_date) : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : [
+          member.sessions_per_week ? `${member.sessions_per_week}×/week` : null,
+          member.scheme_name,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+
+  const updatesAllDone = tab === 'updates' && unactionedNotes.length === 0 && notes.length > 0
 
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-5 py-3.5 border-b text-left transition-colors hover:bg-[var(--bg3)] group"
+      className={cn(
+        'w-full flex items-center gap-3 px-5 py-3.5 border-b text-left transition-colors hover:bg-[var(--bg3)] group',
+        updatesAllDone && 'opacity-55',
+      )}
       style={{ borderColor: 'var(--border)' }}
     >
       <div
@@ -128,6 +203,17 @@ function MemberRow({
         {tab === 'awaiting' && <DraftStatusBadge status={member.draft_status} />}
         {tab === 'phasedue' && <PhaseBadge isOverdue={false} />}
         {tab === 'active' && <ActiveBadge member={member} />}
+        {tab === 'updates' && unactionedNotes.length > 0 && (
+          <NotesQueueBadge count={unactionedNotes.length} />
+        )}
+        {tab === 'updates' && updatesAllDone && (
+          <span
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap"
+            style={{ background: 'var(--bg3)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+          >
+            All actioned
+          </span>
+        )}
         <svg
           className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ color: 'var(--text-muted)' }}
@@ -138,10 +224,6 @@ function MemberRow({
       </div>
     </button>
   )
-}
-
-function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function HoldEntry({ hold }: { hold: MemberHold }) {
@@ -312,6 +394,11 @@ const TAB_CONFIG: { key: QueueTab; label: string; emptyMessage: string }[] = [
     emptyMessage: 'No active programs found.',
   },
   {
+    key: 'updates',
+    label: 'Program Updates',
+    emptyMessage: 'No programming notes for your clients.',
+  },
+  {
     key: 'holiday',
     label: 'Holiday Programs & Holds',
     emptyMessage: 'No members with upcoming holds or holiday programs.',
@@ -321,45 +408,85 @@ const TAB_CONFIG: { key: QueueTab; label: string; emptyMessage: string }[] = [
 export function ClientQueue() {
   const navigate = useNavigate()
   const { members, loading, selectedCoach, selectMember } = useEditorStore()
-  const [activeTab, setActiveTab] = React.useState<QueueTab>('awaiting')
+  const [activeTab, setActiveTab] = useState<QueueTab>('awaiting')
+  const [modalMemberId, setModalMemberId] = useState<string | null>(null)
+  const [updatesPage, setUpdatesPage] = useState(1)
+
+  useEffect(() => {
+    setUpdatesPage(1)
+  }, [activeTab, members])
 
   const tabMembers = useMemo(() => {
     const activeMembersWithProgram = members.filter(
       (m) => m.membership_status === 'active' && m.program_status !== 'needs_program'
     )
     return {
-      awaiting: members.filter((m) => m.is_new),
+      awaiting: members
+        .filter((m) => m.is_new)
+        .sort((a, b) => DRAFT_STATUS_ORDER[a.draft_status] - DRAFT_STATUS_ORDER[b.draft_status]),
       phasedue: members.filter(
         (m) => m.membership_status === 'active' && m.program_status === 'needs_program' && !m.is_new
       ),
       active: activeMembersWithProgram.filter((m) => m.program_status === 'has_program'),
+      updates: members
+        .filter((m) => (m.programming_notes?.length ?? 0) > 0)
+        .sort(compareMembersForUpdatesQueue),
       holiday: members.filter(
         (m) => (m.holds?.length ?? 0) > 0 || (m.holiday_programs?.length ?? 0) > 0
       ),
     }
   }, [members])
 
+  const updatesUnactionedMemberCount = useMemo(
+    () =>
+      tabMembers.updates.filter((m) => (m.programming_notes?.some((n) => !n.implemented) ?? false)).length,
+    [tabMembers.updates],
+  )
+
   const counts: Record<QueueTab, number> = useMemo(
     () => ({
       awaiting: tabMembers.awaiting.length,
       phasedue: tabMembers.phasedue.length,
       active: tabMembers.active.length,
+      updates: updatesUnactionedMemberCount,
       holiday: tabMembers.holiday.length,
     }),
-    [tabMembers]
+    [tabMembers, updatesUnactionedMemberCount],
   )
 
+  const updatesPagination = useMemo(() => {
+    const total = tabMembers.updates.length
+    const totalPages = Math.max(1, Math.ceil(total / UPDATES_PAGE_SIZE))
+    const safePage = Math.min(updatesPage, totalPages)
+    const start = (safePage - 1) * UPDATES_PAGE_SIZE
+    const slice = tabMembers.updates.slice(start, start + UPDATES_PAGE_SIZE)
+    return { total, totalPages, safePage, slice, start }
+  }, [tabMembers.updates, updatesPage])
+
+  const modalMember = modalMemberId
+    ? members.find((m) => m.member_id === modalMemberId)
+    : null
+
   const currentTab = TAB_CONFIG.find((t) => t.key === activeTab)!
-  const currentMembers = tabMembers[activeTab]
+  const currentMembers =
+    activeTab === 'updates' ? updatesPagination.slice : tabMembers[activeTab]
 
   const tabBadgeStyle = (key: QueueTab) => {
     if (key === 'awaiting') return { background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red-border)' }
+    if (key === 'updates') return { background: 'var(--red-bg)', color: 'var(--red)', border: '1px solid var(--red-border)' }
     if (key === 'phasedue') return { background: 'var(--color-gold-50)', color: 'var(--color-gold)', border: '1px solid var(--color-gold-100)' }
     if (key === 'holiday') return { background: 'var(--blue-bg)', color: 'var(--blue)', border: '1px solid var(--blue-border)' }
     return { background: 'var(--green-bg)', color: 'var(--green)', border: '1px solid var(--green-border)' }
   }
 
   const isLoading = loading.members
+
+  const tabCountSuffix = (key: QueueTab) => {
+    if (key === 'active') return 'approved'
+    if (key === 'holiday') return 'remaining'
+    if (key === 'updates') return 'need action'
+    return 'remaining'
+  }
 
   return (
     <div className="p-7">
@@ -371,7 +498,7 @@ export function ClientQueue() {
       )}
 
       {/* Tab strip — 4 equal columns spanning full width */}
-      <div className="grid grid-cols-4 gap-2 mb-5">
+      <div className="grid grid-cols-5 gap-2 mb-5">
         {TAB_CONFIG.map((tab) => {
           const isActive = activeTab === tab.key
           return (
@@ -394,7 +521,7 @@ export function ClientQueue() {
                     : tabBadgeStyle(tab.key)
                   }
                 >
-                  {counts[tab.key]} {tab.key === 'active' ? 'approved' : 'remaining'}
+                  {counts[tab.key]} {tabCountSuffix(tab.key)}
                 </span>
               )}
             </button>
@@ -403,7 +530,11 @@ export function ClientQueue() {
       </div>
 
       {/* Info banner */}
-      <InfoBanner tab={activeTab} count={counts[activeTab]} />
+      <InfoBanner
+        tab={activeTab}
+        count={counts[activeTab]}
+        updatesTotalMembers={tabMembers.updates.length}
+      />
 
       {/* Member list */}
       <div
@@ -435,21 +566,108 @@ export function ClientQueue() {
             />
           ))
         ) : (
-          currentMembers.map((m) => (
-            <MemberRow
-              key={m.member_id}
-              member={m}
-              tab={activeTab}
-              onClick={() => navigate(`/program/${m.member_id}`)}
-            />
-          ))
+          <>
+            {currentMembers.map((m) => (
+              <MemberRow
+                key={m.member_id}
+                member={m}
+                tab={activeTab}
+                onClick={() => {
+                  if (activeTab === 'awaiting') {
+                    setModalMemberId(m.member_id)
+                    return
+                  }
+                  selectMember(m)
+                  navigate(`/program/${m.member_id}`)
+                }}
+              />
+            ))}
+            {activeTab === 'updates' && updatesPagination.totalPages > 1 && (
+              <div
+                className="flex items-center justify-between gap-3 px-5 py-3 border-t text-xs"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+              >
+                <span>
+                  Showing {updatesPagination.start + 1}–
+                  {Math.min(updatesPagination.start + UPDATES_PAGE_SIZE, updatesPagination.total)} of{' '}
+                  {updatesPagination.total}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={updatesPagination.safePage <= 1}
+                    onClick={() => setUpdatesPage((p) => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 rounded-md border font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:bg-[var(--bg3)]"
+                    style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+                  >
+                    Previous
+                  </button>
+                  <span className="tabular-nums font-medium" style={{ color: 'var(--text)' }}>
+                    Page {updatesPagination.safePage} / {updatesPagination.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={updatesPagination.safePage >= updatesPagination.totalPages}
+                    onClick={() =>
+                      setUpdatesPage((p) => Math.min(updatesPagination.totalPages, p + 1))
+                    }
+                    className="px-3 py-1.5 rounded-md border font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:bg-[var(--bg3)]"
+                    style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      {modalMemberId && modalMember && (
+        <MemberDetailModal
+          memberId={modalMemberId}
+          memberName={`${modalMember.first_name} ${modalMember.last_name}`}
+          gymLabel={modalMember.gym}
+          onClose={() => setModalMemberId(null)}
+          onOpenEditor={() => navigate(`/program/${modalMemberId}`)}
+        />
+      )}
     </div>
   )
 }
 
-function InfoBanner({ tab, count }: { tab: QueueTab; count: number }) {
+function InfoBanner({
+  tab,
+  count,
+  updatesTotalMembers,
+}: {
+  tab: QueueTab
+  count: number
+  updatesTotalMembers?: number
+}) {
+  if (tab === 'updates') {
+    const total = updatesTotalMembers ?? count
+    return (
+      <div
+        className="rounded-lg px-4 py-3 mb-5 border"
+        style={{ background: 'var(--red-bg)', borderColor: 'var(--red-border)' }}
+      >
+        <p className="text-xs font-bold uppercase tracking-wide mb-0.5" style={{ color: 'var(--red)' }}>
+          Program Updates — {count} need action
+          {total !== count && (
+            <span className="font-normal normal-case" style={{ color: '#b91c1c' }}>
+              {' '}
+              ({total} with notes)
+            </span>
+          )}
+        </p>
+        <p className="text-xs" style={{ color: '#b91c1c' }}>
+          Sorted with <strong>Urgent</strong> (Injury / Pain) first, then other open notes, then fully actioned (greyed).
+          Click a name to open the <strong>Program Editor</strong>. Implemented notes stay visible in the editor list.
+        </p>
+      </div>
+    )
+  }
   if (tab === 'awaiting') {
     return (
       <div
