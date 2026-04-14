@@ -55,7 +55,7 @@
 3. **Config:** Load programming_rules, programming_progression_schemes (by scheme name), programming_exercise_exclusions (by member). Never invent exercises.
 4. **Generate:** Past program (from step 1) + rules + progression + exclusions -> canonical program JSON per member (deterministic). Phase detection always uses member_tbresults (actual logged reps), not the generated program.
 5. **Write:** Persist to programming_generated (with duration_weeks, phase_number, scheme_name, rep_range, changes_summary, rules_applied).
-6. **Coach review (Program Editor):** Coach views generated program, edits exercises/reps/sets, clicks Save (coach_edited=true) then Finalize (coach_approved=true, next_due_date calculated from member_programs.due_date + duration_weeks, snapped to Monday). Admin marks uploaded_to_teambuildr=true and member_programs.due_date is updated.
+6. **Coach review (Program Editor):** Coach views generated program, edits exercises/reps/sets, clicks Save (coach_edited=true) then Finalize (coach_approved=true, **end_date** = program `start_date` (or `created_at`) + `duration_weeks` weeks; **next_due_date** = that end date snapped to the next Monday). Admin marks uploaded_to_teambuildr=true and member_programs.due_date is updated (manual / Retool).
 
 ---
 
@@ -83,7 +83,7 @@
   - **backfill_program_dates.py** — Backfill `start_date` and `end_date` onto existing rows in `programming_generated`. Supports a continuous timeline. Idempotent. `python tools/backfill_program_dates.py [--dry-run]`.
   - **backfill_row_ids.py** — One-time migration: stamps UUID `row_id` on every exercise inside every `programming_generated` payload that doesn't already have one. Idempotent; safe to re-run. `python tools/backfill_row_ids.py [--dry-run]`.
   - **apply_auto_exclusions.py** — Feedback → programming_exercise_exclusions (e.g. 3+ negative feedbacks → exclude exercise for member).
-  - **run_weekly_batch.py** — Weekly batch generator: queries `member_programs` for members due within 8 days (`update_stage`/`complete`) or `awaiting_program`; skips members with a `programming_generated` row from the last 7 days; runs normalize → phase detect → generate for each; writes to `programming_generated` only (stage/due_date updates are manual). Options: `--dry-run`, `--limit N`, `--member-id <uuid>`, `--duration-weeks N`. Uses `scheme_name` from `member_programs` per member.
+  - **run_weekly_batch.py** — Weekly batch generator: queries `member_programs` for members due within 8 days (`update_stage`/`complete`) or `awaiting_program`; skips members with a `programming_generated` row from the last 7 days; **skips members who already have an active row (`end_date` ≥ today) that is `coach_approved` or `uploaded_to_teambuildr`** (unless `--member-id` override) so finalized programs are not displaced by a new insert; runs normalize → phase detect → generate for each; writes to `programming_generated` only (stage/due_date updates are manual). Options: `--dry-run`, `--limit N`, `--member-id <uuid>`, `--duration-weeks N`. Uses `scheme_name` from `member_programs` per member.
 - **Workflows:** Chronological order: Ingest → Load config → Generate → Write. See **workflows/README.md**. Batch generation runs weekly via GitHub Actions (**Monday 7:00pm AEST**; cron `09:00 UTC` Monday) or on demand via `workflow_dispatch`.
 
 ### Standalone apps
@@ -96,7 +96,9 @@
 
 > **Branch note:** A major UI overhaul is in progress on `feature/ui-overhaul` (pushed to GitHub, not yet merged to `main`). All description below reflects the `feature/ui-overhaul` state. The old dark-theme single-page layout exists only in `main` git history.
 
-React multi-page app for coaches. Stack: React 19 + TypeScript + Vite + Tailwind CSS 4 + Zustand + Supabase JS + react-router-dom. Run: `cd frontend && npm run dev` (requires `frontend/.env` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` — copy values from root `.env`).
+React multi-page app for coaches. Stack: React 19 + TypeScript + Vite + Tailwind CSS 4 + Zustand + Supabase JS + react-router-dom. Run: `cd frontend && npm run dev` (requires `frontend/.env` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` — copy values from root `.env`; see **`frontend/.env.example`**).
+
+- **Local dev auth bypass:** Set `VITE_BYPASS_AUTH=true` in `frontend/.env` and run **`npm run dev`** only (`lib/auth.tsx`: bypass applies when `import.meta.env.DEV` is true **and** that flag is `true`). Restart Vite after changing env. Production builds never bypass. Supabase data calls still need valid URL + anon key.
 
 **Architecture (feature/ui-overhaul):**
 - Light theme throughout (CSS variables in `index.css`; `--bg`, `--text`, `--color-gold`, `--border`, status colors `--red/--green/--blue`)
