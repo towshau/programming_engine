@@ -1,6 +1,6 @@
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
 import type { HistoryPoint } from './types'
-import { TIER_CONFIG } from './tierUtils'
+import { TIER_CONFIG, toDisplayTier } from './tierUtils'
 
 interface RiskSparklineProps {
   history: HistoryPoint[]
@@ -12,7 +12,7 @@ export function RiskSparkline({ history }: RiskSparklineProps) {
   }
 
   const latest = history[history.length - 1]
-  const color = TIER_CONFIG[latest.risk_tier]?.color ?? 'var(--text-muted)'
+  const color = TIER_CONFIG[toDisplayTier(latest.risk_tier)]?.color ?? 'var(--text-muted)'
 
   return (
     <div style={{ width: 80, height: 24 }}>

@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react'
-import type { ChurnRiskMember, RiskTier } from './types'
-import { TIER_ORDER, TIER_CONFIG, tierCounts, pct, formatScoredDate } from './tierUtils'
+import type { ChurnRiskMember } from './types'
+import { TIER_ORDER, TIER_CONFIG, tierCounts, pct, formatScoredDate, type DisplayRiskTier, calculateRpi } from './tierUtils'
 import { cn } from '../../lib/utils'
 import {
   MODEL_SIGNALS_DISCLAIMER,
@@ -56,14 +56,17 @@ const PANEL_CLASS =
 
 interface ChurnSummaryStripProps {
   members: ChurnRiskMember[]
-  activeTiers: Set<RiskTier>
-  onToggleTier: (tier: RiskTier | null) => void
+  activeTiers: Set<DisplayRiskTier>
+  onToggleTier: (tier: DisplayRiskTier | null) => void
   scoredAt: string | null
+  sortRpi: 'none' | 'desc'
+  onToggleSortRpi: () => void
 }
 
-export function ChurnSummaryStrip({ members, activeTiers, onToggleTier, scoredAt }: ChurnSummaryStripProps) {
+export function ChurnSummaryStrip({ members, activeTiers, onToggleTier, scoredAt, sortRpi, onToggleSortRpi }: ChurnSummaryStripProps) {
   const total = members.length
   const counts = tierCounts(members)
+  const renewalProbability = calculateRpi(members)
   const noTierActive = activeTiers.size === 0
   const [infoOpen, setInfoOpen] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
@@ -118,6 +121,30 @@ export function ChurnSummaryStrip({ members, activeTiers, onToggleTier, scoredAt
               </button>
             )
           })}
+
+          <button
+            type="button"
+            onClick={onToggleSortRpi}
+            className={cn(
+              'flex flex-col items-center justify-center rounded-lg px-5 py-3 border min-w-[120px] transition-all',
+              sortRpi === 'desc' 
+                ? 'bg-[var(--bg3)] border-[var(--border)] ring-2 ring-[var(--color-gold)]/40 shadow-sm'
+                : 'bg-[var(--bg3)] border-transparent hover:brightness-[0.98]'
+            )}
+            title="Sort Stakeholder cards below by highest RPI"
+          >
+            <span className="text-2xl font-bold tabular-nums" style={{ color: 'var(--green)' }}>
+              {renewalProbability.toFixed(1)}%
+            </span>
+            <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+              Renewal Probability
+              {sortRpi === 'desc' && (
+                <svg className="w-3 h-3 text-[var(--color-gold)]" viewBox="0 0 12 12" fill="currentColor">
+                  <path d="M6 10l-3-4h6z" />
+                </svg>
+              )}
+            </span>
+          </button>
         </div>
 
         <div className="flex flex-row flex-wrap gap-2 justify-end shrink-0">

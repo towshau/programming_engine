@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { ChurnRiskMember, RiskTier } from './types'
-import { GYM_MANAGER_MAP, groupBy, sortStakeholderCards } from './tierUtils'
+import type { ChurnRiskMember } from './types'
+import { GYM_MANAGER_MAP, groupBy, sortStakeholderCards, calculateRpi, type DisplayRiskTier } from './tierUtils'
 import { StakeholderCard } from './StakeholderCard'
 import { StakeholderMemberModal } from './StakeholderMemberModal'
 import { cn } from '../../lib/utils'
@@ -22,10 +22,11 @@ const TABS: { id: Tab; label: string }[] = [
 
 interface StakeholderBreakdownProps {
   members: ChurnRiskMember[]
-  activeTiers: Set<RiskTier>
+  activeTiers: Set<DisplayRiskTier>
+  sortRpi: 'none' | 'desc'
 }
 
-export function StakeholderBreakdown({ members, activeTiers }: StakeholderBreakdownProps) {
+export function StakeholderBreakdown({ members, activeTiers, sortRpi }: StakeholderBreakdownProps) {
   const [activeTab, setActiveTab] = useState<Tab>('gym')
   const [modal, setModal] = useState<ModalState>(null)
 
@@ -36,7 +37,10 @@ export function StakeholderBreakdown({ members, activeTiers }: StakeholderBreakd
   function renderCards() {
     switch (activeTab) {
       case 'gym': {
-        const gyms = ['BLIGH', 'BRIDGE', 'COLLINS']
+        let gyms = ['BLIGH', 'BRIDGE', 'COLLINS']
+        if (sortRpi === 'desc') {
+          gyms.sort((a, b) => calculateRpi(gymGroups.get(b) ?? []) - calculateRpi(gymGroups.get(a) ?? []))
+        }
         return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {gyms.map((gym) => (
@@ -59,7 +63,7 @@ export function StakeholderBreakdown({ members, activeTiers }: StakeholderBreakd
         )
       }
       case 'coach': {
-        const sorted = sortStakeholderCards(Array.from(coachGroups.entries()), activeTiers)
+        const sorted = sortStakeholderCards(Array.from(coachGroups.entries()), activeTiers, sortRpi)
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {sorted.map(([name, group]) => (
@@ -82,7 +86,7 @@ export function StakeholderBreakdown({ members, activeTiers }: StakeholderBreakd
         )
       }
       case 'renewal_lead': {
-        const sorted = sortStakeholderCards(Array.from(renewalLeadGroups.entries()), activeTiers)
+        const sorted = sortStakeholderCards(Array.from(renewalLeadGroups.entries()), activeTiers, sortRpi)
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {sorted.map(([name, group]) => (
@@ -112,7 +116,7 @@ export function StakeholderBreakdown({ members, activeTiers }: StakeholderBreakd
       className="rounded-xl border p-4"
       style={{ background: 'var(--bg2)', borderColor: 'var(--border)' }}
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
           Stakeholder Breakdown
         </h2>

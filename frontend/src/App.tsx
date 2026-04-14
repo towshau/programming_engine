@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
@@ -31,7 +31,8 @@ export default function App() {
             <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="/client-journey" element={<ClientJourneyPage />} />
             <Route path="/360" element={<ThreeSixtyPage />} />
-            <Route path="/churn-risk" element={<ChurnRiskPage />} />
+            <Route path="/rpi" element={<ChurnRiskPage />} />
+            <Route path="/churn-risk" element={<Navigate to="/rpi" replace />} />
           </Route>
         </Route>
       </Routes>

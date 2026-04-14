@@ -1,5 +1,5 @@
 import type { ChurnRiskMember, HistoryPoint, AttendanceWeek } from './types'
-import { TIER_CONFIG } from './tierUtils'
+import { TIER_CONFIG, toDisplayTier } from './tierUtils'
 import { Badge } from '../../components/ui/Badge'
 import { RiskSparkline } from './RiskSparkline'
 import { ChurnRowDetail } from './ChurnRowDetail'
@@ -13,7 +13,7 @@ interface ChurnRowProps {
 }
 
 export function ChurnRow({ member, history, attendance, expanded, onToggle }: ChurnRowProps) {
-  const tier = TIER_CONFIG[member.risk_tier]
+  const tier = TIER_CONFIG[toDisplayTier(member.risk_tier)]
   const d = member.days_to_renewal
   const urgentSoon = d !== null && d >= 0 && d <= 14
   const overdue = d !== null && d < 0

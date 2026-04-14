@@ -98,9 +98,23 @@
 
 React multi-page app for coaches. Stack: React 19 + TypeScript + Vite + Tailwind CSS 4 + Zustand + Supabase JS + react-router-dom. Run: `cd frontend && npm run dev` (requires `frontend/.env` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` — copy values from root `.env`).
 
+### ⚠️ Local dev setup — do this each time on a new machine / new localhost port
+
+Google OAuth redirects back through Supabase, which only allows pre-approved URLs. **Every time you spin up a new localhost**, add these to the allow-list or login will redirect to production instead:
+
+1. Open **Supabase Dashboard → Authentication → URL Configuration**
+2. Under **Redirect URLs**, add:
+   - `http://localhost:5173`
+   - `http://localhost:5173/`
+   - `http://127.0.0.1:5173`
+   - `http://127.0.0.1:5173/`
+3. Save. Google will now return to your local app after login.
+
+> If you use a different port (e.g. Vite picks `5174`), add that port too. The app reads `window.location.origin` dynamically so no code change is needed — just the Supabase allow-list.
+
 **Architecture (feature/ui-overhaul):**
 - Light theme throughout (CSS variables in `index.css`; `--bg`, `--text`, `--color-gold`, `--border`, status colors `--red/--green/--blue`)
-- `AppShell` — horizontal top nav bar (LR logo, nav links, coach selector, date, "Andrew Ponce" page-owner credit); wraps all pages via react-router `<Outlet>`
+- `AppShell` — horizontal top nav bar (LR logo, nav links, coach selector, date); wraps all pages via react-router `<Outlet>`
 - Routes: `/` → ClientQueue, `/intake[/:memberId]` → Intake, `/program[/:memberId]` → ProgrammingEngine, `/holiday` → HolidayPrograms
 - `MemberSidebar` — collapsible (chevron toggle; collapsed = 40px icon rail, expanded = 288px). Used on Intake and ProgrammingEngine pages. Not used on ClientQueue (has its own inline list)
 
@@ -197,3 +211,5 @@ Two separate layers:
 ## Docs
 
 build-plan.md, data-model.md, engine-config.md, MASTER-CHECKLIST.md, TECHNICAL-REVIEW.md, questions-to-answer-later.md, IMPROVEMENTS.md, ONE-PAGE-PLAN.md.
+
+- **AI route context pack:** `docs/pages/_index.md` (route-by-route briefs + shared shell/store/Supabase contracts for frontend edits).

@@ -1,5 +1,5 @@
-import type { ChurnRiskMember, RiskTier } from './types'
-import { TIER_ORDER, TIER_CONFIG, tierCounts, pct } from './tierUtils'
+import type { ChurnRiskMember } from './types'
+import { TIER_ORDER, TIER_CONFIG, tierCounts, pct, calculateRpi, type DisplayRiskTier } from './tierUtils'
 
 interface StakeholderCardProps {
   title: string
@@ -9,7 +9,7 @@ interface StakeholderCardProps {
   onOpen?: () => void
 }
 
-function StackedBar({ counts, total }: { counts: Record<RiskTier, number>; total: number }) {
+function StackedBar({ counts, total }: { counts: Record<DisplayRiskTier, number>; total: number }) {
   if (total === 0) return <div className="h-2.5 rounded-full" style={{ background: 'var(--bg3)' }} />
   return (
     <div className="flex h-2.5 rounded-full overflow-hidden gap-px">
@@ -31,6 +31,7 @@ function StackedBar({ counts, total }: { counts: Record<RiskTier, number>; total
 export function StakeholderCard({ title, subtitle, members, onOpen }: StakeholderCardProps) {
   const total = members.length
   const counts = tierCounts(members)
+  const rpi = calculateRpi(members)
 
   const className =
     'rounded-lg border p-4 flex flex-col gap-3 min-w-[200px] w-full text-left'
@@ -39,11 +40,21 @@ export function StakeholderCard({ title, subtitle, members, onOpen }: Stakeholde
 
   const inner = (
     <>
-      <div>
-        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{title}</p>
-        {subtitle && (
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{subtitle}</p>
-        )}
+      <div className="flex justify-between items-start gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{title}</p>
+          {subtitle && (
+            <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{subtitle}</p>
+          )}
+        </div>
+        <div className="shrink-0 text-right">
+          <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--green)' }}>
+            {rpi.toFixed(1)}%
+          </span>
+          <p className="text-[10px] uppercase font-semibold" style={{ color: 'var(--text-muted)' }}>
+            RPI
+          </p>
+        </div>
       </div>
 
       <StackedBar counts={counts} total={total} />

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
-import type { ChurnRiskMember, HistoryPoint, AttendanceWeek, RiskTier, SortColumn, SortState } from './types'
-import { TIER_ORDER, TIER_CONFIG } from './tierUtils'
+import type { ChurnRiskMember, HistoryPoint, AttendanceWeek, SortColumn, SortState } from './types'
+import { TIER_ORDER, TIER_CONFIG, toDisplayTier, type DisplayRiskTier } from './tierUtils'
 import { SearchInput } from '../../components/ui/SearchInput'
 import { ChurnRow } from './ChurnRow'
 
@@ -9,7 +9,7 @@ const PAGE_SIZE = 50
 interface ChurnTableProps {
   members: ChurnRiskMember[]
   historyMap: Map<string, HistoryPoint[]>
-  activeTiers: Set<RiskTier>
+  activeTiers: Set<DisplayRiskTier>
   attendanceMap: Map<string, AttendanceWeek[]>
   onExpandMember: (memberId: string) => void
 }
@@ -62,7 +62,7 @@ export function ChurnTable({ members, historyMap, activeTiers, attendanceMap, on
 
   const filtered = useMemo(() => {
     let list = members
-    if (activeTiers.size > 0) list = list.filter((m) => activeTiers.has(m.risk_tier))
+    if (activeTiers.size > 0) list = list.filter((m) => activeTiers.has(toDisplayTier(m.risk_tier)))
     if (gymFilter) list = list.filter((m) => m.gym === gymFilter)
     if (coachFilter) list = list.filter((m) => m.coach_name === coachFilter)
     if (renewalLeadFilter) list = list.filter((m) => m.renewal_lead_name === renewalLeadFilter)

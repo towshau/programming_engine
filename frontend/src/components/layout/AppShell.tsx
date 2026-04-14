@@ -18,7 +18,7 @@ const PROFILE_MENU_ITEMS = [
   { label: 'Onboarding', href: '/onboarding' },
   { label: 'Client Journey', href: '/client-journey' },
   { label: '360', href: '/360' },
-  { label: 'Churn Risk', href: '/churn-risk' },
+  { label: 'RPI', href: '/rpi' },
 ]
 
 export function AppShell() {

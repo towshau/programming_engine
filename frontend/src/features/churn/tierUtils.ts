@@ -1,31 +1,26 @@
 import type { RiskTier, ChurnRiskMember } from './types'
 
-export const TIER_ORDER: RiskTier[] = ['critical', 'high', 'medium', 'low']
+export type DisplayRiskTier = 'high' | 'medium' | 'low'
+
+export const TIER_ORDER: DisplayRiskTier[] = ['high', 'medium', 'low']
 
 export const TIER_CONFIG: Record<
-  RiskTier,
-  { label: string; color: string; bg: string; border: string; badgeVariant: 'red' | 'amber' | 'blue' | 'green' }
+  DisplayRiskTier,
+  { label: string; color: string; bg: string; border: string; badgeVariant: 'red' | 'amber' | 'green' }
 > = {
-  critical: {
-    label: 'Critical',
+  high: {
+    label: 'High',
     color: 'var(--red)',
     bg: 'var(--red-bg)',
     border: 'var(--red-border)',
     badgeVariant: 'red',
   },
-  high: {
-    label: 'High',
-    color: 'var(--orange)',
-    bg: 'var(--orange-bg)',
-    border: 'var(--orange-border)',
-    badgeVariant: 'amber',
-  },
   medium: {
     label: 'Medium',
-    color: 'var(--blue)',
-    bg: 'var(--blue-bg)',
-    border: 'var(--blue-border)',
-    badgeVariant: 'blue',
+    color: 'var(--yellow)',
+    bg: 'var(--yellow-bg)',
+    border: 'var(--yellow-border)',
+    badgeVariant: 'amber',
   },
   low: {
     label: 'Low',
@@ -36,16 +31,27 @@ export const TIER_CONFIG: Record<
   },
 }
 
+export function toDisplayTier(tier: RiskTier): DisplayRiskTier {
+  if (tier === 'critical') return 'high'
+  return tier
+}
+
 export const GYM_MANAGER_MAP: Record<string, string> = {
   BLIGH: 'Levi Wheatley',
   BRIDGE: 'Andy Kong',
   COLLINS: 'Nick Woolward',
 }
 
-export function tierCounts(members: { risk_tier: RiskTier }[]): Record<RiskTier, number> {
-  const counts: Record<RiskTier, number> = { critical: 0, high: 0, medium: 0, low: 0 }
-  for (const m of members) counts[m.risk_tier]++
+export function tierCounts(members: { risk_tier: RiskTier }[]): Record<DisplayRiskTier, number> {
+  const counts: Record<DisplayRiskTier, number> = { high: 0, medium: 0, low: 0 }
+  for (const m of members) counts[toDisplayTier(m.risk_tier)]++
   return counts
+}
+
+export function calculateRpi(members: { risk_tier: RiskTier }[]): number {
+  const counts = tierCounts(members)
+  const expectedRenewals = counts.high * 0.10 + counts.medium * 0.50 + counts.low * 0.90
+  return members.length > 0 ? (expectedRenewals / members.length) * 100 : 0
 }
 
 export function pct(n: number, total: number): string {
@@ -88,18 +94,21 @@ export function groupBy<T>(items: T[], keyFn: (item: T) => string): Map<string, 
 /** Sort coach / renewal-lead cards: when tier filters are active, rank by count in those tiers (highest first). */
 export function sortStakeholderCards(
   entries: [string, ChurnRiskMember[]][],
-  activeTiers: Set<RiskTier>,
+  activeTiers: Set<DisplayRiskTier>,
+  sortRpi: 'none' | 'desc' = 'none'
 ): [string, ChurnRiskMember[]][] {
   return [...entries].sort(([, a], [, b]) => {
+    if (sortRpi === 'desc') {
+      return calculateRpi(b) - calculateRpi(a)
+    }
+
     if (activeTiers.size > 0) {
       const countInSelectedTiers = (group: ChurnRiskMember[]) =>
-        group.filter((m) => activeTiers.has(m.risk_tier)).length
+        group.filter((m) => activeTiers.has(toDisplayTier(m.risk_tier))).length
       return countInSelectedTiers(b) - countInSelectedTiers(a)
     }
-    const aCritHigh = a.filter((m) => m.risk_tier === 'critical' || m.risk_tier === 'high').length
-    const bCritHigh = b.filter((m) => m.risk_tier === 'critical' || m.risk_tier === 'high').length
-    const aPct = a.length > 0 ? aCritHigh / a.length : 0
-    const bPct = b.length > 0 ? bCritHigh / b.length : 0
-    return bPct - aPct
+
+    // Default: Sort by seniority / sheer volume of active members (largest portfolio first)
+    return b.length - a.length
   })
 }

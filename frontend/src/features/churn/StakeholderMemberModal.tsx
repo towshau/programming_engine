@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { ChurnRiskMember, RiskTier } from './types'
-import { TIER_ORDER, TIER_CONFIG } from './tierUtils'
+import type { ChurnRiskMember } from './types'
+import { TIER_ORDER, TIER_CONFIG, toDisplayTier, type DisplayRiskTier } from './tierUtils'
 import { SubScoreBars } from './SubScoreBars'
 import { cn } from '../../lib/utils'
 
@@ -14,14 +14,13 @@ interface StakeholderMemberModalProps {
   contextLabel?: string
 }
 
-function groupByTier(members: ChurnRiskMember[]): Record<RiskTier, ChurnRiskMember[]> {
-  const out: Record<RiskTier, ChurnRiskMember[]> = {
-    critical: [],
+function groupByTier(members: ChurnRiskMember[]): Record<DisplayRiskTier, ChurnRiskMember[]> {
+  const out: Record<DisplayRiskTier, ChurnRiskMember[]> = {
     high: [],
     medium: [],
     low: [],
   }
-  for (const m of members) out[m.risk_tier].push(m)
+  for (const m of members) out[toDisplayTier(m.risk_tier)].push(m)
   for (const t of TIER_ORDER) {
     out[t].sort((a, b) => b.risk_score - a.risk_score)
   }
